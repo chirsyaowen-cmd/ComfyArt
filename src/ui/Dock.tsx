@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
-import { atom, useEditor, useValue } from 'tldraw'
+import { useEditor, useValue } from 'tldraw'
 
-import { createGenerator } from '../generate'
 import { addComposeShape, createBoard, importLayout } from '../compose'
 import { errorText } from '../jobs'
 import { GENBLOCK, QR } from '../shapes/ComposeShapes'
@@ -10,7 +9,6 @@ import { DOODLE } from '../shapes/DoodleShape'
 import { PEN } from '../shapes/PenTool'
 import { TEXT } from '../shapes/TextShape'
 import { VECTOR, vectorKindAtom } from '../shapes/VectorShape'
-import { audioDialogAtom } from './AudioDialog'
 import { DoodleBar } from './DoodleBar'
 import { NativeStyleBar } from './NativeStyleBar'
 import { Icons } from './icons'
@@ -22,10 +20,9 @@ const INSERTS: [string, string, keyof typeof Icons, string, string?][] = [
   ['line', t('dock.line'), 'minus', 'L'], ['arrow', t('dock.arrow'), 'link', 'Shift L'], ['note', t('dock.stickyNote'), 'page', 'N'], ['frame', t('common.artboard'), 'frame', 'F'],
 ]
 const COMPOSE_INSERTS: [string, string, keyof typeof Icons][] = [
-  ['board', t('compose.board'), 'frame'], [GENBLOCK, t('compose.aiBlock'), 'genImage'], [QR, t('compose.qrCode'), 'qr'],
+  ['board', t('compose.board'), 'frame'], [QR, t('compose.qrCode'), 'qr'],
 ]
 
-export const dockVideoAtom = atom('dock video', false)
 
 const KINDS: [CommentKind, string, keyof typeof Icons][] = [['point', t('dock.clickSelect'), 'comment'], ['lasso', t('dock.lassoSelect'), 'lasso'], ['box', t('dock.boxSelect'), 'box']]
 
@@ -45,13 +42,10 @@ function CommentBar() {
 export function Dock({ onError }: { onError: (msg: string) => void }) {
   const editor = useEditor()
   const tool = useValue('tool', () => editor.getCurrentToolId(), [editor])
-  const video = useValue(dockVideoAtom)
-  const [menu, setMenu] = useState(false)
   const [insert, setInsert] = useState(false)
   const upload = useRef<HTMLInputElement>(null)
   const layout = useRef<HTMLInputElement>(null)
 
-  const gen = (v: boolean) => () => { setMenu(false); dockVideoAtom.set(v); createGenerator(editor, v) }
   const pickTool = (id: string) => {
     setInsert(false)
     if (id === 'text') editor.setCurrentTool(TEXT)
@@ -114,35 +108,7 @@ export function Dock({ onError }: { onError: (msg: string) => void }) {
           onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) void editor.putExternalContent({ type: 'files', files, point: editor.getViewportPageBounds().center }); e.target.value = '' }}
         />
         <input ref={layout} type="file" hidden accept=".json" onChange={(e) => { const f = e.target.files?.[0]; if (f) importLayout(editor, f).catch((err) => onError(errorText(err))); e.target.value = '' }} />
-        <div className="ca-bar__sep" />
-        <div className="ca-split">
-          <button type="button" className="ca-bar__btn" onClick={gen(video)}>
-            <span className="ca-icon">{video ? Icons.genVideo : Icons.genImage}</span><span>{video ? t('dock.videoGeneration') : t('dock.imageGeneration')}</span>
-          </button>
-          <Popover
-            open={menu}
-            onOpenChange={setMenu}
-            side="top"
-            align="end"
-            trigger={({ open, toggle }) => (
-              <button type="button" className="ca-bar__btn ca-split__chev" data-open={open || undefined} onClick={toggle}>
-                <span className="ca-icon">{Icons.chevron}</span>
-              </button>
-            )}
-          >
-            <div className="ca-menu">
-              <button type="button" className="ca-menu__item" onClick={gen(false)}>
-                <span className="ca-icon">{Icons.genImage}</span><span className="ca-menu__grow">{t('dock.imageGeneration')}</span><span className="ca-menu__key">A</span>
-              </button>
-              <button type="button" className="ca-menu__item" onClick={gen(true)}>
-                <span className="ca-icon">{Icons.genVideo}</span><span className="ca-menu__grow">{t('dock.videoGeneration')}</span><span className="ca-menu__key">S</span>
-              </button>
-              <button type="button" className="ca-menu__item" onClick={() => { setMenu(false); audioDialogAtom.set(true) }}>
-                <span className="ca-icon">{Icons.music}</span><span className="ca-menu__grow">{t('audio.generateAudio')}</span>
-              </button>
-            </div>
-          </Popover>
-        </div>
+
       </div>
     </div>
   )

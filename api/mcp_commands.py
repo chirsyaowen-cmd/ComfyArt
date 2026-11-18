@@ -1,19 +1,19 @@
 import asyncio
 
 from aiohttp import web
-from server import PromptServer
+from .. import runtime
 
 from ..bot.command_relay import CommandRelay
 from ._common import json_body, routes
 
 DEFAULT_TIMEOUT_S = 20.0
 
-RELAY = CommandRelay("comfyart-mcp-command", lambda event, data, sid: PromptServer.instance.send_sync(event, data, sid))
+RELAY = CommandRelay("comfyart-mcp-command", runtime.send_event)
 _pages: dict[str, str] = {}
 
 
 def _open_pages() -> dict[str, str]:
-    live = PromptServer.instance.sockets
+    live = runtime.sockets
     for client in [c for c in _pages if c not in live]:
         del _pages[client]
     return _pages

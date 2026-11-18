@@ -2,7 +2,7 @@ import hashlib
 import re
 from pathlib import Path
 
-import folder_paths
+from ..runtime import DATA
 import pypdfium2
 from aiohttp import web
 
@@ -26,7 +26,7 @@ async def render_pdf(request: web.Request) -> web.Response:
     except pypdfium2.PdfiumError as e:
         raise bad_request(f"not a readable PDF: {e}")
     sub = f"comfyart/pdf/{stem}-{hashlib.sha1(data).hexdigest()[:10]}"
-    out = Path(folder_paths.get_input_directory()) / sub
+    out = (DATA / "input") / sub
     out.mkdir(parents=True, exist_ok=True)
     pages = []
     try:

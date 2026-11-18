@@ -46,6 +46,7 @@ function describe(editor: Editor, shape: TLShape) {
   return {
     id: shape.id,
     type: shape.type === GENERATOR ? (job ? 'generating' : 'generator') : shape.type,
+    ...(typeof shape.meta.vectorcraft === 'string' ? { artwork: shape.meta.vectorcraft } : {}),
     name: nameOf(editor, shape) || undefined,
     x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h),
     ...(parent?.type === 'frame' ? { frame: parent.id } : {}),

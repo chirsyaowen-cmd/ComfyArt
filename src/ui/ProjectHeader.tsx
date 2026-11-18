@@ -9,7 +9,6 @@ import { importFiles } from './DropHandlers'
 import { historyAtom } from './HistoryDialog'
 import { Icons } from './icons'
 import { memoryOpenAtom } from './MemoryDialog'
-import { workflowsOpenAtom } from './WorkflowsDialog'
 import { Popover } from './Popover'
 import { t } from '../i18n'
 import { isEnter } from './keys'
@@ -48,7 +47,6 @@ export function ProjectHeader({ editor, projectId, children }: { editor: Editor;
         <div className="ca-menu ca-head__list">
           <Item close={close} icon={Icons.home} label={t('home.home')} run={() => openView('home')} />
           <Item close={close} icon={Icons.folder} label={t('home.projectLibrary')} run={() => openView('projects')} />
-          <Item close={close} icon={Icons.exit} label={t('home.backToComfyUI')} run={() => void saveNow().then(() => location.assign('/'))} />
           <Item close={close} icon={Icons.plus} label={t('projectHeader.newProject')} run={() => newProject()} />
           <Item close={close} icon={Icons.page} label={t('projectHeader.duplicateProject')} run={() => void saveNow().then(() => duplicateProject(projectId)).then(openProject)} />
           <Item close={close} icon={Icons.trash} label={t('home.deleteCurrentProject')} danger run={() => confirmDelete([projectId], () => openView('projects'))} />
@@ -65,7 +63,6 @@ export function ProjectHeader({ editor, projectId, children }: { editor: Editor;
           <Item close={close} icon={Icons.minus} label={t('common.zoomOut')} kbd="Ctrl -" run={() => editor.zoomOut(undefined, { animation: { duration: 200 } })} />
           <div className="ca-menu__sep" />
           <Item close={close} icon={Icons.memory} label={t('common.memory')} run={() => memoryOpenAtom.set(true)} />
-          <Item close={close} icon={Icons.grid} label={t('customWorkflows.title')} run={() => workflowsOpenAtom.set(true)} />
           {kits.length > 0 && (
             <>
               <div className="ca-menu__sep" />

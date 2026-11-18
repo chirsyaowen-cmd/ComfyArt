@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 
 from aiohttp import web
 
@@ -38,6 +39,9 @@ async def bot_complete(request: web.Request) -> web.Response:
         attachments = [await asyncio.to_thread(render_attachment, str(u)) for u in images[:ATTACH_MAX_COUNT]]
     except MEDIA_ERRORS as e:
         return error(str(e), 400)
+    layout = body.get("layout_context")
+    if attachments and isinstance(layout, str) and layout:
+        attachments[0]["layout_context"] = layout[:40_000]
     parts: list[str] = []
 
     async def emit(ev: BotEvent) -> None:
@@ -45,7 +49,7 @@ async def bot_complete(request: web.Request) -> web.Response:
             parts.append(ev.text)
 
     result = await provider.send(TurnRequest(
-        chat_id="complete",
+        chat_id=f"complete-{uuid.uuid4().hex}",
         user_text=f"{system}\n\n{text}" if system else text,
         attachments=attachments,
         model=provider_model(provider.id),

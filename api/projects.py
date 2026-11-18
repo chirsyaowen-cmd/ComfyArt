@@ -38,16 +38,21 @@ async def get_project(request: web.Request) -> web.Response:
     snapshot = project_store.get_snapshot(await _user(request), request.match_info["pid"])
     if snapshot is None:
         return error("project not found", 404)
-    return web.Response(text=snapshot, content_type="application/json")
+    return web.Response(text=snapshot, content_type="application/json", headers={"ETag": project_store.revision(snapshot)})
 
 
 @routes.put("/comfyart/projects/{pid}")
 async def save_project(request: web.Request) -> web.Response:
     user = await _user(request)
     body = await json_body(request)
-    entry = project_store.save_project(user, request.match_info["pid"], _snapshot(body), str(body.get("name") or ""),
-                                       _strings(body.get("covers", []), "covers"))
-    return web.json_response(entry)
+    snapshot = _snapshot(body)
+    try:
+        entry = project_store.save_project(user, request.match_info["pid"], snapshot, str(body.get("name") or ""),
+                                           _strings(body.get("covers", []), "covers"), request.headers.get("If-Match"))
+    except project_store.ProjectChanged:
+        return error("作品已在其他窗口更改。请重新打开项目后继续。", 412)
+    return web.json_response(entry, headers={"ETag": project_store.revision(snapshot)})
+
 
 
 @routes.patch("/comfyart/projects/{pid}")

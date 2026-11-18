@@ -95,13 +95,22 @@ async function onTurnDone(e: { chat_id: string; message_id: string; status: stri
   if (plan?.skills) await evolveSkill(plan.skills)
 }
 
-const signature = (editor: Editor) => [...editor.getCurrentPageShapeIds()].sort().join(',')
+function layoutContext(editor: Editor) {
+  return JSON.stringify(editor.getCurrentPageShapes().map(shape => ({
+    id: shape.id, parent: shape.parentId, type: shape.type,
+    bounds: editor.getShapePageBounds(shape)?.toJson(),
+    text: 'text' in shape.props ? shape.props.text : undefined,
+    name: 'name' in shape.props ? shape.props.name : undefined,
+  })))
+}
 
 async function review(editor: Editor) {
   const ids = [...editor.getCurrentPageShapeIds()]
   if (ids.length < REVIEW_MIN_SHAPES) return
   const project = currentProject()
-  const sig = signature(editor)
+  const layout = layoutContext(editor)
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(layout))
+  const sig = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
   const go = await withState((s) => {
     if (s.reviewed[project] === sig || !take(s, 'review')) return false
     s.reviewed[project] = sig
@@ -111,8 +120,8 @@ async function review(editor: Editor) {
   const bounds = editor.getCurrentPageBounds()!
   const { blob } = await exportImage(editor, ids, { format: 'png', background: true, scale: Math.min(1, REVIEW_PX / Math.max(bounds.w, bounds.h)) })
   const src = viewUrl(await uploadImage(blob, `review-${project}.png`))
-  const issues = parseJson(await ask('Review this canvas.', REVIEW_SYSTEM, [src]))?.issues
-  if (Array.isArray(issues) && issues.length) await notify({ kind: 'suggestion', title: t('proactive.reviewTitle'), body: issues.map((x) => `• ${x}`).join('\n') })
+  const issues = parseJson(await ask('Review this canvas.', REVIEW_SYSTEM, [src], layout))?.issues
+  if (Array.isArray(issues) && issues.length) await notify({ project, kind: 'suggestion', title: t('proactive.reviewTitle'), body: issues.map((x) => `• ${x}`).join('\n') })
 }
 
 export function startProactive(editor: Editor, onError: ErrorSink) {

@@ -15,7 +15,7 @@ def _snapshot(name: str, shapes: int = 0) -> dict:
 
 
 def _write_json_projects(base):
-    root = base / "user" / "default" / "comfyart"
+    root = base / "userdata" / "comfyart"
     (root / "projects").mkdir(parents=True)
     (root / "projects" / "aaaa1111.json").write_text(json.dumps(_snapshot("Poster", 2)), encoding="utf-8")
     (root / "projects" / "bbbb2222.json").write_text(json.dumps(_snapshot("Logo")), encoding="utf-8")
@@ -49,11 +49,11 @@ async def test_json_projects_are_imported_once_and_files_kept(bot_client, fresh_
     assert [p["id"] for p in again] == ["bbbb2222", "aaaa1111"]
 
 
-async def test_users_without_json_files_start_empty_and_stay_separate(bot_client, fresh_user_dir):
+async def test_legacy_user_header_cannot_overwrite_local_project(bot_client, fresh_user_dir):
     _write_json_projects(fresh_user_dir)
-    assert (await (await bot_client.get("/comfyart/projects", headers=ALICE)).json())["projects"] == []
-    assert (await bot_client.get("/comfyart/projects/aaaa1111", headers=ALICE)).status == 404
-    await bot_client.put("/comfyart/projects/aaaa1111", json={"snapshot": _snapshot("Alice"), "name": "Alice", "covers": []}, headers=ALICE)
+    assert (await bot_client.get("/comfyart/projects", headers=ALICE)).status == 403
+    response = await bot_client.put("/comfyart/projects/aaaa1111", json={"snapshot": _snapshot("Alice")}, headers=ALICE)
+    assert response.status == 403
     mine = await (await bot_client.get("/comfyart/projects/aaaa1111")).json()
     assert mine["document"]["store"]["document:document"]["name"] == "Poster"
 

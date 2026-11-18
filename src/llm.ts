@@ -35,8 +35,8 @@ export function parseJson(raw: string): Record<string, unknown> | null {
   }
 }
 
-export async function ask(prompt: string, system: string, images: string[]): Promise<string> {
-  const res = await api('/comfyart/bot/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: prompt, system, images }) })
+export async function ask(prompt: string, system: string, images: string[], layoutContext?: string): Promise<string> {
+  const res = await api('/comfyart/bot/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: prompt, system, images, layout_context: layoutContext }) })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.error ?? t('llm.agentCallFailed', res.status))
   return body.text as string

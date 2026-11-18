@@ -13,7 +13,7 @@ async def test_missing_file_is_no_content(bot_client, fresh_user_dir):
 
 
 async def test_existing_file_is_returned_as_text(bot_client, fresh_user_dir):
-    path = fresh_user_dir / "user" / "default" / "comfyart" / "schedules.json"
+    path = fresh_user_dir / "userdata" / "comfyart" / "schedules.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('[{"id": "a"}]', encoding="utf-8")
     res = await bot_client.get(_url("comfyart/schedules.json"))

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 
-import type { AgentMode } from '../agent'
 import { botEnabledAtom, loadProviders } from '../bot'
 import { thumbUrl, uploadImage, viewUrl } from '../comfy'
 import { t } from '../i18n'
@@ -9,7 +8,6 @@ import { newProject, openView, type ProjectEntry } from '../projects'
 import { loadSkills, type Skill } from '../skills'
 import { Icons } from '../ui/icons'
 import { isEnter } from '../ui/keys'
-import { Popover } from '../ui/Popover'
 import { loadEntries, ProjectCard } from './Projects'
 
 const RECENT = 5
@@ -22,14 +20,10 @@ const QUICK: [keyof typeof Icons, string, string][] = [
   ['effects', t('home.quickCreative'), t('home.quickCreativePrompt')],
   ['page', t('home.quickWebsite'), t('home.quickWebsitePrompt')],
 ]
-const MODES: [AgentMode, string, keyof typeof Icons][] = [['agent', 'Agent', 'agent'], ['image', t('composer.image'), 'genImage'], ['video', t('common.video'), 'genVideo']]
-
 export function Home() {
   const [text, setText] = useState('')
   const [refs, setRefs] = useState<string[]>([])
-  const [mode, setMode] = useState<AgentMode>('agent')
   const [agent, setAgent] = useState<boolean | null>(null)
-  const [modeMenu, setModeMenu] = useState(false)
   const [example, setExample] = useState(0)
   const [recent, setRecent] = useState<ProjectEntry[] | null>(null)
   const [skills, setSkills] = useState<Skill[]>([])
@@ -38,15 +32,13 @@ export function Home() {
   const [drop, setDrop] = useState(false)
   const input = useRef<HTMLTextAreaElement>(null)
   const file = useRef<HTMLInputElement>(null)
-  const breakdown = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     input.current?.focus()
     void loadProviders().then(() => {
       const on = !!botEnabledAtom.get()
       setAgent(on)
-      if (!on) setMode('image')
-    }, () => { setAgent(false); setMode('image') })
+    }, () => setAgent(false))
     void loadEntries(RECENT).then(setRecent)
     void loadSkills().then(setSkills)
     const timer = window.setInterval(() => setExample((i) => (i + 1) % EXAMPLES.length), ROTATE_MS)
@@ -54,8 +46,8 @@ export function Home() {
   }, [])
 
   const send = () => {
-    if (!text.trim() || uploading) return
-    newProject({ ask: text.trim(), mode, ref: refs })
+    if (!agent || !text.trim() || uploading) return
+    newProject({ ask: text.trim(), mode: 'agent', ref: refs })
   }
   const upload = async (files: FileList | null) => {
     setUploading(true)
@@ -70,19 +62,6 @@ export function Home() {
       setUploading(false)
     }
   }
-  const breakDown = async (f: File | undefined) => {
-    if (!f) return
-    setUploading(true)
-    try {
-      newProject({ ref: viewUrl(await uploadImage(f, f.name)), tool: 'elements' })
-    } catch (e) {
-      setError(errorText(e))
-      setUploading(false)
-    }
-  }
-  const modes = MODES.filter(([m]) => agent || m !== 'agent')
-  const modeInfo = MODES.find(([m]) => m === mode)!
-
   return (
     <div className="ca-landing">
       <h1 className="ca-landing__title">{t('home.whatToDesign')}</h1>
@@ -116,22 +95,9 @@ export function Home() {
         />
         <div className="ca-landing__foot">
           <button type="button" className="ca-rail__btn" title={t('home.addImage')} onClick={() => file.current?.click()}><span className="ca-icon">{Icons.plus}</span></button>
-          <Popover open={modeMenu} onOpenChange={setModeMenu} trigger={({ open, toggle }) => (
-            <button type="button" className="ca-landing__mode" data-open={open || undefined} onClick={toggle}>
-              <span className="ca-icon">{Icons[modeInfo[2]]}</span>{modeInfo[1]}<span className="ca-icon">{Icons.chevron}</span>
-            </button>
-          )}>
-            <div className="ca-menu">
-              {modes.map(([m, label, icon]) => (
-                <button key={m} type="button" className="ca-menu__item" onClick={() => { setMode(m); setModeMenu(false) }}>
-                  <span className="ca-icon">{Icons[icon]}</span><span className="ca-menu__grow">{label}</span>
-                  {m === mode && <span className="ca-icon">{Icons.check}</span>}
-                </button>
-              ))}
-            </div>
-          </Popover>
+
           <div className="ca-landing__spacer" />
-          <button type="button" className="ca-landing__send" disabled={!text.trim() || uploading} title={t('composer.send')} onClick={send}><span className="ca-icon">{Icons.send}</span></button>
+          <button type="button" className="ca-landing__send" disabled={!agent || !text.trim() || uploading} title={t('composer.send')} onClick={send}><span className="ca-icon">{Icons.send}</span></button>
         </div>
         <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = '' }} />
       </div>
@@ -143,10 +109,7 @@ export function Home() {
             <span className="ca-icon">{Icons[icon]}</span>{label}
           </button>
         ))}
-        <button type="button" className="ca-landing__chip" disabled={uploading} title={t('home.breakdownHint')} onClick={() => breakdown.current?.click()}>
-          <span className="ca-icon">{Icons.layers}</span>{t('home.breakdown')}
-        </button>
-        <input ref={breakdown} type="file" accept="image/*" hidden onChange={(e) => { void breakDown(e.target.files?.[0]); e.target.value = '' }} />
+
       </div>
 
       <section className="ca-landing__section">

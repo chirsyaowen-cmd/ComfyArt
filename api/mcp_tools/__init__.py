@@ -1,4 +1,4 @@
-from server import PromptServer
+from . import vectorcraft
 
 from .. import chat_store
 from . import bot_tools, canvas, media
@@ -11,17 +11,20 @@ async def _server_info(_args: dict) -> dict:
         "app": "ComfyArt",
         "project": PROJECT.get() or None,
         "chat": {"id": chat["id"], "provider": chat["provider"], "run_mode": chat["run_mode"]} if chat else None,
-        "comfyui_queue_remaining": PromptServer.instance.prompt_queue.get_tasks_remaining(),
+        "runtime": "standalone-dsh",
     }
 
 
 TOOLS: dict[str, dict] = {
     "server_info": {
-        "description": "ComfyArt status: the open project, this chat and how many ComfyUI jobs are queued.",
+        "description": "ComfyArt status: the open project, this chat and its runtime.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "handler": _server_info,
     },
 }
-TOOLS.update(canvas.TOOLS)
+CANVAS_TOOLS = ("get_canvas", "view_canvas", "brand_kits", "add_text", "add_shape", "create_frame",
+                "update_shapes", "delete_shapes", "focus", "memory", "skill", "create_slides", "vectorize_image")
+TOOLS.update({name: canvas.TOOLS[name] for name in CANVAS_TOOLS})
+TOOLS.update(vectorcraft.TOOLS)
 TOOLS.update(media.TOOLS)
 TOOLS.update(bot_tools.TOOLS)

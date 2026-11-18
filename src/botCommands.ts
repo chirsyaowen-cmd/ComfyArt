@@ -4,14 +4,14 @@ import * as actions from './actions'
 import { generateAudio, imageTo3d, musicModels, viewsTo3d, voices } from './assetGen'
 import { editElements } from './elements'
 import { bakeToImage, createMockup } from './mockup'
-import { api } from './comfy'
+import { api, viewUrl } from './comfy'
 import { LAYOUT_HANDLERS, shapeOf, type Args, type Handler } from './botLayout'
 import { placeInChatFrame } from './chatFrame'
 import { capRefs, createGenerator, generate } from './generate'
 import { CUSTOM_MODEL3D, customWorkflowCommand } from './customWorkflows'
 import { DURATIONS, RATIOS, VIDEO_RATIOS } from './genOptions'
 import { MAX_VIDEO_REF_KINDS, VIDEO_TARGETS } from './videoGraphs'
-import { type ErrorSink, errorText, fileSrc, GAP, resultsAtom } from './jobs'
+import { type ErrorSink, errorText, fileSrc, placeMedia, GAP, resultsAtom } from './jobs'
 import { agentModels } from './models'
 import { modesFor } from './refModes'
 import { AUDIO } from './shapes/EmbedShapes'
@@ -182,6 +182,18 @@ function waitResults(editor: Editor, ids: string[], timeout: number) {
 
 const HANDLERS: Record<string, Handler> = {
   ...LAYOUT_HANDLERS,
+  place_vectorcraft: (editor, args, _onError, chat) => {
+    const existing = editor.getCurrentPageShapes().find(s => s.meta.vectorcraft === args.artwork && s.meta.vectorChat === chat)
+    if (existing) return { id: existing.id }
+    const ref = { filename: 'preview.png', subfolder: String(args.subfolder), type: 'output' }
+    const media = { kind: 'image' as const, ref, src: viewUrl(ref), w: Number(args.width), h: Number(args.height) }
+    const center = editor.getViewportPageBounds().center
+    const id = placeMedia(editor, media, String(args.name), center.x, center.y, Math.min(media.w, 512))
+    editor.updateShape({ id, type: 'image', meta: { vectorcraft: String(args.artwork), vectorChat: chat } })
+    place(editor, id, {}, chat)
+    editor.select(id)
+    return { id }
+  },
   list_models: () => ({
     image: agentModels(false).map((m) => ({ id: m.id, label: m.label, desc: m.desc, accepts_refs: !!m.refs, ratios: RATIOS })),
     video: agentModels(true).map((m) => ({ id: m.id, label: m.label, desc: m.desc, accepts_first_frame: true, max_reference_images: MAX_VIDEO_REF_KINDS.image, max_reference_videos: MAX_VIDEO_REF_KINDS.video, max_reference_audios: MAX_VIDEO_REF_KINDS.audio, motion_control: true, lip_sync: true, ratios: VIDEO_RATIOS, durations: DURATIONS })),

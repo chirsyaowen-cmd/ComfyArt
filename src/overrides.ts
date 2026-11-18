@@ -2,13 +2,11 @@ import { Box, createShapeId, type Editor, type TLUiOverrides } from 'tldraw'
 
 import { imageUnder } from './actions'
 import { openCanvasChat } from './canvasChat'
-import { createGenerator } from './generate'
 import { COMMENT, COMMENT_SIZE } from './shapes/CommentShape'
 import { DOODLE } from './shapes/DoodleShape'
 import { PEN } from './shapes/PenTool'
 import { TEXT } from './shapes/TextShape'
 import { VECTOR, vectorKindAtom } from './shapes/VectorShape'
-import { dockVideoAtom } from './ui/Dock'
 import { arrange } from './ui/MultiToolbar'
 import { shortcutsAtom } from './ui/Shortcuts'
 
@@ -32,8 +30,6 @@ function comment(editor: Editor) {
 
 function keys(editor: Editor): Record<string, [string, () => void]> {
   return {
-    'ca-gen-image': ['a', () => { dockVideoAtom.set(false); createGenerator(editor) }],
-    'ca-gen-video': ['s', () => { dockVideoAtom.set(true); createGenerator(editor, true) }],
     'ca-comment': ['c', () => comment(editor)],
     'ca-doodle': ['d', () => editor.setCurrentTool(DOODLE)],
     'ca-pen': ['p', () => editor.setCurrentTool(PEN)],

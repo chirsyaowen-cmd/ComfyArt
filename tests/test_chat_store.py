@@ -29,9 +29,9 @@ def test_chats_are_scoped_by_user_and_project():
     assert len(chat_store.list_chats("alice", "p1")) == 1
 
 
-def test_database_lives_in_the_system_user_dir(fresh_user_dir):
+def test_database_lives_in_the_standalone_data_dir(fresh_user_dir):
     chat_store.create_chat(user="alice", project="p", provider="codex")
-    assert os.path.isfile(fresh_user_dir / "user" / "__comfyart" / "data.db")
+    assert os.path.isfile(fresh_user_dir / "data.db")
 
 
 def test_reopen_keeps_owner_and_messages():
@@ -72,7 +72,7 @@ def test_update_ignores_none_and_delete_cascades_messages():
 
 
 def test_a_database_from_the_raw_sqlite_version_is_used_as_is(fresh_user_dir):
-    path = fresh_user_dir / "user" / "__comfyart" / "data.db"
+    path = fresh_user_dir / "data.db"
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.executescript(OLD_SCHEMA)

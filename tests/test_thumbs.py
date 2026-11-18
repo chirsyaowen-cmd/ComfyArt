@@ -21,7 +21,7 @@ async def test_large_image_gets_a_cached_webp_thumbnail(bot_client, fresh_user_d
     im = Image.open(io.BytesIO(await res.read()))
     assert im.format == "WEBP" and max(im.size) == 256
     path = thumbs.thumb_for(url, 256)
-    assert path.startswith(str(fresh_user_dir / "user" / "__comfyart" / "thumbs"))
+    assert path.startswith(str(fresh_user_dir / "thumbs"))
     assert thumbs.thumb_for(url, 200) == path
 
 

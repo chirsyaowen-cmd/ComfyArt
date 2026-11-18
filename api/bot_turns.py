@@ -1,9 +1,8 @@
 import logging
 import re
 
-from server import PromptServer
+from .. import runtime
 
-from ..bot._cli_common import resolve_comfy_mcp_argv
 from ..bot.turns import TurnRunner
 from . import chat_store
 from ._common import spawn
@@ -14,24 +13,13 @@ _log = logging.getLogger(__name__)
 
 def broadcast(event: str, payload: dict) -> None:
     try:
-        PromptServer.instance.send_sync("comfyart-bot", {"event": event, **payload})
+        runtime.send_event("comfyart-bot", {"event": event, **payload})
     except Exception:
         _log.exception("[ComfyArt/bot] broadcast failed")
 
 
 def _mcp_endpoint(chat_id: str) -> str:
-    return f"http://127.0.0.1:{PromptServer.instance.port}/comfyart/mcp?bot_chat={chat_id}"
-
-
-def _comfy_mcp_argv() -> list[str]:
-    if not get_setting("bot-enable-comfy-mcp"):
-        return []
-    argv = resolve_comfy_mcp_argv(str(get_setting("bot-comfy-mcp-command") or ""))
-    if not argv:
-        _log.warning("[ComfyArt/bot] bot-enable-comfy-mcp is on but no "
-                     "comfy-mcp executable was found — set "
-                     "bot-comfy-mcp-command or install comfy-mcp on PATH")
-    return argv
+    return f"http://127.0.0.1:{runtime.port}/comfyart/mcp?bot_chat={chat_id}"
 
 
 def provider_model(provider_id: str) -> str:
@@ -73,7 +61,7 @@ def unverified_write_notice(blocks: list[dict]) -> dict | None:
 
 RUNNER = TurnRunner(
     label="ComfyArt", mcp_name="comfyart", store=chat_store, broadcast=broadcast, spawn=spawn,
-    mcp_endpoint=_mcp_endpoint, comfy_mcp_argv=_comfy_mcp_argv, provider_model=provider_model,
+    mcp_endpoint=_mcp_endpoint, comfy_mcp_argv=list, provider_model=provider_model,
     replay_text=blocks_text, finish_notice=unverified_write_notice,
 )
 ACTIVE_TURNS = RUNNER.active

@@ -1,8 +1,9 @@
+import hashlib
 import json
 import time
 from typing import Optional
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from . import db
 from .db import Project, ProjectVersion
@@ -42,10 +43,21 @@ def get_snapshot(user: str, project_id: str) -> Optional[str]:
         return row.snapshot if row else None
 
 
-def save_project(user: str, project_id: str, snapshot: str, name: str, covers: list[str]) -> dict:
+def revision(snapshot: str) -> str:
+    return '"' + hashlib.sha256(snapshot.encode("utf-8")).hexdigest() + '"'
+
+
+class ProjectChanged(Exception):
+    pass
+
+
+def save_project(user: str, project_id: str, snapshot: str, name: str, covers: list[str], expected: str | None) -> dict:
     now = time.time()
     with db.session() as s:
+        s.execute(text("BEGIN IMMEDIATE"))
         row = s.get(Project, (user, project_id))
+        if expected != (revision(row.snapshot) if row is not None else None):
+            raise ProjectChanged
         if row is None:
             row = Project(user=user, id=project_id, pinned=False, created_at=now)
             s.add(row)

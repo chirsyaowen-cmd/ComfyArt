@@ -5,9 +5,9 @@ from aiohttp import web
 from ._common import app_path, error, json_body, read_json, routes, write_json
 
 SETTINGS_SPEC: dict[str, object] = {
-    "enable-mcp": False,
-    "enable-bot": False,
-    "bot-provider": "",
+    "enable-mcp": True,
+    "enable-bot": True,
+    "bot-provider": "deepseek-harness",
     "bot-model-claude-code": "",
     "bot-model-codex": "",
     "bot-model-qwen-code": "",
@@ -19,7 +19,7 @@ SETTINGS_SPEC: dict[str, object] = {
     "bot-model-local-llm": "",
     "bot-enable-comfy-mcp": False,
     "bot-comfy-mcp-command": "",
-    "ocr-engine": "local",
+    "ocr-engine": "agent",
     "generation-backend": "local",
     "generation-target": "auto",
     "memory-enabled": True,
@@ -29,7 +29,7 @@ SETTINGS_SPEC: dict[str, object] = {
     "proactive-daily": 5,
 }
 
-CHOICES: dict[str, tuple[str, ...]] = {"ocr-engine": ("local", "agent"), "generation-backend": ("local", "cloud")}
+CHOICES: dict[str, tuple[str, ...]] = {"ocr-engine": ("agent",), "generation-backend": ("local",), "bot-provider": ("deepseek-harness",)}
 
 LOCAL_ONLY = ("enable-mcp", "enable-bot", "bot-enable-comfy-mcp", "bot-comfy-mcp-command", "bot-hermes-ssh-host")
 
@@ -79,7 +79,7 @@ async def put_settings(request: web.Request) -> web.Response:
     if not ipaddress.ip_address(request.remote).is_loopback:
         blocked = [k for k in LOCAL_ONLY if k in body and body[k] != current[k]]
         if blocked:
-            return error(f"{', '.join(blocked)} can only be changed from the machine running ComfyUI", 403)
+            return error(f"{', '.join(blocked)} can only be changed from the local ComfyArt machine", 403)
     current.update(body)
     write_json(_file(), current)
     return web.json_response(current)

@@ -7,11 +7,9 @@ import { refLinkedOf, setRefLinked } from '../chatFrame'
 import { isBoard, renderBoard } from '../compose'
 import { chatViewAtom } from './AgentPanel'
 import { ComposePanel } from './ComposePanel'
-import { createGenerator } from '../generate'
 import { errorText, mediaAsset } from '../jobs'
 import { download } from '../psd'
 import { artboardStyle, type ArtboardStyle } from '../shapes/ArtboardShape'
-import type { GeneratorShape } from '../shapes/GeneratorShape'
 import { ColorPicker } from './ColorPicker'
 import { exportAtom } from './ExportDialog'
 import { slideshowAtom } from './Slideshow'
@@ -24,7 +22,6 @@ import { t } from '../i18n'
 const GAP = 22
 const EDGE = 8
 const PAD = 24
-const GEN_LONG = 1536
 const SIZE_PRESETS: [string, number, number][] = [
   ['Instagram', 1080, 1080], [t('frameToolbar.instagramPortrait'), 1080, 1350], [t('frameToolbar.story'), 1080, 1920],
   [t('frameToolbar.youtubeThumbnail'), 1280, 720], [t('frameToolbar.presentation'), 1920, 1080],
@@ -155,15 +152,6 @@ export function framesOnPage(editor: Editor) {
     .sort((a, b) => a.y - b.y || a.x - b.x).map((s) => s.id)
 }
 
-function generateInto(editor: Editor, frame: TLFrameShape) {
-  const { w, h } = frame.props
-  const k = GEN_LONG / Math.max(w, h)
-  const id = createGenerator(editor, false, { resolution: 'custom', cw: Math.round(w * k), ch: Math.round(h * k) }, false)
-  editor.reparentShapes([id], frame.id)
-  editor.updateShape<GeneratorShape>({ id, type: 'generator', x: 0, y: 0, props: { w, h } })
-  editor.select(id)
-}
-
 export function FrameToolbar({ onError }: { onError: (msg: string) => void }) {
   const editor = useEditor()
   const actions = useActions()
@@ -244,7 +232,6 @@ export function FrameToolbar({ onError }: { onError: (msg: string) => void }) {
         <button type="button" className="ca-panel__chip" data-on={!isAuto(frame) || undefined} onClick={() => setMeta({ layout: 'manual' })}>{t('frameToolbar.manual')}</button>
       </div>
       <button type="button" className="ca-bar__btn" onClick={() => actions['fit-frame-to-content']?.onSelect('toolbar')}><span className="ca-icon">{Icons.expand}</span><span>{t('frameToolbar.hugContents')}</span></button>
-      <button type="button" className="ca-bar__btn" onClick={() => generateInto(editor, frame)}><span className="ca-icon">{Icons.genImage}</span><span>{t('common.generate')}</span></button>
       {isBoard(frame) && <button type="button" className="ca-bar__btn" onClick={() => renderBoard(editor, frame, onError)}><span className="ca-icon">{Icons.replace}</span><span>{frame.meta.elements ? t('elements.rerender') : t('compose.render')}</span></button>}
       {isBoard(frame) && <ComposePanel frame={frame} />}
       <div className="ca-bar__sep" />

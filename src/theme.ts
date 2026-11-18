@@ -16,11 +16,6 @@ const isDark = (theme: Theme) => theme === 'dark' || (theme === 'system' && syst
 export async function initTheme() {
   const stored = readLocal(KEY)
   if (stored === 'light' || stored === 'dark' || stored === 'system') themeAtom.set(stored)
-  else {
-    const res = await fetch('/api/settings/Comfy.ColorPalette').catch(() => null)
-    const palette = res?.ok ? await res.json().catch(() => null) : null
-    themeAtom.set(palette === 'light' ? 'light' : 'dark')
-  }
   markDark(isDark(themeAtom.get()))
   systemDark.addEventListener('change', () => { if (themeAtom.get() === 'system') markDark(systemDark.matches) })
 }

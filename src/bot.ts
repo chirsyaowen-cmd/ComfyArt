@@ -1,3 +1,4 @@
+import { readLocal, writeLocal } from './localPrefs'
 import { atom, react } from 'tldraw'
 
 import { api, setCloud, setTarget } from './comfy'
@@ -148,6 +149,7 @@ export async function loadChats() {
 }
 
 export async function openChat(id: string | null) {
+  writeLocal(`comfyart.chat.${project}`, id ?? '')
   chatIdAtom.set(id)
   if (!id) return messagesAtom.set([])
   const { chat, messages } = await json<{ chat: BotChat; messages: BotMessage[] }>(`/comfyart/bot/chats/${id}`)
@@ -169,6 +171,7 @@ async function ensureChat(): Promise<BotChat> {
   if (!provider) throw new Error(t('bot.noAgentAvailableConfigureOne'))
   const { chat } = await json<{ chat: BotChat }>('/comfyart/bot/chats', send({ project, provider }))
   upsertChat(chat)
+  writeLocal(`comfyart.chat.${project}`, chat.id)
   chatIdAtom.set(chat.id)
   messagesAtom.set([])
   return chat
@@ -307,7 +310,13 @@ export async function refreshBot() {
 
 export function startBot(projectId: string, isStale: () => boolean) {
   project = projectId
-  void refreshBot()
+  void refreshBot().then(() => {
+    if (isStale() || project !== projectId || chatIdAtom.get()) return
+    const chats = chatsAtom.get()
+    const saved = readLocal(`comfyart.chat.${projectId}`)
+    const id = saved === null ? chats[0]?.id : chats.find(chat => chat.id === saved)?.id
+    if (id) return openChat(id)
+  })
   const stops = [
     onComfyEvent('comfyart-bot', (e: { event: string }) => {
       if (!isStale()) reducers[e.event]?.(e)

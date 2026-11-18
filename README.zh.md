@@ -1,3 +1,7 @@
+## 独立版入口
+
+此分支使用 DeepSeek Harness 和 VectorCraft，可独立启动。安装、启动、数据目录和功能范围见[独立版说明](docs/standalone.md)。以下为上游插件文档。
+
 # ComfyArt
 
 [English](README.md) | 中文

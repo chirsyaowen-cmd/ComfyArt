@@ -39,11 +39,10 @@ async def test_create_requires_project_and_known_provider(bot_client, fake_provi
 async def test_other_users_cannot_see_or_touch_a_chat(bot_client, fake_provider):
     chat = await _chat(bot_client)
     alice = {"comfy-user": "alice"}
-    assert (await bot_client.get(f"/comfyart/bot/chats/{chat['id']}", headers=alice)).status == 404
-    assert (await bot_client.delete(f"/comfyart/bot/chats/{chat['id']}", headers=alice)).status == 404
-    listed = await (await bot_client.get("/comfyart/bot/chats?project=p", headers=alice)).json()
-    assert listed["chats"] == []
-    assert (await bot_client.get("/comfyart/bot/chats?project=p", headers={"comfy-user": "mallory"})).status == 403
+    assert (await bot_client.get(f"/comfyart/bot/chats/{chat['id']}", headers=alice)).status == 403
+    assert (await bot_client.delete(f"/comfyart/bot/chats/{chat['id']}", headers=alice)).status == 403
+    assert (await bot_client.get("/comfyart/bot/chats?project=p", headers=alice)).status == 403
+
 
 
 async def test_send_streams_blocks_and_titles_the_chat(bot_client, fake_provider):
@@ -132,7 +131,7 @@ async def test_settings_validate_keys_and_types(bot_client):
     assert (await bot_client.put("/comfyart/settings", json={"enable-bot": "yes"})).status == 400
     saved = await (await bot_client.put("/comfyart/settings", json={"bot-local-llm-url": "http://h/v1"})).json()
     assert saved["bot-local-llm-url"] == "http://h/v1"
-    assert saved["ocr-engine"] == "local"
+    assert saved["ocr-engine"] == "agent"
     assert (await bot_client.put("/comfyart/settings", json={"ocr-engine": "cloud"})).status == 400
     saved = await (await bot_client.put("/comfyart/settings", json={"ocr-engine": "agent"})).json()
     assert saved["ocr-engine"] == "agent"

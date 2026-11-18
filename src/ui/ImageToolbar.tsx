@@ -30,8 +30,8 @@ const GAP = 22
 const EDGE = 8
 const AUTO_LAYERS = 4
 const BAR_KEY = 'comfyart.toolbar'
-const DEFAULT_PINNED = ['chat', 'quick', 'upscale', 'cutout', 'erase']
-const ALL_TOOLS = ['chat', 'quick', 'upscale', 'cutout', 'erase', 'layers', 'text', 'angles', 'animate', 'move', 'expand', 'adjust', 'crop', 'vectorize', 'elements', 'mockup', 'to3d', 'transform', 'inpaint', 'style', 'ocr', 'effects', 'smudge', 'regenerate', 'remix', 'copyPrompt', 'info', 'preview', 'export']
+const DEFAULT_PINNED = ['chat', 'crop', 'transform']
+const ALL_TOOLS = ['chat', 'crop', 'transform', 'adjust', 'effects', 'vectorize', 'ocr', 'info', 'preview', 'export']
 
 interface BarPrefs { pinned: string[]; names: boolean; seen: string[] }
 
@@ -126,18 +126,6 @@ export function ImageToolbar({ onError }: { onError: (msg: string) => void }) {
     if (bar.current) setWidth(bar.current.offsetWidth)
   })
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !shape || modeAtom.get()) return
-      if (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable="true"]')) return
-      e.preventDefault()
-      e.stopPropagation()
-      enterMode('quick')
-    }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [shape])
-
   if (!shape || !rect || mode) return null
   const asset = shape.props.assetId ? editor.getAsset(shape.props.assetId) : null
   if (asset?.type !== 'image' || !asset.props.src) return null
@@ -219,13 +207,13 @@ export function ImageToolbar({ onError }: { onError: (msg: string) => void }) {
     { id: 'preview', icon: Icons.preview, label: t('canvasMenu.viewLarger'), run: () => lightboxAtom.set(shape.id) },
     { id: 'export', icon: Icons.export, label: t('canvasMenu.export'), run: () => exportAtom.set([shape.id]) },
   ]
-  const usable = tools.filter((t) => t.when !== false).sort((a, b) => ALL_TOOLS.indexOf(a.id) - ALL_TOOLS.indexOf(b.id))
+  const usable = tools.filter((t) => t.when !== false && ALL_TOOLS.includes(t.id)).sort((a, b) => ALL_TOOLS.indexOf(a.id) - ALL_TOOLS.indexOf(b.id))
   const pinned = usable.filter((t) => prefs.pinned.includes(t.id))
   const unpinned = usable.filter((t) => !prefs.pinned.includes(t.id))
   const barTool = (t: Tool) => (t.menu
     ? <Popover key={t.id} open={menu === t.id} onOpenChange={toggle(t.id)} trigger={({ open, toggle: tg }) => <Btn icon={t.icon} label={t.label} open={open} onClick={tg} />}>{t.menu}</Popover>
     : <Btn key={t.id} icon={t.icon} label={t.label} hint={t.hint} onClick={t.run!} />)
-  const moreView = tools.find((t) => t.id === inMore)
+  const moreView = usable.find((t) => t.id === inMore)
   const pin = (id: string) => {
     const list = prefsAtom.get().pinned
     setPrefs({ pinned: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] })
@@ -253,6 +241,13 @@ export function ImageToolbar({ onError }: { onError: (msg: string) => void }) {
           {unpinned.map((t) => <Item key={t.id} icon={t.icon} label={t.label} onClick={t.menu ? () => setInMore(t.id) : close(t.run!)} />)}
           {frame?.type === 'frame' && <Item icon={Icons.frame} label={t('imageToolbar.fillArtboard')} onClick={close(() => fitFrame(true))} />}
           {frame?.type === 'frame' && <Item icon={Icons.frame} label={t('imageToolbar.fitArtboard')} onClick={close(() => fitFrame(false))} />}
+          {typeof shape.meta.vectorcraft === 'string' && ['source.svg', 'design.vectorcraft'].map(file => (
+            <Item key={file} icon={Icons.download} label={file} onClick={close(() => {
+              const url = new URL(src, location.origin)
+              url.searchParams.set('filename', file)
+              download(url.href, name + file.slice(file.lastIndexOf('.')))
+            })} />
+          ))}
           {originalOf(shape) && <Item icon={Icons.restore} label={t('imageToolbar.restoreOriginal')} onClick={close(() => restoreOriginal(editor, shape))} />}
           <div className="ca-menu__sep" />
           <Item icon={Icons.grid} label={t('imageToolbar.customizeToolbar')} onClick={() => setCustomize(true)} />

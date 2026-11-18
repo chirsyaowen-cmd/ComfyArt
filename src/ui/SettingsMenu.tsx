@@ -1,17 +1,11 @@
 import { useState, type ReactNode } from 'react'
 import { useValue, type Editor } from 'tldraw'
 
-import { saveSettings, settingsAtom } from '../bot'
-import { freeMemory } from '../comfy'
 import { lang, setLang, t, type Lang } from '../i18n'
-import { errorText } from '../jobs'
-import { instancesAtom, instanceStatusAtom, loadInstances, targetOptions } from '../instances'
 import { pushEnabled, setPush } from '../notices'
 import { saveTheme, setTheme, themeAtom, THEMES } from '../theme'
 import { dockAtom, setDock } from './chatDock'
-import { reportError, reportSuccess } from './ErrorToasts'
 import { Icons } from './icons'
-import { InstancesDialog } from './InstancesDialog'
 import { Popover } from './Popover'
 import { shortcutsAtom } from './Shortcuts'
 
@@ -31,19 +25,9 @@ export function SettingsMenu({ editor, trigger }: { editor?: Editor; trigger: (p
   const [push, setPushOn] = useState(pushEnabled)
   const theme = useValue(themeAtom)
   const dock = useValue(dockAtom)
-  const [manage, setManage] = useState(false)
-  const settings = useValue(settingsAtom)
-  const instances = useValue(instancesAtom)
-  const targets = targetOptions(instances, useValue(instanceStatusAtom))
-  const cloud = settings['generation-backend'] === 'cloud'
-  const target = targets.length > 2 ? (targets.find(([id]) => id === settings['generation-target'])?.[0] ?? 'auto') : 'local'
-  const toggle = (next: boolean) => {
-    setOpen(next)
-    if (next) void loadInstances().catch(() => {})
-  }
   return (
     <>
-      <Popover open={open} onOpenChange={toggle} side={editor ? 'bottom' : 'top'} align={editor ? 'end' : 'start'} trigger={trigger}>
+      <Popover open={open} onOpenChange={setOpen} side={editor ? 'bottom' : 'top'} align={editor ? 'end' : 'start'} trigger={trigger}>
         <div className="ca-menu ca-settings">
           <div className="ca-gen__label">{t('settings.language')}</div>
           {LANGS.map(([value, label]) => <Choice key={value} label={label} on={lang === value} onPick={() => value !== lang && setLang(value)} />)}
@@ -51,19 +35,7 @@ export function SettingsMenu({ editor, trigger }: { editor?: Editor; trigger: (p
           <div className="ca-gen__label">{t('projectHeader.theme')}</div>
           {THEMES.map(([value, label]) => <Choice key={value} label={label} on={theme === value} onPick={() => (editor ? setTheme(editor, value) : saveTheme(value))} />)}
           <div className="ca-menu__sep" />
-          <div className="ca-gen__label">{t('settings.backend')}</div>
-          {(targets.length > 2 ? targets : targets.filter(([id]) => id === 'local')).map(([id, label, hint]) => (
-            <Choice key={id} label={label} hint={hint} on={!cloud && target === id} onPick={() => void saveSettings({ 'generation-backend': 'local', 'generation-target': id })} />
-          ))}
-          <Choice label={t('settings.backendCloud')} on={cloud} onPick={() => void saveSettings({ 'generation-backend': 'cloud' })} />
-          <button type="button" className="ca-menu__item" onClick={() => { setOpen(false); setManage(true) }}>
-            <span className="ca-icon">{Icons.settings}</span><span className="ca-menu__grow">{t('settings.manageInstances')}</span>
-          </button>
-          {editor && (
-            <button type="button" className="ca-menu__item" onClick={() => { setOpen(false); void freeMemory().then((busy) => reportSuccess(t(busy ? 'settings.freeMemoryQueued' : 'settings.freeMemoryDone')), (e) => reportError(errorText(e))) }}>
-              <span className="ca-icon">{Icons.erase}</span><span className="ca-menu__grow">{t('settings.freeMemory')}</span>
-            </button>
-          )}
+          <div className="ca-chat__hint">{t('standalone.disabled')}</div>
           {editor && (
             <>
               <div className="ca-menu__sep" />
@@ -81,7 +53,6 @@ export function SettingsMenu({ editor, trigger }: { editor?: Editor; trigger: (p
           )}
         </div>
       </Popover>
-      {manage && <InstancesDialog onClose={() => setManage(false)} />}
     </>
   )
 }

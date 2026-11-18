@@ -17,12 +17,7 @@ function storedLang(): Lang | null {
 
 export async function initLocale() {
   const stored = storedLang()
-  if (stored) lang = stored
-  else {
-    const res = await fetch('/api/settings/Comfy.Locale').catch(() => null)
-    const value = res?.ok ? await res.json().catch(() => null) : null
-    lang = String(value || navigator.language).toLowerCase().startsWith('zh') ? 'zh' : 'en'
-  }
+  lang = stored ?? (navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en')
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
 }
 

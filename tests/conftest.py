@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import os
 import sys
 import tempfile
 import types
@@ -14,6 +15,7 @@ if str(_REPO.parent) not in sys.path:
     sys.path.insert(0, str(_REPO.parent))
 
 BASE = Path(tempfile.mkdtemp(prefix="comfyart-tests-"))
+os.environ["COMFYART_DATA"] = str(BASE)
 SENT: list[tuple[str, dict]] = []
 
 
@@ -104,6 +106,7 @@ def _install_stubs() -> None:
 
 _install_stubs()
 
+from ComfyArt import __main__, runtime
 from ComfyArt import api
 from ComfyArt.api import chat_store
 from ComfyArt.bot import bot_asks
@@ -114,12 +117,16 @@ from ComfyArt.bot.providers import AgentProvider, ProviderCaps, ProviderStatus, 
 
 
 @pytest.fixture(autouse=True)
-def fresh_user_dir(tmp_path):
+def fresh_user_dir(tmp_path, monkeypatch):
+    for name, module in tuple(sys.modules.items()):
+        if name.startswith("ComfyArt.") and hasattr(module, "DATA"):
+            monkeypatch.setattr(module, "DATA", tmp_path)
     import folder_paths
     folder_paths.STATE["base"] = tmp_path
     SENT.clear()
     from server import PromptServer
     PromptServer.instance.sockets.clear()
+    runtime.sockets.clear()
     yield tmp_path
 
 
@@ -187,17 +194,21 @@ def fake_stateless():
 
 
 @pytest.fixture()
-async def bot_client():
+async def bot_client(monkeypatch):
     from aiohttp import web
     from aiohttp.test_utils import TestClient, TestServer
 
-    import server
+    from ComfyArt.api import mcp_commands
+    def capture(event, data, sid=None):
+        SENT.append((event, {**data, "_sid": sid} if sid else data))
+    monkeypatch.setattr(runtime, "send_event", capture)
+    monkeypatch.setattr(mcp_commands.RELAY, "send", capture)
     write_settings(**{"enable-mcp": True, "enable-bot": True})
     ACTIVE_TURNS.clear()
     QUEUED.clear()
     bot_asks.PENDING.clear()
     app = web.Application()
-    app.router.add_routes(server.PromptServer.instance.routes)
+    app.router.add_routes(runtime.routes)
     client = TestClient(TestServer(app))
     await client.start_server()
     yield client

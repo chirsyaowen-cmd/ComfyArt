@@ -1,4 +1,6 @@
 {
+  "standalone.disabled": "独立版使用 DSH 与 VectorCraft。ComfyUI 图像、视频、音频、3D 生成、模型库和自定义工作流不可用。",
+  "standalone.workflowUnavailable": "独立版未提供 ComfyUI 工作流「{0}」。请使用 Agent 的 VectorCraft 工具创作图形。",
   "abilities.dailyRuns": "每日次数",
   "abilities.memoryDesc": "每次对话后记下你提到的长期偏好，不用反复交代。",
   "abilities.memoryTitle": "自动更新记忆",

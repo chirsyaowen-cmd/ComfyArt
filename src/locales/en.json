@@ -1,4 +1,6 @@
 {
+  "standalone.disabled": "Standalone mode uses DSH and VectorCraft. ComfyUI image, video, audio and 3D generation, model libraries and custom workflows are unavailable.",
+  "standalone.workflowUnavailable": "ComfyUI workflow {0} is unavailable in standalone mode. Use VectorCraft in the Agent chat for vector artwork.",
   "abilities.dailyRuns": "Daily runs",
   "abilities.memoryDesc": "After each chat, keeps the lasting preferences you mentioned, so you don't have to repeat yourself.",
   "abilities.memoryTitle": "Auto-update memory",

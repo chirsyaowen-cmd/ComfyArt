@@ -5,7 +5,7 @@ import re
 import threading
 import time
 
-import folder_paths
+from ..runtime import DATA
 
 from . import db
 from ._common import app_path
@@ -75,7 +75,7 @@ def ensure_imported(user: str) -> None:
             return
         with db.session() as s:
             if s.get(Migration, (user, MIGRATION)) is None:
-                root = folder_paths.get_public_user_directory(user)
+                root = str(DATA / "userdata")
                 count = _import(s, user, os.path.join(root, "comfyart")) if root else 0
                 s.add(Migration(user=user, name=MIGRATION, done_at=time.time()))
                 s.commit()

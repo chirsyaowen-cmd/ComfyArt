@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useValue, type Editor, type TLShapeId } from 'tldraw'
 
-import { agentModeAtom, directSettingsAtom, DOC_ACCEPT, docsAtom, draftAtom, eachLine, eachRuns, extraRefsAtom, generateDirect, isRefShape, kitsAtom, refKindOf, sendToAgent, srcOf, uploadRefs, type AgentMode, type DirectSettings, type RefShape } from '../agent'
+import { agentModeAtom, directSettingsAtom, DOC_ACCEPT, docsAtom, draftAtom, eachLine, eachRuns, extraRefsAtom, generateDirect, isRefShape, kitsAtom, refKindOf, sendToAgent, srcOf, uploadRefs, type DirectSettings, type RefShape } from '../agent'
 import { EachButton, EachRole, useEach } from './EachToggle'
 import { RefFrameButton } from './RefFrameButton'
-import { placeAsset } from '../assets'
 import { botEnabledAtom, messagesAtom } from '../bot'
 import { imageUrl } from '../comfy'
 import { VIDEO_RATIOS } from '../genOptions'
@@ -14,12 +13,10 @@ import { agentModels, installedModels, modelOf } from '../models'
 import { GENERATOR, type GeneratorShape, type GeneratorShapeUtil } from '../shapes/GeneratorShape'
 import type { AudioShape } from '../shapes/EmbedShapes'
 import { loadSkills, saveSkill, skillAtom, type Skill } from '../skills'
-import { AssetGrid } from './AssetPicker'
 import { ModelPill, SettingsPill } from './GenSettings'
 import { schedulesOpenAtom } from '../schedules'
 import { AgentPicker } from './AgentPicker'
 import { Icons } from './icons'
-import { ModelPrefs } from './ModelPrefs'
 import { VoiceButton } from './VoiceButton'
 import { SkillForm, skillsOpenAtom } from './SkillsDialog'
 import { Popover } from './Popover'
@@ -27,7 +24,6 @@ import { t } from '../i18n'
 import { uuid } from '../id'
 import { isEnter } from './keys'
 
-const MODES: [AgentMode, string, keyof typeof Icons][] = [['agent', 'Agent', 'agent'], ['image', t('composer.image'), 'genImage'], ['video', t('common.video'), 'genVideo']]
 const REVIEW_PROMPT = t('composer.canvasReviewUseGetCanvas')
 const SKILL_PROMPT = t('composer.turnTheApproachCompletedIn')
 
@@ -132,7 +128,6 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
   const mentions = at ? images.filter((s) => imageName(editor, s).toLowerCase().includes(at[1].toLowerCase())).slice(0, 8) : []
   const kitMentions = at ? library.filter((k) => k.name.toLowerCase().includes(at[1].toLowerCase()) && !kits.some((x) => x.id === k.id)).slice(0, 8) : []
   const clearAt = () => draftAtom.set(draft.slice(0, at!.index) + (at!.index ? ' ' : ''))
-  const modeInfo = MODES.find(([m]) => m === mode)!
 
   return (
     <div
@@ -237,9 +232,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
               <button type="button" className="ca-menu__item" onClick={() => setMenu('skills')}>
                 <span className="ca-icon">{Icons.skill}</span><span className="ca-menu__grow">Skill</span><span className="ca-icon">{Icons.next}</span>
               </button>
-              <button type="button" className="ca-menu__item" onClick={() => setMenu('assets')}>
-                <span className="ca-icon">{Icons.files}</span><span className="ca-menu__grow">{t('composer.addAssets')}</span><span className="ca-icon">{Icons.next}</span>
-              </button>
+
             </div>
           )}
           {menu === 'skills' && (
@@ -262,11 +255,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
               ))}
             </div>
           )}
-          {menu === 'assets' && (
-            <div className="ca-menu ca-assets-pop">
-              <AssetGrid only="image" onPick={(item) => { setMenu(null); void placeAsset(editor, item).then((id) => id && addRef(id)) }} />
-            </div>
-          )}
+
           {menu === 'create' && (
             <div className="ca-menu ca-skilled">
               <div className="ca-gen__title">{t('composer.skillCreator')}</div>
@@ -281,30 +270,10 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
             </div>
           )}
         </Popover>
-        <Popover
-          open={menu === 'mode'}
-          onOpenChange={(o) => setMenu(o ? 'mode' : null)}
-          side="top"
-          trigger={({ open, toggle }) => (
-            <button type="button" className="ca-bar__btn ca-composer__mode" data-open={open || undefined} onClick={toggle}>
-              <span className="ca-icon">{Icons[modeInfo[2]]}</span><span>{modeInfo[1]}</span><span className="ca-icon">{Icons.chevron}</span>
-            </button>
-          )}
-        >
-          <div className="ca-menu">
-            {MODES.map(([m, label, icon]) => (
-              <button key={m} type="button" className="ca-menu__item" onClick={() => { agentModeAtom.set(m); setMenu(null) }}>
-                <span className="ca-icon">{Icons[icon]}</span><span className="ca-menu__grow">{label}</span>
-                {m === mode && <span className="ca-icon">{Icons.check}</span>}
-              </button>
-            ))}
-          </div>
-        </Popover>
         {mode !== 'agent' && <DirectPills editor={editor} video={mode === 'video'} />}
         {refs.length > 1 && <EachButton compact on={each.on} onChange={each.setOn} />}
         {mode === 'agent' && !agentOff && <AgentPicker onError={onError} />}
         {mode === 'agent' && !agentOff && <RefFrameButton editor={editor} />}
-        {mode === 'agent' && <ModelPrefs onError={onError} />}
         <div className="ca-gen__spacer" />
         <VoiceButton onError={onError} onText={(t) => draftAtom.set(`${draftAtom.get()}${draftAtom.get() ? ' ' : ''}${t}`)} />
         <button type="button" className="ca-gen__send" disabled={!draft.trim() || agentOff} title={busy && mode === 'agent' ? t('composer.sendQueuedAfterTheCurrent') : t('composer.send')} onClick={send}>

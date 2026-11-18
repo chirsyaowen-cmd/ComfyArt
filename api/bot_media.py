@@ -1,3 +1,4 @@
+from pathlib import Path
 import av
 from PIL import Image
 
@@ -16,4 +17,8 @@ def render_attachment(url: str) -> dict:
     if path.lower().endswith(VIDEO_EXT):
         return jpeg(contact_sheet(video_frames(path, SHEET_FRAMES)[0], ATTACH_MAX_PX), ATTACH_MAX_PX)
     with Image.open(path) as im:
-        return jpeg(im, ATTACH_MAX_PX)
+        attachment = jpeg(im, ATTACH_MAX_PX)
+    file = Path(path)
+    if file.name == "preview.png" and file.parent.parent.parent.name == "vectorcraft" and file.with_name("source.svg").is_file():
+        attachment["artwork"] = file.parent.name
+    return attachment

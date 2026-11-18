@@ -20,10 +20,30 @@ export async function call<T>(path: string, init?: RequestInit): Promise<T | nul
   return body as T
 }
 
-export const loadProject = (id: string) => call<TLEditorSnapshot>(url(id))
+const revisions = new Map<string, string>()
 
-export const saveProject = (id: string, snapshot: TLEditorSnapshot, name: string, covers: string[]) =>
-  call<ProjectEntry>(url(id), send('PUT', { snapshot, name, covers }))
+export async function loadProject(id: string): Promise<TLEditorSnapshot | null> {
+  const res = await api(url(id), { cache: 'no-store' })
+  if (res.status === 404) {
+    revisions.delete(id)
+    return null
+  }
+  const revision = res.headers.get('ETag')
+  if (!res.ok || !revision) throw new Error(`Cannot open project (${res.status})`)
+  const snapshot: TLEditorSnapshot = await res.json()
+  revisions.set(id, revision)
+  return snapshot
+}
+
+export async function saveProject(id: string, snapshot: TLEditorSnapshot, name: string, covers: string[]) {
+  const init = send('PUT', { snapshot, name, covers })
+  const expected = revisions.get(id)
+  const res = await api(url(id), { ...init, headers: { ...init.headers, ...(expected ? { 'If-Match': expected } : {}) } })
+  if (!res.ok) throw new Error((await res.json()).error ?? `Save failed (${res.status})`)
+  const revision = res.headers.get('ETag')
+  if (!revision) throw new Error('Missing saved project revision')
+  revisions.set(id, revision)
+}
 
 export async function listProjects(): Promise<ProjectEntry[]> {
   return (await call<{ projects: ProjectEntry[] }>('/comfyart/projects'))?.projects ?? []

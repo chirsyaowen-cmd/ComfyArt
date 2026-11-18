@@ -1,16 +1,11 @@
-import { readLocal } from './localPrefs'
 import { t } from './i18n'
-import { CLIENT_ID, onComfyEvent } from './ws'
+import { onComfyEvent } from './ws'
 
 const POLL_MS = 1500
 
 export type PromptGraph = Record<string, { class_type: string; inputs: Record<string, unknown>; _meta?: { title?: string } }>
 
 export interface ImageRef { filename: string; subfolder: string; type: string; metadata?: { width?: number; height?: number } }
-
-function comfyUser(): string | null {
-  return readLocal('Comfy.userId')
-}
 
 let cloud = false
 let lanIds: string[] = []
@@ -27,8 +22,7 @@ export const LAN_ID = 'srv:'
 const lanPath = (promptId: string) => promptId.slice(LAN_ID.length).replace(':', '/')
 
 export function api(path: string, init?: RequestInit) {
-  const user = comfyUser()
-  return fetch(`/api${path}`, user ? { ...init, headers: { ...init?.headers, 'Comfy-User': user } } : init)
+  return fetch(`/api${path}`, init)
 }
 
 const userFile = (path: string) => `/userdata/${encodeURIComponent(path)}`
@@ -123,9 +117,7 @@ export async function uploadImage(file: Blob, name: string): Promise<ImageRef> {
 }
 
 export async function loadWorkflow(name: string): Promise<PromptGraph> {
-  const res = await fetch(`/comfyart/workflows/${encodeURIComponent(name)}`)
-  if (!res.ok) throw new Error(`workflow ${name} not found`)
-  return res.json()
+  throw new Error(t('standalone.workflowUnavailable', name))
 }
 
 export const titleTags = (node: PromptGraph[string]) => (node._meta?.title ?? '').toLowerCase().split(/[\s,]+/).filter((w) => w.startsWith('@'))
@@ -149,32 +141,8 @@ export async function loadModelPaths(): Promise<Record<string, string>> {
   return modelPaths
 }
 
-function withModelPaths(prompt: PromptGraph): PromptGraph {
-  return Object.fromEntries(Object.entries(prompt).map(([id, node]) => [id, {
-    ...node,
-    inputs: Object.fromEntries(Object.entries(node.inputs).map(([k, v]) => [k, typeof v === 'string' && v in modelPaths ? modelPaths[v] : v])),
-  }]))
-}
-
-function promptError(body: any, status: number): string {
-  const lines = Object.entries<any>(body?.node_errors ?? {}).flatMap(([id, ne]) =>
-    (ne?.errors ?? []).map((er: any) => `${ne.class_type ?? ''} #${id}: ${er.message}${er.details ? ` — ${er.details}` : ''}`))
-  if (lines.length) return lines.join('\n')
-  const top = body?.error
-  if (!top?.message) return `queue failed: ${status}`
-  return top.details ? `${top.message}: ${top.details}` : top.message
-}
-
-export async function queuePrompt(prompt: PromptGraph, runOn = defaultTarget()): Promise<string> {
-  const init = { method: 'POST', headers: { 'Content-Type': 'application/json' } }
-  const res = cloud
-    ? await api('/comfyart/cloud/prompt', { ...init, body: JSON.stringify({ prompt }) })
-    : !lanMode() || runOn === 'local'
-      ? await api('/prompt', { ...init, body: JSON.stringify({ prompt: withModelPaths(prompt), client_id: CLIENT_ID }) })
-      : await api('/comfyart/remote/prompt', { ...init, body: JSON.stringify({ prompt, client_id: CLIENT_ID, target: runOn }) })
-  const body = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(promptError(body, res.status))
-  return String(body.prompt_id)
+export async function queuePrompt(_prompt: PromptGraph, _runOn = defaultTarget()): Promise<string> {
+  throw new Error(t('standalone.disabled'))
 }
 
 const queued = (list: unknown[] | undefined, promptId: string) => (list ?? []).some((e) => Array.isArray(e) && String(e[1]) === promptId)

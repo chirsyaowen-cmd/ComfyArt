@@ -1,3 +1,7 @@
+## Standalone fork
+
+Run ComfyArt with DeepSeek Harness and VectorCraft without a ComfyUI server. See [standalone setup and verification](docs/standalone.md). The original extension documentation follows.
+
 # ComfyArt
 
 English | [中文](README.zh.md)

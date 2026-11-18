@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 
 from conftest import SENT, write_settings
-from server import PromptServer
+from ComfyArt import runtime
 
 from ComfyArt.api import chat_store, mcp_commands
-from ComfyArt.api.mcp_tools import bot_tools
+from ComfyArt.api.mcp_tools import bot_tools, vectorcraft
 from ComfyArt.api.bot_turns import ACTIVE_TURNS
 from ComfyArt.bot.turns import TurnState
 from ComfyArt.bot.guide import CORE_MCP_TOOLS
@@ -14,7 +14,7 @@ from ComfyArt.bot.providers import TurnHandle
 
 
 async def _open(client, project="p", tab="tab-1"):
-    PromptServer.instance.sockets[tab] = object()
+    runtime.sockets[tab] = object()
     await client.post("/comfyart/mcp_page", json={"client_id": tab, "project": project})
 
 
@@ -43,7 +43,7 @@ async def test_mcp_is_off_by_default(bot_client):
 async def test_tools_list_matches_the_core_list(bot_client):
     tools = (await (await bot_client.post("/comfyart/mcp", json=_rpc("tools/list"))).json())["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert names == set(CORE_MCP_TOOLS) - set(bot_tools.TOOLS)
+    assert names == set(CORE_MCP_TOOLS) - set(bot_tools.TOOLS) - set(vectorcraft.TOOLS)
     chat = chat_store.create_chat(user="default", project="p", provider="codex")
     with_chat = await (await bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc("tools/list"))).json()
     assert set(bot_tools.TOOLS) <= {t["name"] for t in with_chat["result"]["tools"]}
@@ -71,12 +71,10 @@ async def test_view_canvas_png_becomes_an_image_block(bot_client):
     assert "png" not in content[0]["text"]
 
 
-async def test_list_models_keeps_its_image_field(bot_client):
-    await _open(bot_client)
-    call = asyncio.create_task(bot_client.post("/comfyart/mcp", json=_rpc("tools/call", {"name": "list_models", "arguments": {}})))
-    await _answer_commands(bot_client, lambda c: {"ok": True, "result": {"image": [{"id": "m"}], "video": []}})
-    content = (await (await call).json())["result"]["content"]
-    assert len(content) == 1 and '"image": [{"id": "m"}]' in content[0]["text"]
+async def test_comfyui_models_are_not_available(bot_client):
+    response = await bot_client.post("/comfyart/mcp", json=_rpc("tools/list"))
+    names = {row["name"] for row in (await response.json())["result"]["tools"]}
+    assert "list_models" not in names and "generate_image" not in names
 
 
 async def test_page_errors_come_back_as_tool_errors(bot_client):
@@ -122,7 +120,7 @@ async def test_generation_asks_first_when_the_chat_runs_in_ask_mode(bot_client):
     msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
     ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
     call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc(
-        "tools/call", {"name": "generate_image", "arguments": {"prompt": "a cat"}})))
+        "tools/call", {"name": "render_vectorcraft", "arguments": {"name": "a cat", "svg": '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'}})))
     for _ in range(200):
         asks = [d for e, d in SENT if e == "comfyart-bot" and d["event"] == "turn_ask"]
         if asks:
