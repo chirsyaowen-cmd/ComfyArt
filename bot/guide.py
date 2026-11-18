@@ -10,7 +10,7 @@ AGENT_GUIDE = (
 
 CORE_MCP_TOOLS = [
     "server_info", "get_canvas", "view_canvas", "view_video", "brand_kits",
-    "render_vectorcraft", "read_vectorcraft", "create_slides", "vectorize_image",
+    "vectorcraft_color_blocks", "render_vectorcraft", "read_vectorcraft", "create_slides", "vectorize_image",
     "add_text", "add_shape", "create_frame", "update_shapes", "delete_shapes",
     "focus", "memory", "skill", "ask_user", "update_plan",
 ]

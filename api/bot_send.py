@@ -66,7 +66,10 @@ async def prepare_attachments(refs: list[dict], kits: list[dict], docs: list[dic
     attachments = []
     for r in visual_refs(refs)[:ATTACH_MAX_COUNT]:
         try:
-            attachments.append(await asyncio.to_thread(render_attachment, r["src"]))
+            attachment = await asyncio.to_thread(render_attachment, r["src"])
+            if r["kind"] == "image" and r.get("id"):
+                attachment["canvas_shape"] = r["id"]
+            attachments.append(attachment)
         except MEDIA_ERRORS as e:
             raise ValueError(f"could not read {r['src']} ({e})") from e
     doc_lines = []

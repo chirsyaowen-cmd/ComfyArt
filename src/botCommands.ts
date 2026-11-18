@@ -182,15 +182,28 @@ function waitResults(editor: Editor, ids: string[], timeout: number) {
 
 const HANDLERS: Record<string, Handler> = {
   ...LAYOUT_HANDLERS,
+  vectorcraft_photo_source: (editor, args) => {
+    const photo = imageOf(editor, args.id)
+    const src = fileSrc(editor, photo)
+    if (!src || editor.getAncestorPageId(photo.id) !== editor.getCurrentPageId()) throw new Error('Open the page containing the source photo')
+    const asset = photo.props.assetId && editor.getAsset(photo.props.assetId)
+    return { src, name: asset?.type === 'image' ? asset.props.name : 'Photo' }
+  },
   place_vectorcraft: (editor, args, _onError, chat) => {
-    const existing = editor.getCurrentPageShapes().find(s => s.meta.vectorcraft === args.artwork && s.meta.vectorChat === chat)
+    const photo = args.beside ? imageOf(editor, args.beside) : undefined
+    if (photo && (editor.getAncestorPageId(photo.id) !== editor.getCurrentPageId() || fileSrc(editor, photo) !== args.source_url)) {
+      throw new Error('Source photo changed during processing. Re-select it and try again.')
+    }
+    const existing = editor.getCurrentPageShapes().find(s => s.meta.vectorcraft === args.artwork && s.meta.vectorChat === chat && s.meta.vectorSource === photo?.id)
     if (existing) return { id: existing.id }
     const ref = { filename: 'preview.png', subfolder: String(args.subfolder), type: 'output' }
     const media = { kind: 'image' as const, ref, src: viewUrl(ref), w: Number(args.width), h: Number(args.height) }
     const center = editor.getViewportPageBounds().center
-    const id = placeMedia(editor, media, String(args.name), center.x, center.y, Math.min(media.w, 512))
-    editor.updateShape({ id, type: 'image', meta: { vectorcraft: String(args.artwork), vectorChat: chat } })
-    place(editor, id, {}, chat)
+    const bounds = photo && editor.getShapePageBounds(photo)
+    const id = placeMedia(editor, media, String(args.name), bounds ? bounds.maxX + GAP : center.x,
+      bounds?.minY ?? center.y, bounds?.width ?? Math.min(media.w, 512), editor.getCurrentPageId())
+    editor.updateShape({ id, type: 'image', meta: { vectorcraft: String(args.artwork), vectorChat: chat, ...(photo ? { vectorSource: photo.id } : {}) } })
+    if (!photo) place(editor, id, {}, chat)
     editor.select(id)
     return { id }
   },

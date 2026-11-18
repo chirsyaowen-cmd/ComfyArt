@@ -25,11 +25,12 @@ class StandaloneDSH(DeepSeekHarnessProvider):
                 turn = replace(turn, attachments=[], user_text=turn.user_text +
                     "\nThe screenshot is unavailable. Review only the supplied geometry and editable text. "
                     "Do not infer pixels or image quality.\n" + layout)
-        if not image_supported and turn.mcp_endpoint and turn.attachments and all(a.get("artwork") for a in turn.attachments):
-            ids = ", ".join(a["artwork"] for a in turn.attachments)
-            text = (f"The selected VectorCraft artwork IDs are {ids}. This session accepts text. "
-                    "Use read_vectorcraft to inspect their original SVG and get_canvas for their current placement.\n"
-                    + turn.user_text)
+        if not image_supported and turn.mcp_endpoint and turn.attachments and all(a.get("canvas_shape") or a.get("artwork") for a in turn.attachments):
+            refs = [f"shape {a.get('canvas_shape', '')}, artwork {a['artwork']}" if a.get("artwork")
+                    else f"photo shape {a['canvas_shape']}" for a in turn.attachments]
+            text = ("Canvas references: " + "; ".join(refs) + ". This model did not receive pixels. "
+                    "Use vectorcraft_color_blocks on the referenced photo for limited-color processing. "
+                    "For existing vector originals use read_vectorcraft. Do not claim visual inspection.\n" + turn.user_text)
             turn = replace(turn, user_text=text, attachments=[])
         return super()._prompt_blocks(turn, image_supported)
 
