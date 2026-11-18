@@ -4,8 +4,10 @@ import { lang } from './i18n'
 
 const WIDTH = 480
 const HEIGHT = 680
-const GAP = WIDTH * 2
+const SPREAD_GAP = 32
 const SPREADS = [[0], [1, 2], [3, 4], [5, 6], [7]]
+
+const PAGE_X = SPREADS.flatMap((spread, group) => spread.map(page => page * WIDTH + group * SPREAD_GAP))
 
 export function getZinePages(editor: Editor): TLShapeId[] {
   const ids = editor.getDocumentSettings().meta.zinePages
@@ -13,25 +15,29 @@ export function getZinePages(editor: Editor): TLShapeId[] {
 }
 
 export function createZine(editor: Editor) {
-  const pages = Array.from({ length: 8 }, () => createShapeId())
-  let x = 0
+  const pages = PAGE_X.map(() => createShapeId())
   editor.run(() => {
-    for (const spread of SPREADS) {
-      for (const page of spread) {
-        editor.createShape({
-          id: pages[page], type: 'frame', parentId: editor.getCurrentPageId(), x, y: 0,
-          props: { w: WIDTH, h: HEIGHT, name: String(page + 1) },
-          meta: { style: { fill: '#fffefa', stroke: '#cecac1' } },
-        })
-        x += WIDTH
-      }
-      x += GAP
-    }
+    editor.createShapes(PAGE_X.map((x, page) => ({
+      id: pages[page], type: 'frame', parentId: editor.getCurrentPageId(), x, y: 0,
+      props: { w: WIDTH, h: HEIGHT, name: String(page + 1) },
+      meta: { style: { fill: '#fffefa', stroke: '#cecac1' } },
+    })))
     editor.updateDocumentSettings({
       name: lang === 'zh' ? '未命名小志' : 'Untitled Zine',
       meta: { ...editor.getDocumentSettings().meta, zinePages: pages },
     })
   })
+}
+
+// Normalize saved books before the editor fixes their paper positions.
+export function restoreZineLayout(editor: Editor) {
+  const moves = getZinePages(editor).flatMap((id, page) => {
+    const frame = editor.getShape(id)
+    return frame?.type === 'frame' && frame.x !== PAGE_X[page]
+      ? [{ id, type: 'frame' as const, x: PAGE_X[page] }]
+      : []
+  })
+  if (moves.length) editor.run(() => editor.updateShapes(moves), { history: 'ignore' })
 }
 
 export function activeZineIndex(editor: Editor) {

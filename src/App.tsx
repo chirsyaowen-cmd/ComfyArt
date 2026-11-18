@@ -85,7 +85,7 @@ import { VideoEditor } from './ui/VideoEditor'
 import { VideoToolbar } from './ui/VideoToolbar'
 import { Zoom } from './ui/Zoom'
 import { lang, t } from './i18n'
-import { createZine, focusZinePage, getZinePages } from './zine'
+import { createZine, focusZinePage, getZinePages, restoreZineLayout } from './zine'
 import { ZineNavigation } from './ui/ZineNavigation'
 import { uuid } from './id'
 
@@ -152,6 +152,7 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
   const onMount = useCallback((ed: Editor) => {
     ed.user.updateUserPreferences({ colorScheme: themeAtom.get(), locale: lang === 'zh' ? 'zh-cn' : 'en' })
     setEditor(ed)
+    restoreZineLayout(ed)
     const stopFrames = registerFrameRules(ed)
     const stopCrop = registerCropRule(ed)
     return () => { stopFrames(); stopCrop() }
