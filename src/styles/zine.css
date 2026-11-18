@@ -1,0 +1,9 @@
+.ca-zine-paper { position: absolute; pointer-events: none; outline: 1px solid #457b9d; outline-offset: 1px; z-index: 100; }
+.ca-zine-paper span { position: absolute; right: 0; bottom: calc(100% + 5px); background: #315c77; color: white; padding: 3px 7px; border-radius: 4px; font: 12px/1.4 system-ui, sans-serif; white-space: nowrap; }
+.ca-zine-nav { position: absolute; z-index: 300; bottom: 3px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; padding: 4px; border: 1px solid var(--ca-border); border-radius: 8px; background: var(--ca-float); color: var(--ca-text); max-width: 96%; overflow-x: auto; }
+.ca-zine-nav button { border: 0; background: transparent; color: inherit; cursor: pointer; font: 500 13px/1.4 system-ui, sans-serif; padding: 4px 7px; white-space: nowrap; }
+.ca-zine-nav button[data-spread-start] { border-left: 1px solid var(--ca-border); margin-left: 2px; }
+.ca-zine-nav button[aria-current] { background: #315c77; color: white; border-radius: 4px; }
+
+.ca-canvas:has(> .ca-zine-nav) { padding-bottom: 40px; box-sizing: border-box; }
+.ca-zine-nav button:nth-child(3)::before, .ca-zine-nav button:nth-child(5)::before, .ca-zine-nav button:nth-child(7)::before { content: '·'; margin-right: 6px; }

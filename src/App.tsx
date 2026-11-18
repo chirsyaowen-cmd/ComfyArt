@@ -1,6 +1,6 @@
 import { getAssetUrlsByImport } from '@tldraw/assets/imports.vite'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { loadSnapshot, Tldraw, useValue, type Editor, type TLAssetStore, type TLComponents, type TLShape } from 'tldraw'
+import { Tldraw, useValue, type Editor, type TLAssetStore, type TLComponents, type TLEditorSnapshot, type TLShape } from 'tldraw'
 import 'tldraw/tldraw.css'
 
 import { isViewUrl, thumbSize, thumbUrl, uploadImage, viewUrl } from './comfy'
@@ -11,7 +11,7 @@ import { defaultKitId, loadLibrary } from './library'
 import { loadMemory } from './memory'
 import { loadModels } from './models'
 import { loadWorkflowConfig } from './customWorkflows'
-import { loadProject, NEW_PARAM } from './projects'
+import { NEW_PARAM } from './projects'
 import { startAutosave } from './autosave'
 import { takeHandoff } from './home/handoff'
 import { markDark, themeAtom } from './theme'
@@ -85,6 +85,8 @@ import { VideoEditor } from './ui/VideoEditor'
 import { VideoToolbar } from './ui/VideoToolbar'
 import { Zoom } from './ui/Zoom'
 import { lang, t } from './i18n'
+import { createZine, focusZinePage, getZinePages, restoreZineLayout } from './zine'
+import { ZineNavigation } from './ui/ZineNavigation'
 import { uuid } from './id'
 
 const CHANNEL = 'comfyart-projects'
@@ -129,7 +131,7 @@ const assets: TLAssetStore = {
   },
 }
 
-export function App({ id }: { id: string }) {
+export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot | null }) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const setError = reportError
   const chat = useValue(chatViewAtom)
@@ -150,6 +152,7 @@ export function App({ id }: { id: string }) {
   const onMount = useCallback((ed: Editor) => {
     ed.user.updateUserPreferences({ colorScheme: themeAtom.get(), locale: lang === 'zh' ? 'zh-cn' : 'en' })
     setEditor(ed)
+    restoreZineLayout(ed)
     const stopFrames = registerFrameRules(ed)
     const stopCrop = registerCropRule(ed)
     return () => { stopFrames(); stopCrop() }
@@ -165,13 +168,14 @@ export function App({ id }: { id: string }) {
     let stopCommands = () => { }
     let stopAutosave = () => { }
     const stopBot = startBot(id, () => staleRef.current)
-    Promise.all([loadProject(id), loadLibrary()])
-      .then(([snap]) => {
+    loadLibrary()
+      .then(() => {
         if (!alive) return
-        if (snap) loadSnapshot(editor.store, snap)
         const doc = editor.getDocumentSettings()
         const kit = new URL(location.href).searchParams.get('kit')
-        if (!snap && !('brandKit' in doc.meta)) editor.updateDocumentSettings({ meta: { ...doc.meta, brandKit: kit ?? defaultKitId() } })
+        if (!snapshot && !('brandKit' in doc.meta)) editor.updateDocumentSettings({ meta: { ...doc.meta, brandKit: kit ?? defaultKitId() } })
+        const params = new URL(location.href).searchParams
+        if (!snapshot && params.has(NEW_PARAM) && params.get('format') === 'zine') createZine(editor)
         if (kit) {
           const url = new URL(location.href)
           url.searchParams.delete('kit')
@@ -181,7 +185,10 @@ export function App({ id }: { id: string }) {
           if (/^Page \d+$/.test(page.name)) editor.renamePage(page.id, page.name.replace('Page', t('app.page')))
         }
         const content = editor.getCurrentPageBounds()
-        if (content) editor.zoomToBounds(content, { targetZoom: 1 })
+        if (getZinePages(editor).length) {
+          editor.selectNone()
+          focusZinePage(editor, 0)
+        } else if (content) editor.zoomToBounds(content, { targetZoom: 1 })
         editor.clearHistory()
         stopJobs = resumeJobs(editor, setError)
         stopScheduler = startScheduler(editor, setError)
@@ -194,6 +201,7 @@ export function App({ id }: { id: string }) {
         if (url.searchParams.has(NEW_PARAM)) {
           void autosave.save()
           url.searchParams.delete(NEW_PARAM)
+          url.searchParams.delete('format')
           history.replaceState(null, '', url)
         }
         takeHandoff(editor, setError).catch((e) => setError(errorText(e)))
@@ -216,7 +224,7 @@ export function App({ id }: { id: string }) {
       channel.close()
       stopAutosave()
     }
-  }, [editor, id])
+  }, [editor, id, snapshot])
 
   return (
     <div className="ca-root" data-chat={chat} data-dock={dock}>
@@ -248,6 +256,7 @@ export function App({ id }: { id: string }) {
           {editor && <SidePanel editor={editor} left onError={setError} />}
           <div className="ca-canvas">
             <Tldraw
+              snapshot={snapshot ?? undefined}
               assets={assets}
               assetUrls={assetUrls}
               shapeUtils={shapeUtils}
@@ -259,6 +268,7 @@ export function App({ id }: { id: string }) {
             >
               <ErrorToasts />
               <DropHandlers onError={setError} />
+              <ZineNavigation />
               <SelectionLabel />
               <EditLayers />
               <ImageToolbar onError={setError} />
