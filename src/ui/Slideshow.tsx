@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { atom, useValue, type Editor, type TLShapeId } from 'tldraw'
 
 import { exportImage } from '../shapes/ArtboardShape'
@@ -8,12 +8,7 @@ import { lang, t } from '../i18n'
 export const slideshowAtom = atom<{ ids: TLShapeId[]; index: number } | null>('slideshow', null)
 
 const bookPreview = atom<{ ids: TLShapeId[]; index: number } | null>('book preview', null)
-const ZineReader = lazy(() => import('./ZineReader').catch(() => ({
-  default: ({ onClose }: { onClose: () => void }) => <div className="ca-book-loading" role="alert">
-    <p>{lang === 'zh' ? '翻书组件加载失败，请保存作品并刷新页面。' : 'Could not load the reader. Save your work and reload the page.'}</p>
-    <button type="button" onClick={onClose}>{t('slideshow.exit')}</button>
-  </div>,
-})))
+type ReaderComponent = typeof import('./ZineReader')['default']
 
 export function openBookPreview(ids: TLShapeId[], index: number) {
   bookPreview.set({ ids, index })
@@ -23,6 +18,15 @@ function closeBookPreview() { bookPreview.set(null) }
 
 function BookPreview({ editor, ids, index }: { editor: Editor; ids: TLShapeId[]; index: number }) {
   const root = useRef<HTMLDialogElement>(null)
+  const [Reader, setReader] = useState<ReaderComponent | 'loading' | 'failed'>('loading')
+  useEffect(() => {
+    let active = true
+    import('./ZineReader').then(
+      module => { if (active) setReader(() => module.default) },
+      () => { if (active) setReader('failed') },
+    )
+    return () => { active = false }
+  }, [])
   useLayoutEffect(() => {
     const dialog = root.current
     if (!dialog) return
@@ -57,9 +61,12 @@ function BookPreview({ editor, ids, index }: { editor: Editor; ids: TLShapeId[];
       e.stopPropagation()
       if (e.key === 'Escape') { e.preventDefault(); closeBookPreview() }
     }}>
-    <Suspense fallback={<div className="ca-book-loading" role="status">{lang === 'zh' ? '正在打开小志…' : 'Opening book…'}</div>}>
-      <ZineReader editor={editor} ids={ids} index={index} onClose={closeBookPreview} />
-    </Suspense>
+    {typeof Reader === 'function' ? <Reader editor={editor} ids={ids} index={index} onClose={closeBookPreview} /> :
+      <div className="ca-book-loading" role={Reader === 'failed' ? 'alert' : 'status'}>
+        {Reader === 'loading' ? (lang === 'zh' ? '正在打开小志…' : 'Opening book…')
+          : (lang === 'zh' ? '翻书组件加载失败，请保存作品并刷新页面。' : 'Could not load the reader. Save your work and reload the page.')}
+        <button type="button" onClick={closeBookPreview}>{t('slideshow.exit')}</button>
+      </div>}
   </dialog>
 }
 
