@@ -18,6 +18,7 @@ import { Popover } from './Popover'
 import { useOnlySelected, useSelectionRect } from './selection'
 import { Num, Section } from './StyleToolbars'
 import { t } from '../i18n'
+import { getZinePages } from '../zine'
 
 const GAP = 22
 const EDGE = 8
@@ -99,14 +100,35 @@ export function registerFrameRules(editor: Editor) {
   const touch = (shape: TLShape) => {
     if (busy) return
     const parent = editor.getShape(shape.parentId as TLShapeId)
-    if (parent?.type !== 'frame') return
+    if (parent?.type !== 'frame' || getZinePages(editor).includes(parent.id)) return
     const frame = parent as TLFrameShape
     if (!isAuto(frame) && sizingOf(frame, 'w') === 'fixed' && sizingOf(frame, 'h') === 'fixed') return
     if (!pending.size) queueMicrotask(flush)
     pending.add(frame.id)
   }
+  const protectedChildren = new Set<TLShapeId>()
+  // tldraw expands a frame deletion to all descendants before removing any records.
+  const beforeDeleteShapes = (ids: TLShapeId[]) => {
+    protectedChildren.clear()
+    for (const page of getZinePages(editor)) {
+      if (ids.includes(page)) editor.visitDescendants(page, id => { protectedChildren.add(id) })
+    }
+  }
+  editor.on('deleted-shapes', beforeDeleteShapes)
   const stops = [
+    () => { editor.off('deleted-shapes', beforeDeleteShapes) },
+    editor.sideEffects.registerBeforeChangeHandler('instance_page_state', (_, next) => {
+      const pages = getZinePages(editor)
+      if (!next.selectedShapeIds.some(id => pages.includes(id))) return next
+      return { ...next, selectedShapeIds: next.selectedShapeIds.filter(id => !pages.includes(id)) }
+    }),
     editor.sideEffects.registerBeforeChangeHandler('shape', (prev, next) => {
+      if (prev.type === 'frame' && next.type === 'frame' && getZinePages(editor).includes(prev.id)) {
+        return {
+          ...next, x: prev.x, y: prev.y, rotation: prev.rotation, parentId: prev.parentId,
+          isLocked: false, props: { ...next.props, w: prev.props.w, h: prev.props.h },
+        }
+      }
       const ratio = next.meta.ratio as number | null | undefined
       if (next.type !== 'frame' || !ratio || prev.type !== 'frame') return next
       const [p, n] = [(prev as TLFrameShape).props, (next as TLFrameShape).props]
@@ -116,6 +138,9 @@ export function registerFrameRules(editor: Editor) {
     }),
     editor.sideEffects.registerAfterChangeHandler('shape', (prev, next) => { touch(next); if (prev.parentId !== next.parentId) touch(prev) }),
     editor.sideEffects.registerAfterCreateHandler('shape', touch),
+    editor.sideEffects.registerBeforeDeleteHandler('shape', (shape) => {
+      if (protectedChildren.delete(shape.id) || (shape.type === 'frame' && getZinePages(editor).includes(shape.id))) return false
+    }),
     editor.sideEffects.registerAfterDeleteHandler('shape', touch),
   ]
   return () => stops.forEach((stop) => stop())
@@ -164,7 +189,7 @@ export function FrameToolbar({ onError }: { onError: (msg: string) => void }) {
   useLayoutEffect(() => {
     if (bar.current && bar.current.offsetWidth !== width) setWidth(bar.current.offsetWidth)
   })
-  if (!frame || !rect) return null
+  if (!frame || !rect || getZinePages(editor).includes(frame.id)) return null
   const host = editor.getContainer().getBoundingClientRect()
   const left = Math.min(Math.max((rect.l + rect.r) / 2 - width / 2, EDGE), host.width - width - EDGE)
   let top = rect.t - GAP - 44

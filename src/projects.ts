@@ -98,10 +98,6 @@ export function newProject(params: Record<string, string | string[]> = {}) {
   location.assign(projectUrl(uuid().slice(0, 8), { [NEW_PARAM]: '1', ...params }))
 }
 
-export async function projectExists(id: string) {
-  return (await loadProject(id)) !== null
-}
-
 export function openView(view: 'home' | 'projects') {
   const url = new URL(location.pathname, location.origin)
   if (view === 'projects') url.searchParams.set('view', 'projects')

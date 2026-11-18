@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { defaultHandleExternalFileContent, useEditor, useToasts, useTranslation, type Editor, type TLShape } from 'tldraw'
 
+import { fileInsertionPoint, selectZinePage, getZinePages } from '../zine'
 import { placeEmbed } from '../embeds'
 import { errorText } from '../jobs'
 import { isPdf, placePdf } from '../pdf'
@@ -14,7 +15,7 @@ export function importFiles(editor: Editor, accept: string) {
   input.multiple = true
   input.onchange = () => {
     const files = Array.from(input.files ?? [])
-    if (files.length) void editor.putExternalContent({ type: 'files', files, point: editor.getViewportPageBounds().center })
+    if (files.length) void editor.putExternalContent({ type: 'files', files, point: fileInsertionPoint(editor) })
   }
   input.click()
 }
@@ -48,8 +49,14 @@ export function DropHandlers({ onError }: { onError: (msg: string) => void }) {
         }
       }
       if (!rest.length) return
+      const page = point && getZinePages(editor).find((id) => editor.getShapePageBounds(id)?.containsPoint(point))
+      if (page) selectZinePage(editor, getZinePages(editor).indexOf(page))
       const before = new Set(editor.getCurrentPageShapeIds())
       await defaultHandleExternalFileContent(editor, { point, files: rest }, { toasts, msg })
+      if (page) {
+        const images = editor.getSelectedShapes().filter((shape) => shape.type === 'image' && !before.has(shape.id))
+        if (images.length) editor.reparentShapes(images, page)
+      }
       const added = editor.getCurrentPageShapes().filter((s) => !before.has(s.id) && s.parentId === editor.getCurrentPageId())
       if (added.length > 1) lineUp(editor, added)
     })
