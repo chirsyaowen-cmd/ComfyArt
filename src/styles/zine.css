@@ -7,3 +7,9 @@
 
 .ca-canvas:has(> .ca-zine-nav) { padding-bottom: 40px; box-sizing: border-box; }
 .ca-zine-nav button:nth-child(3)::before, .ca-zine-nav button:nth-child(5)::before, .ca-zine-nav button:nth-child(7)::before { content: '·'; margin-right: 6px; }
+
+.ca-zine-nav .ca-zine-play { display: grid; place-items: center; border-left: 1px solid var(--ca-border); }
+.ca-zine-play .ca-icon { width: 16px; height: 16px; }
+.ca-book-preview { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #242322; color: #fff; }
+.ca-book-preview::backdrop { background: #242322; }
+.ca-book-loading { display: grid; height: 100%; place-content: center; }

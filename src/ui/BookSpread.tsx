@@ -50,6 +50,7 @@ export function BookSpread({ images, spread, turn, onTurnEnd, onTurn }: BookSpre
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
     let frame = 0
     const start = performance.now()
+    const stripWidth = paper.getBoundingClientRect().width / stripCount
 
     function draw(now: number) {
       if (!paper || !stack) return
@@ -57,7 +58,6 @@ export function BookSpread({ images, spread, turn, onTurnEnd, onTurn }: BookSpre
       const eased = (1 - Math.cos(elapsed * Math.PI)) / 2
       const progress = turn === 1 ? eased : 1 - eased
       const curl = Math.sin(progress * Math.PI)
-      const stripWidth = paper.getBoundingClientRect().width / stripCount
       stack.style.transform = `translateX(${offset + (targetOffset - offset) * eased}%)`
 
       // Walk outward from the spine. Each strip begins at the previous strip's free edge.

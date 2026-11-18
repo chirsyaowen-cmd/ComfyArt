@@ -26,7 +26,8 @@ import { exportAtom } from './ExportDialog'
 import { libraryTabAtom } from './LibraryPanel'
 import { framesOnPage } from './FrameToolbar'
 import { lightboxAtom } from './Lightbox'
-import { slideshowAtom } from './Slideshow'
+import { openBookPreview, slideshowAtom } from './Slideshow'
+import { getZinePages } from '../zine'
 import { sideAtom } from './SidePanel'
 import { t } from '../i18n'
 import { uuid } from '../id'
@@ -137,7 +138,11 @@ function Content() {
           <Item id="zoom-out" label={t('common.zoomOut')} />
           <Item id="zoom-to-fit" label={t('canvasMenu.zoomToFitAll')} />
           <Item id="zoom-to-100" label={t('shortcuts.zoomTo100')} />
-          {s.frames > 0 && <TldrawUiMenuItem id="ca-slideshow" label={t('canvasMenu.playArtboardsFullscreen')} onSelect={() => { slideshowAtom.set({ ids: framesOnPage(editor), index: 0 }) }} />}
+          {s.frames > 0 && <TldrawUiMenuItem id="ca-slideshow" label={t('canvasMenu.playArtboardsFullscreen')} onSelect={() => {
+            const pages = getZinePages(editor)
+            if (pages.length) openBookPreview(pages, 0)
+            else slideshowAtom.set({ ids: framesOnPage(editor), index: 0 })
+          }} />}
           {s.locked && <Item id="unlock-all" label={t('canvasMenu.unlockAll')} />}
         </TldrawUiMenuGroup>
       </>

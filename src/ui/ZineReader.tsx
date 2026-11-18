@@ -12,6 +12,7 @@ type Direction = -1 | 1
 type View =
   | { phase: 'open'; spread: number }
   | { phase: 'preparing' | 'turning'; spread: number; direction: Direction }
+  | { phase: 'failed'; spread: number; direction: Direction | null }
 
 function pageImages(editor: Editor, ids: TLShapeId[]) {
   const images = new Map<number, string>()
@@ -69,8 +70,6 @@ export default function ZineReader({ editor, ids, index, onClose }: ReaderProps)
     phase: 'open', spread: Math.max(0, SPREADS.findIndex(pages => pages.includes(index))),
   }))
   const [images, setImages] = useState<ReadonlyMap<number, string>>(() => new Map())
-  const [failed, setFailed] = useState(false)
-  const [attempt, setAttempt] = useState(0)
   const cache = useRef<ReturnType<typeof pageImages> | null>(null)
 
   useEffect(() => {
@@ -81,10 +80,9 @@ export default function ZineReader({ editor, ids, index, onClose }: ReaderProps)
 
   useEffect(() => {
     const session = cache.current
-    if (!session || view.phase === 'turning') return
+    if (!session || view.phase === 'turning' || view.phase === 'failed') return
     let cancelled = false
     let idleTimer: number | undefined
-    setFailed(false)
 
     async function prepare(pages: NonNullable<typeof session>) {
       const next = view.phase === 'preparing' ? view.spread + view.direction : view.spread
@@ -107,15 +105,17 @@ export default function ZineReader({ editor, ids, index, onClose }: ReaderProps)
         }
       }, 80)
     }
-    void prepare(session).catch(() => { if (!cancelled) setFailed(true) })
+    void prepare(session).catch(() => {
+      if (!cancelled) setView({ phase: 'failed', spread: view.spread, direction: view.phase === 'preparing' ? view.direction : null })
+    })
     return () => { cancelled = true; window.clearTimeout(idleTimer) }
-  }, [view, editor, ids, attempt])
+  }, [view, editor, ids])
 
   const ready = SPREADS[view.spread].every(page => images.has(page))
   const turn = useCallback((direction: Direction) => {
     if (!ready) return
     setView(current => {
-      if (current.phase !== 'open' || !SPREADS[current.spread + direction]) return current
+      if (current.phase === 'turning' || current.phase === 'preparing' || !SPREADS[current.spread + direction]) return current
       return { phase: 'preparing', spread: current.spread, direction }
     })
   }, [ready])
@@ -146,16 +146,18 @@ export default function ZineReader({ editor, ids, index, onClose }: ReaderProps)
   const label = view.spread === 0 ? (zh ? '封面' : 'Cover')
     : view.spread === SPREADS.length - 1 ? (zh ? '封底' : 'Back cover')
     : pages.map(page => page + 1).join('–')
-  const busy = view.phase !== 'open' || !ready
+  const busy = view.phase === 'turning' || view.phase === 'preparing' || !ready
 
   return (
     <div className="ca-zine-reader">
       <div className="ca-zine-reader__stage">
         {ready && <BookSpread images={images} spread={view.spread}
           turn={view.phase === 'turning' ? view.direction : null} onTurnEnd={finish} onTurn={turn} />}
-        {failed ? <div className="ca-zine-reader__notice" role="alert">
+        {view.phase === 'failed' ? <div className="ca-zine-reader__notice" role="alert">
           {zh ? '书页加载失败' : 'Could not load the page'}
-          <button type="button" onClick={() => setAttempt(value => value + 1)}>{zh ? '重试' : 'Retry'}</button>
+          <button type="button" onClick={() => setView(view.direction
+            ? { phase: 'preparing', spread: view.spread, direction: view.direction }
+            : { phase: 'open', spread: view.spread })}>{zh ? '重试' : 'Retry'}</button>
         </div> : (!ready || view.phase === 'preparing') &&
           <div className="ca-zine-reader__notice" role="status">{t('assetPicker.loading')}</div>}
       </div>
