@@ -5,7 +5,7 @@ import { lang } from './i18n'
 const WIDTH = 480
 const HEIGHT = 680
 const SPREAD_GAP = 32
-const SPREADS = [[0], [1, 2], [3, 4], [5, 6], [7]]
+export const SPREADS = [[0], [1, 2], [3, 4], [5, 6], [7]]
 
 const PAGE_X = SPREADS.flatMap((spread, group) => spread.map(page => page * WIDTH + group * SPREAD_GAP))
 

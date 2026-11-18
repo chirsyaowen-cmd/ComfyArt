@@ -2,8 +2,10 @@ import { useEffect } from 'react'
 import { useEditor, useValue, type TLEventInfo } from 'tldraw'
 
 import { createPortal } from 'react-dom'
-import { lang } from '../i18n'
+import { lang, t } from '../i18n'
 import { activeZineIndex, focusZinePage, getZinePages, selectZinePage } from '../zine'
+import { openBookPreview } from './Slideshow'
+import { Icons } from './icons'
 import '../styles/zine.css'
 
 export function ZineNavigation() {
@@ -49,6 +51,10 @@ export function ZineNavigation() {
         onClick={() => { editor.complete(); editor.selectNone(); focusZinePage(editor, i) }}>
         {i === 0 ? (zh ? '封面' : 'Cover') : i === pages.length - 1 ? (zh ? '封底' : 'Back') : i + 1}
       </button>)}
+      <button type="button" className="ca-zine-play" title={t('frameToolbar.playFullscreen')}
+        aria-label={t('frameToolbar.playFullscreen')} onClick={() => { editor.complete(); openBookPreview(pages, active) }}>
+        <span className="ca-icon">{Icons.play}</span>
+      </button>
     </nav>, canvas)}
   </>
 }
