@@ -18,7 +18,7 @@ import { Popover } from './Popover'
 import { useOnlySelected, useSelectionRect } from './selection'
 import { Num, Section } from './StyleToolbars'
 import { t } from '../i18n'
-import { getZinePages } from '../zine'
+import { getZinePages, zinePositions } from '../zine'
 
 const GAP = 22
 const EDGE = 8
@@ -117,15 +117,25 @@ export function registerFrameRules(editor: Editor) {
   editor.on('deleted-shapes', beforeDeleteShapes)
   const stops = [
     () => { editor.off('deleted-shapes', beforeDeleteShapes) },
+    editor.sideEffects.registerBeforeChangeHandler('document', (prev, next) => {
+      // Undo replays whole document records. An added spread only owns the page order.
+      if (prev.meta.zinePages !== next.meta.zinePages && Array.isArray(next.meta.zinePages)
+        && 'isReplayingHistory' in editor && typeof editor.isReplayingHistory === 'function' && editor.isReplayingHistory()) {
+        return { ...prev, meta: { ...prev.meta, zinePages: next.meta.zinePages } }
+      }
+      return next
+    }),
     editor.sideEffects.registerBeforeChangeHandler('instance_page_state', (_, next) => {
       const pages = getZinePages(editor)
       if (!next.selectedShapeIds.some(id => pages.includes(id))) return next
       return { ...next, selectedShapeIds: next.selectedShapeIds.filter(id => !pages.includes(id)) }
     }),
     editor.sideEffects.registerBeforeChangeHandler('shape', (prev, next) => {
-      if (prev.type === 'frame' && next.type === 'frame' && getZinePages(editor).includes(prev.id)) {
-        return {
-          ...next, x: prev.x, y: prev.y, rotation: prev.rotation, parentId: prev.parentId,
+      if (prev.type === 'frame' && next.type === 'frame') {
+        const pages = getZinePages(editor)
+        const page = pages.indexOf(prev.id)
+        if (page >= 0) return {
+          ...next, ...zinePositions(pages.length)[page], rotation: prev.rotation, parentId: prev.parentId,
           isLocked: false, props: { ...next.props, w: prev.props.w, h: prev.props.h },
         }
       }
