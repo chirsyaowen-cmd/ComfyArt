@@ -196,6 +196,7 @@
   "canvasMenu.viewLarger": "放大查看",
   "canvasMenu.zoomToFitAll": "缩放到全部内容",
   "canvasTools.backToContent": "回到内容",
+  "canvasTools.followTheme": "跟随主题",
   "canvasTools.canvasBackgroundColor": "画布背景色",
   "canvasTools.generatedFiles": "生成文件",
   "canvasTools.minimap": "小地图",

@@ -11,11 +11,12 @@ const valid = (v: string) => /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)
 const rgbOf = (v: string) => v.slice(0, 7).toUpperCase()
 const withAlpha = (rgb: string, a: number) => (a >= 1 ? rgb : `${rgb}${Math.round(a * 255).toString(16).padStart(2, '0').toUpperCase()}`)
 
-export function ColorPicker({ value, onChange, title, trigger, allowNone, alpha }: {
+export function ColorPicker({ value, onChange, title, trigger, allowNone, defaultOption, alpha }: {
   value: string
   onChange: (v: string) => void
   title: string
   trigger?: (props: { open: boolean; toggle: () => void }) => ReactNode
+  defaultOption?: { label: string; background: string }
   allowNone?: boolean
   alpha?: boolean
 }) {
@@ -32,12 +33,19 @@ export function ColorPicker({ value, onChange, title, trigger, allowNone, alpha 
       side="top"
       trigger={trigger ?? (({ open: o, toggle }) => (
         <button type="button" className="ca-bar__btn ca-bar__btn--icon" title={title} data-open={o || undefined} onClick={toggle}>
-          <span className="ca-tools__dot" data-none={!value || undefined} style={{ background: value || undefined }} />
+          <span className="ca-tools__dot" data-none={!value && !defaultOption || undefined} style={{ background: value || defaultOption?.background }} />
         </button>
       ))}
     >
       <div className="ca-menu ca-bg">
         <div className="ca-gen__title">{title}</div>
+        {defaultOption && (
+          <button type="button" className="ca-menu__item" aria-pressed={!value} onClick={() => onChange('')}>
+            <span className="ca-tools__dot" style={{ background: defaultOption.background }} />
+            {defaultOption.label}
+            {!value && <span aria-hidden="true">✓</span>}
+          </button>
+        )}
         <div className="ca-bg__swatches ca-bg__swatches--wrap">
           {allowNone && <button type="button" className="ca-bg__swatch ca-bg__none" title={t('common.none')} data-on={!value || undefined} onClick={() => onChange('')} />}
           {SWATCHES.map((c) => (
