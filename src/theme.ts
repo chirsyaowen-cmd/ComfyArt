@@ -8,7 +8,7 @@ export const THEMES: [Theme, string][] = [['light', t('projectHeader.themeLight'
 
 const KEY = 'comfyart.theme'
 
-export const themeAtom = atom<Theme>('theme', 'dark')
+export const themeAtom = atom<Theme>('theme', 'light')
 
 const systemDark = matchMedia('(prefers-color-scheme: dark)')
 const isDark = (theme: Theme) => theme === 'dark' || (theme === 'system' && systemDark.matches)
