@@ -2,6 +2,8 @@ import { Box, createShapeId, isShapeId, type Editor, type TLShapeId } from 'tldr
 
 import { lang } from './i18n'
 
+export const ZINE_PAPER_STYLE = { fill: '#fffefa', stroke: '#cecac1' }
+
 const WIDTH = 480
 const HEIGHT = 680
 const SPREAD_GAP = 32
@@ -20,7 +22,7 @@ export function createZine(editor: Editor) {
     editor.createShapes(PAGE_X.map((x, page) => ({
       id: pages[page], type: 'frame', parentId: editor.getCurrentPageId(), x, y: 0,
       props: { w: WIDTH, h: HEIGHT, name: String(page + 1) },
-      meta: { style: { fill: '#fffefa', stroke: '#cecac1' } },
+      meta: { style: { ...ZINE_PAPER_STYLE } },
     })))
     editor.updateDocumentSettings({
       name: lang === 'zh' ? '未命名小志' : 'Untitled Zine',

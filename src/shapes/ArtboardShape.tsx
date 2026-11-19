@@ -3,6 +3,7 @@ import { FrameShapeUtil, Vec, type Editor, type SvgExportContext, type TLFrameSh
 
 import { t } from '../i18n'
 import { canvasBlob } from '../canvasBlob'
+import { activeZineIndex, getZinePages, SPREADS, ZINE_PAPER_STYLE } from '../zine'
 
 export interface ArtboardStyle { fill?: string; stroke?: string; radius?: number }
 
@@ -64,8 +65,16 @@ export class ArtboardShapeUtil extends FrameShapeUtil.configure({
   override component(shape: TLFrameShape) {
     const r = radiusOf(shape)
     const empty = shape.meta.refFrame === true && !this.editor.getSortedChildIdsForParent(shape.id).length
+    const page = getZinePages(this.editor).indexOf(shape.id)
+    const spread = page >= 0 ? SPREADS.find(pages => pages.includes(page)) : undefined
+    const side = spread && (spread.length === 1 ? 'single' : spread[0] === page ? 'left' : 'right')
+    const { fill, stroke } = artboardStyle(shape)
     return (
-      <div style={{ display: 'contents', '--ca-frame-r': `${r}px` } as CSSProperties}>
+      <div style={{ display: 'contents', '--ca-frame-r': `${r}px` } as CSSProperties}
+        data-zine-side={side}
+        data-zine-active={side && page === activeZineIndex(this.editor) || undefined}
+        data-zine-default-fill={side && fill === ZINE_PAPER_STYLE.fill || undefined}
+        data-zine-default-edge={side && stroke === ZINE_PAPER_STYLE.stroke || undefined}>
         {super.component(shape)}
         {empty && <div className="ca-reframe__hint">{t('chatFrame.dropHint')}</div>}
       </div>
