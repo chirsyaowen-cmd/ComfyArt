@@ -1,5 +1,7 @@
 import { react, type Editor, type TLImageShape, type TLShapeId, type TLVideoShape } from 'tldraw'
 
+import { appendSearchReferences, referenceSourceAtom } from './ui/ReferencePanel'
+import { sideAtom } from './ui/SidePanel'
 import * as actions from './actions'
 import { generateAudio, imageTo3d, musicModels, viewsTo3d, voices } from './assetGen'
 import { editElements } from './elements'
@@ -182,6 +184,14 @@ function waitResults(editor: Editor, ids: string[], timeout: number) {
 
 const HANDLERS: Record<string, Handler> = {
   ...LAYOUT_HANDLERS,
+  add_search_references: (editor, args) => {
+    const added = appendSearchReferences(editor, args.images)
+    if (added) {
+      referenceSourceAtom.set('all')
+      sideAtom.set('references')
+    }
+    return { added }
+  },
   vectorcraft_photo_source: (editor, args) => {
     const photo = imageOf(editor, args.id)
     const src = fileSrc(editor, photo)

@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
-import { createShapeId, useValue, type Editor, type TLImageShape } from 'tldraw'
+import { useEffect, useRef, useState } from 'react'
+import { atom, createShapeId, useValue, type Editor, type TLImageShape } from 'tldraw'
 
 import { draftAtom, extraRefsAtom, srcOf } from '../agent'
-import { imageUrl, refFromUrl, uploadImage, viewUrl } from '../comfy'
+import { imageUrl, isViewUrl, refFromUrl, uploadImage, viewUrl } from '../comfy'
 import { createGenerator, generate } from '../generate'
 import { type ErrorSink, errorText, placeMedia, toMedia } from '../jobs'
 import { ask, stripThink } from '../llm'
@@ -16,10 +16,11 @@ import { t } from '../i18n'
 import { uuid } from '../id'
 import { isEnter } from './keys'
 
-type Source = 'upload' | 'canvas' | 'assets'
-interface Reference { src: string; notes?: string; name?: string; source?: Source; time?: number; key?: string }
+type Source = 'upload' | 'canvas' | 'assets' | 'search'
+export const referenceSourceAtom = atom<Source | 'all'>('reference source', 'all')
+interface Reference { src: string; notes?: string; name?: string; source?: Source; time?: number; key?: string; imageUrl?: string; sourcePageUrl?: string }
 
-const SOURCES: [Source | 'all', string][] = [['all', t('common.all')], ['upload', t('assetPicker.upload')], ['canvas', t('referencePanel.canvas')], ['assets', t('referencePanel.library')]]
+const SOURCES: [Source | 'all', string][] = [['all', t('common.all')], ['upload', t('assetPicker.upload')], ['canvas', t('referencePanel.canvas')], ['assets', t('referencePanel.library')], ['search', t('referencePanel.search')]]
 const SORTS: [string, string][] = [['time', t('referencePanel.newest')], ['name', t('referencePanel.name')]]
 const keyOf = (r: Reference) => r.key ?? r.src
 const nameOf = (r: Reference) => r.name ?? decodeURIComponent(new URL(r.src, location.origin).searchParams.get('filename') ?? t('common.reference'))
@@ -58,6 +59,25 @@ function setRefs(editor: Editor, refs: Reference[]) {
   editor.updateDocumentSettings({ meta: { ...doc.meta, references: refs as any } })
 }
 
+export function appendSearchReferences(editor: Editor, images: unknown) {
+  if (!Array.isArray(images)) throw new Error('Expected a list of search images')
+  const refs = refsOf(editor)
+  const seen = new Set(refs.map((r) => r.imageUrl ?? r.src))
+  const additions: Reference[] = []
+  for (const image of images) {
+    if (!image || typeof image.localUrl !== 'string' || !isViewUrl(image.localUrl) ||
+        typeof image.title !== 'string' || typeof image.imageUrl !== 'string' || typeof image.sourcePageUrl !== 'string') {
+      throw new Error('Invalid search reference')
+    }
+    if (seen.has(image.imageUrl)) continue
+    seen.add(image.imageUrl)
+    additions.push({ src: image.localUrl, key: image.imageUrl, imageUrl: image.imageUrl, sourcePageUrl: image.sourcePageUrl,
+      name: image.title || t('common.reference'), time: Date.now(), source: 'search' })
+  }
+  if (additions.length) setRefs(editor, [...refs, ...additions])
+  return additions.length
+}
+
 async function moodboard(editor: Editor, refs: Reference[]) {
   const media = await Promise.all(refs.map((r) => toMedia(refFromUrl(r.src), 'image')))
   const heights = media.map((m) => MOOD_W * m.h / m.w)
@@ -86,11 +106,15 @@ export function ReferencePanel({ editor, onError }: { editor: Editor; onError: E
   const [pick, setPick] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const file = useRef<HTMLInputElement>(null)
-  const [source, setSource] = useState<Source | 'all'>('all')
+  const source = useValue(referenceSourceAtom)
+  useEffect(() => () => { referenceSourceAtom.set('all') }, [])
   const [sort, setSort] = useState('time')
   const [menu, setMenu] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
-  const add = (srcs: string[], from: Source) => setRefs(editor, [...refs, ...srcs.filter((s) => !refs.some((r) => r.src === s)).map((src) => ({ src, source: from, time: Date.now() }))])
+  const add = (srcs: string[], from: Source) => {
+    const current = refsOf(editor)
+    setRefs(editor, [...current, ...srcs.filter((src) => !current.some((r) => r.src === src)).map((src) => ({ src, source: from, time: Date.now() }))])
+  }
   const update = (key: string, patch: Partial<Reference>) => setRefs(editor, refsOf(editor).map((r) => (keyOf(r) === key ? { ...r, ...patch } : r)))
   const removeRef = (key: string) => setRefs(editor, refsOf(editor).filter((r) => keyOf(r) !== key))
   const shown = refs.filter((r) => source === 'all' || (r.source ?? 'upload') === source)
@@ -120,7 +144,7 @@ export function ReferencePanel({ editor, onError }: { editor: Editor; onError: E
   const toChat = async (r: Reference) => {
     const m = await toMedia(refFromUrl(r.src), 'image')
     const c = editor.getViewportPageBounds().center
-    const id = placeMedia(editor, m, t('common.reference'), c.x - 200, c.y - 200 * m.h / m.w, 400)
+    const id = placeMedia(editor, m, r.name || t('common.reference'), c.x - 200, c.y - 200 * m.h / m.w, 400)
     extraRefsAtom.set([...extraRefsAtom.get(), id])
     if (r.notes) draftAtom.set(t('referencePanel.referenceNotes', draftAtom.get(), draftAtom.get() ? '\n' : '', r.notes.split('\n').slice(1).join(' ')))
   }
@@ -150,7 +174,7 @@ export function ReferencePanel({ editor, onError }: { editor: Editor; onError: E
       </div>
       {refs.length > 0 && (
         <div className="ca-style__row">
-          <Chips value={source} options={SOURCES} onPick={setSource} />
+          <Chips value={source} options={SOURCES} onPick={(value) => referenceSourceAtom.set(value)} />
           <span className="ca-menu__grow" />
           <Chips value={sort} options={SORTS} onPick={setSort} />
         </div>
@@ -180,7 +204,10 @@ export function ReferencePanel({ editor, onError }: { editor: Editor; onError: E
           </div>
           {renaming === keyOf(r)
             ? <input autoFocus className="ca-panel__input" defaultValue={nameOf(r)} onBlur={(e) => { setRenaming(null); if (e.target.value.trim()) update(keyOf(r), { name: e.target.value.trim() }) }} onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e)) e.currentTarget.blur() }} />
-            : <div className="ca-ref__name" onDoubleClick={() => setRenaming(keyOf(r))}>{nameOf(r)}<span className="ca-model__tag">{SOURCES.find(([k]) => k === (r.source ?? 'upload'))![1]}</span></div>}
+            : <div className="ca-ref__name" onDoubleClick={() => setRenaming(keyOf(r))}>
+              <span className="ca-ref__title" title={nameOf(r)}>{nameOf(r)}</span>
+              <span className="ca-model__tag">{SOURCES.find(([k]) => k === (r.source ?? 'upload'))![1]}</span>
+            </div>}
           <div className="ca-panel__chips">
             {ANALYSES.map((a) => (
               <button key={a[0]} type="button" className="ca-panel__chip" disabled={!!busy} onClick={() => void analyze(r, a)}>{busy === `${r.src}${a[0]}` ? t('referencePanel.analyzing') : a[0]}</button>

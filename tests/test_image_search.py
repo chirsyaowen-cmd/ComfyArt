@@ -1,34 +1,60 @@
+import asyncio
+import io
 import json
 
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 import pytest
+from PIL import Image
+from test_mcp import _answer_commands, _open
 
 from ComfyArt.api.mcp_tools import image_search
 
 
 async def test_search_images_through_mcp(bot_client, monkeypatch):
-    row = {"title": "Zine", "url": "https://example.org/zine",
-           "properties": {"url": "https://example.org/cover.jpg"},
-           "thumbnail": {"src": "https://example.org/small.jpg"}}
+    png = io.BytesIO()
+    Image.new("RGB", (3, 4)).save(png, format="PNG")
+
     async def brave(request):
         assert request.headers["X-Subscription-Token"] == "test-token"
         assert dict(request.query) == {"q": "黑白拼贴", "count": "2", "safesearch": "strict"}
-        return web.json_response({"results": [{}, row, row]})
+        row = {"title": "Zine", "url": "https://example.org/zine",
+               "properties": {"url": str(server.make_url("/cover"))}}
+        bad = {**row, "properties": {"url": str(server.make_url("/not-an-image"))}}
+        return web.json_response({"results": [{}, row, row, bad]})
+
+    async def cover(request):
+        assert "X-Subscription-Token" not in request.headers
+        return web.Response(body=png.getvalue())
+
+    async def invalid(request):
+        return web.Response(text="Not an image")
 
     app = web.Application()
     app.router.add_get("/images", brave)
+    app.router.add_get("/cover", cover)
+    app.router.add_get("/not-an-image", invalid)
+    await _open(bot_client, "other", "other-tab")
+    await _open(bot_client, "current")
     async with TestServer(app) as server:
         monkeypatch.setattr(image_search, "ENDPOINT", str(server.make_url("/images")))
+        monkeypatch.setattr(image_search, "_public_socket", None)  # allow the fixture's loopback server
         monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "test-token")
         request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                    "params": {"name": "search_images", "arguments": {"query": "黑白拼贴", "count": 2}}}
-        result = (await (await bot_client.post("/comfyart/mcp", json=request)).json())["result"]
-    assert not result["isError"]
-    assert json.loads(result["content"][0]["text"]) == {"images": [{
-        "title": "Zine", "thumbnailUrl": row["thumbnail"]["src"], "imageUrl": row["properties"]["url"],
-        "sourcePageUrl": row["url"],
-    }]}
+        call = asyncio.create_task(bot_client.post("/comfyart/mcp?project=current", json=request))
+        command, = await _answer_commands(bot_client, lambda _: {"ok": True, "result": {"added": 1}})
+        result = (await (await call).json())["result"]
+        assert not result["isError"]
+        data = json.loads(result["content"][0]["text"])
+        saved, failed = data["images"]
+        assert data["added"] == 1 and "localUrl" not in failed
+        assert saved == {"title": "Zine", "thumbnailUrl": None, "imageUrl": str(server.make_url("/cover")),
+                         "sourcePageUrl": "https://example.org/zine", "localUrl": saved["localUrl"], "savedFrom": "original"}
+        assert command["action"] == "add_search_references" and command["project"] == "current"
+        assert command["args"]["images"] == [saved]
+        response = await bot_client.get(saved["localUrl"].removeprefix("/api"))
+        assert response.content_type == "image/png" and await response.read() == png.getvalue()
 
 
 async def test_search_images_without_key(monkeypatch):
