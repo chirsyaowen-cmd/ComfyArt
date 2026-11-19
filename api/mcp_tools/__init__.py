@@ -1,7 +1,7 @@
 from . import vectorcraft
 
 from .. import chat_store
-from . import bot_tools, canvas, media
+from . import bot_tools, canvas, image_search, media
 from ._context import BOT_CHAT_ID, PROJECT
 
 
@@ -27,4 +27,5 @@ CANVAS_TOOLS = ("get_canvas", "view_canvas", "brand_kits", "add_text", "add_shap
 TOOLS.update({name: canvas.TOOLS[name] for name in CANVAS_TOOLS})
 TOOLS.update(vectorcraft.TOOLS)
 TOOLS.update(media.TOOLS)
+TOOLS.update(image_search.TOOLS)
 TOOLS.update(bot_tools.TOOLS)

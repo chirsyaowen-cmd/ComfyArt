@@ -12,6 +12,8 @@ def configure_tldraw(root: Path):
     node = Path(config["nodeExecutable"])
     os.environ["PATH"] = str(node.parent) + os.pathsep + os.environ.get("PATH", "")
     os.environ.setdefault("COMFYART_DSH", str(Path(config["engineRoot"]) / "apps/cli/lib/bin.js"))
+    if config.get("braveSearchApiKey"):
+        os.environ.setdefault("BRAVE_SEARCH_API_KEY", config["braveSearchApiKey"])
     artwork = config.get("artwork", {})
     if artwork.get("enabled") and artwork.get("executable"):
         os.environ.setdefault("VECTORCRAFT_CLI", artwork["executable"])
