@@ -75,6 +75,7 @@ export function addZineSpread(editor: Editor) {
   const frames = [insertAt, insertAt + 1].map(i => blankPage(createShapeId(), editor.getCurrentPageId(), i, positions[i]))
   if (!editor.canCreateShapes(frames)) return
 
+  selectZinePage(editor, activeZineIndex(editor))
   editor.markHistoryStoppingPoint('add zine spread')
   editor.run(() => {
     const doc = editor.getDocumentSettings()
@@ -86,10 +87,8 @@ export function addZineSpread(editor: Editor) {
       id: back.id, type: 'frame', ...positions[order.length - 1],
       props: back.props.name === String(pages.length) ? { name: String(order.length) } : {},
     })
-    editor.selectNone()
   }, { ignoreShapeLock: true })
   editor.markHistoryStoppingPoint()
-  selectZinePage(editor, insertAt)
 }
 
 // Normalize saved books before the editor fixes their paper positions.
@@ -108,13 +107,18 @@ export function restoreZineLayout(editor: Editor) {
 }
 
 export function activeZineIndex(editor: Editor) {
-  const index = editor.getInstanceState().meta.zinePageIndex
-  if (typeof index !== 'number' || !Number.isInteger(index)) return 0
-  return Math.max(0, Math.min(index, getZinePages(editor).length - 1))
+  const pages = getZinePages(editor)
+  const { zinePageId, zinePageIndex } = editor.getInstanceState().meta
+  const index = pages.findIndex(page => page === zinePageId)
+  if (index >= 0) return index
+  if (typeof zinePageIndex !== 'number' || !Number.isInteger(zinePageIndex)) return 0
+  return Math.max(0, Math.min(zinePageIndex, pages.length - 1))
 }
 
 export function selectZinePage(editor: Editor, index: number) {
-  if (index !== editor.getInstanceState().meta.zinePageIndex) editor.updateInstanceState({ meta: { ...editor.getInstanceState().meta, zinePageIndex: index } })
+  const page = getZinePages(editor)[index]
+  const { meta } = editor.getInstanceState()
+  if (page && page !== meta.zinePageId) editor.updateInstanceState({ meta: { ...meta, zinePageId: page } })
 }
 
 export function fileInsertionPoint(editor: Editor) {

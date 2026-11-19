@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useEditor, useValue, type TLEventInfo } from 'tldraw'
 
 import { createPortal } from 'react-dom'
@@ -15,14 +15,6 @@ export function ZineNavigation() {
 
   const canAdd = useValue('can add zine pages', () => pages.length > 0 && !editor.getIsReadonly()
     && editor.getCurrentPageShapeIds().size + 2 <= editor.options.maxShapesPerPage, [editor, pages])
-
-  const previousCount = useRef(pages.length)
-  useLayoutEffect(() => {
-    if (previousCount.current && pages.length && previousCount.current !== pages.length) {
-      focusZinePage(editor, activeZineIndex(editor))
-    }
-    previousCount.current = pages.length
-  }, [editor, pages.length])
 
   useEffect(() => {
     if (!pages.length) return
