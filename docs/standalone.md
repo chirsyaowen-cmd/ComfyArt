@@ -26,7 +26,7 @@ COMFYART_DATA="$PWD/.local/data" DSH_HOME="$PWD/.local/dsh" \
 
 ## 对话、原稿和保存
 
-在聊天里输入「帮我找 3 张黑白拼贴 Zine 封面参考，附来源」，Agent 会通过 `search_images` 搜索 Brave 图片并返回参考链接。启动后端时设置 `BRAVE_SEARCH_API_KEY` 即可启用。使用 `COMFYART_TLDRAW` 启动时，默认沿用本机 tldraw 配置中的 `braveSearchApiKey`，显式设置的环境变量优先。
+在聊天里输入「帮我找 3 张黑白拼贴 Zine 封面参考，附来源」，Agent 会通过 `search_images` 搜索 Brave 图片并返回来源链接。图片会保留标题，自动加入当前项目的参考图。优先保存原图，原图无法下载时使用 Brave 提供的预览图。新增图片后，参考图侧栏会打开并显示全部来源。启动后端时设置 `BRAVE_SEARCH_API_KEY` 即可启用。使用 `COMFYART_TLDRAW` 启动时，默认沿用本机 tldraw 配置中的 `braveSearchApiKey`，显式设置的环境变量优先。
 
 - 网页通过同源 HTTP 发送消息和附件。网站复用 ComfyArt 原有 ACP 适配器启动 DSH，用 `session/new` 创建会话，后续通过 `session/resume` 恢复同一会话。
 - DSH 调用网站提供的 HTTP MCP 工具 `render_vectorcraft`。网站从聊天记录确定目标项目，把静态 SVG 放入该项目的临时目录，使用本机 tldraw 项目的 stdio 客户端启动 `vectorcraft-cli mcp --headless`。VectorCraft 打开 SVG、保存原稿并导出 PNG，读写范围限于本次渲染目录。

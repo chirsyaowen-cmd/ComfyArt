@@ -954,6 +954,7 @@
   "referencePanel.copy": "{0} 副本",
   "referencePanel.copyNeedsSecureContext": "复制图片需要 HTTPS 或 localhost 访问，请换成其中一种方式打开 ComfyArt",
   "referencePanel.generateVariations": "生成变体",
+  "referencePanel.search": "搜到的参考图",
   "referencePanel.library": "素材库",
   "referencePanel.moodBoard": "情绪板",
   "referencePanel.moodboard": "生成情绪板",

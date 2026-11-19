@@ -954,6 +954,7 @@
   "referencePanel.copy": "{0} copy",
   "referencePanel.copyNeedsSecureContext": "Copying images needs HTTPS or localhost; open ComfyArt through one of them",
   "referencePanel.generateVariations": "Generate Variations",
+  "referencePanel.search": "Image search",
   "referencePanel.library": "Library",
   "referencePanel.moodBoard": "Mood Board",
   "referencePanel.moodboard": "Generate moodboard",

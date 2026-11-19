@@ -280,7 +280,9 @@
 .ca-details__detail { font-size: 12px; line-height: 18px; white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow: auto; }
 .ca-details__detail[data-error] { color: #dc2626; }
 .ca-memory__log { font-size: 13px; }
-.ca-ref__name { display: flex; align-items: center; gap: 6px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ca-ref__name { display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.ca-ref__title { overflow: hidden; text-overflow: ellipsis; }
+.ca-ref__name .ca-model__tag { flex: none; margin-left: 0; }
 .ca-ability { align-items: flex-start; padding: 8px 0; }
 .ca-ability .ca-menu__grow { display: flex; flex-direction: column; gap: 2px; }
 .ca-chip__name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
