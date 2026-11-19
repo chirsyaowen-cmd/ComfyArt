@@ -12,16 +12,6 @@ export function ZineNavigation() {
   const editor = useEditor()
   const active = useValue('active book page', () => activeZineIndex(editor), [editor])
   const pages = useValue('zine pages', () => getZinePages(editor), [editor])
-  const rect = useValue('active paper', () => {
-    const id = pages[active]
-    const shape = id && editor.getShape(id)
-    if (!shape || shape.parentId !== editor.getCurrentPageId()) return null
-    const bounds = editor.getShapePageBounds(shape)
-    if (!bounds) return null
-    const { x, y } = editor.pageToViewport(bounds.point)
-    const zoom = editor.getZoomLevel()
-    return { left: x, top: y, width: bounds.w * zoom, height: bounds.h * zoom }
-  }, [editor, active, pages])
 
   useEffect(() => {
     if (!pages.length) return
@@ -40,21 +30,16 @@ export function ZineNavigation() {
   if (!pages.length || !canvas) return null
   const zh = lang === 'zh'
   const pageName = (i: number) => zh ? `第 ${i + 1} 页` : `Page ${i + 1}`
-  return <>
-    {rect && <div className="ca-zine-paper" style={rect}>
-      <span>{zh ? '正在编辑' : 'Editing'} · {pageName(active)}</span>
-    </div>}
-    {createPortal(<nav className="ca-zine-nav" aria-label={zh ? '书页' : 'Book pages'} onPointerDown={e => e.stopPropagation()}>
-      {pages.map((id, i) => <button key={id} type="button" aria-label={pageName(i)}
-        aria-current={i === active ? 'page' : undefined}
-        data-spread-start={i % 2 === 1 || undefined}
-        onClick={() => { editor.complete(); editor.selectNone(); focusZinePage(editor, i) }}>
-        {i === 0 ? (zh ? '封面' : 'Cover') : i === pages.length - 1 ? (zh ? '封底' : 'Back') : i + 1}
-      </button>)}
-      <button type="button" className="ca-zine-play" title={t('frameToolbar.playFullscreen')}
-        aria-label={t('frameToolbar.playFullscreen')} onClick={() => { editor.complete(); openBookPreview(pages, active) }}>
-        <span className="ca-icon">{Icons.play}</span>
-      </button>
-    </nav>, canvas)}
-  </>
+  return createPortal(<nav className="ca-zine-nav" aria-label={zh ? '书页' : 'Book pages'} onPointerDown={e => e.stopPropagation()}>
+    {pages.map((id, i) => <button key={id} type="button" aria-label={pageName(i)}
+      aria-current={i === active ? 'page' : undefined}
+      data-spread-start={i % 2 === 1 || undefined}
+      onClick={() => { editor.complete(); editor.selectNone(); focusZinePage(editor, i) }}>
+      {i === 0 ? (zh ? '封面' : 'Cover') : i === pages.length - 1 ? (zh ? '封底' : 'Back') : i + 1}
+    </button>)}
+    <button type="button" className="ca-zine-play" title={t('frameToolbar.playFullscreen')}
+      aria-label={t('frameToolbar.playFullscreen')} onClick={() => { editor.complete(); openBookPreview(pages, active) }}>
+      <span className="ca-icon">{Icons.play}</span>
+    </button>
+  </nav>, canvas)
 }
