@@ -5,6 +5,7 @@ import '../styles/book-spread.css'
 type Direction = -1 | 1
 
 interface BookSpreadProps {
+  pageCount: number
   images: ReadonlyMap<number, string>
   spread: number
   turn: Direction | null
@@ -17,9 +18,9 @@ const strips = Array.from({ length: stripCount }, (_, index) => index)
 const turnDuration = 650
 
 // A closed cover occupies only half the spread; shift its spine to center the book.
-function spreadOffset(spread: number) {
+function spreadOffset(spread: number, pageCount: number) {
   if (spread === 0) return -25
-  if (spread === 4) return 25
+  if (spread === pageCount / 2) return 25
   return 0
 }
 
@@ -27,7 +28,7 @@ function pageLabel(index: number) {
   return lang === 'zh' ? `第 ${index + 1} 页` : `Page ${index + 1}`
 }
 
-export function BookSpread({ images, spread, turn, onTurnEnd, onTurn }: BookSpreadProps) {
+export function BookSpread({ pageCount, images, spread, turn, onTurnEnd, onTurn }: BookSpreadProps) {
   const book = useRef<HTMLDivElement>(null)
   const leaf = useRef<HTMLDivElement>(null)
   const done = useRef(onTurnEnd)
@@ -45,8 +46,8 @@ export function BookSpread({ images, spread, turn, onTurnEnd, onTurn }: BookSpre
     if (!turn || !paper || !stack) return
 
     const slices = Array.from(paper.children).filter((node): node is HTMLElement => node instanceof HTMLElement)
-    const offset = spreadOffset(spread)
-    const targetOffset = spreadOffset(spread + turn)
+    const offset = spreadOffset(spread, pageCount)
+    const targetOffset = spreadOffset(spread + turn, pageCount)
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
     let frame = 0
     const start = performance.now()
@@ -77,10 +78,10 @@ export function BookSpread({ images, spread, turn, onTurnEnd, onTurn }: BookSpre
 
     draw(start)
     return () => cancelAnimationFrame(frame)
-  }, [spread, turn])
+  }, [spread, turn, pageCount])
 
   function page(index: number, side: 'left' | 'right') {
-    if (index < 0 || index > 7) return null
+    if (index < 0 || index >= pageCount) return null
     const src = images.get(index)
     const direction = side === 'left' ? -1 : 1
     const action = t(direction === -1 ? 'slideshow.previous' : 'slideshow.next')
@@ -91,7 +92,7 @@ export function BookSpread({ images, spread, turn, onTurnEnd, onTurn }: BookSpre
   }
 
   return <div className="ca-book-stage">
-    <div className="ca-book-spread" ref={book} style={{ transform: `translateX(${spreadOffset(spread)}%)` }}>
+    <div className="ca-book-spread" ref={book} style={{ transform: `translateX(${spreadOffset(spread, pageCount)}%)` }}>
       {page(left, 'left')}
       {page(right, 'right')}
       {turn !== null && <div className="ca-book-leaf" ref={leaf} aria-hidden="true">

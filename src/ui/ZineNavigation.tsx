@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useEditor, useValue, type TLEventInfo } from 'tldraw'
 
 import { createPortal } from 'react-dom'
 import { lang, t } from '../i18n'
-import { activeZineIndex, focusZinePage, getZinePages, selectZinePage } from '../zine'
+import { activeZineIndex, addZineSpread, focusZinePage, getZinePages, selectZinePage } from '../zine'
 import { openBookPreview } from './Slideshow'
 import { Icons } from './icons'
 import '../styles/zine.css'
@@ -12,6 +12,17 @@ export function ZineNavigation() {
   const editor = useEditor()
   const active = useValue('active book page', () => activeZineIndex(editor), [editor])
   const pages = useValue('zine pages', () => getZinePages(editor), [editor])
+
+  const canAdd = useValue('can add zine pages', () => pages.length > 0 && !editor.getIsReadonly()
+    && editor.getCurrentPageShapeIds().size + 2 <= editor.options.maxShapesPerPage, [editor, pages])
+
+  const previousCount = useRef(pages.length)
+  useLayoutEffect(() => {
+    if (previousCount.current && pages.length && previousCount.current !== pages.length) {
+      focusZinePage(editor, activeZineIndex(editor))
+    }
+    previousCount.current = pages.length
+  }, [editor, pages.length])
 
   useEffect(() => {
     if (!pages.length) return
@@ -34,9 +45,13 @@ export function ZineNavigation() {
     {pages.map((id, i) => <button key={id} type="button" aria-label={pageName(i)}
       aria-current={i === active ? 'page' : undefined}
       data-spread-start={i % 2 === 1 || undefined}
+      data-spread-right={i > 0 && i % 2 === 0 || undefined}
       onClick={() => { editor.complete(); editor.selectNone(); focusZinePage(editor, i) }}>
       {i === 0 ? (zh ? '封面' : 'Cover') : i === pages.length - 1 ? (zh ? '封底' : 'Back') : i + 1}
     </button>)}
+    <button type="button" className="ca-zine-add" disabled={!canAdd} onClick={() => addZineSpread(editor)}>
+      {zh ? '+ 加两页' : '+ Add two pages'}
+    </button>
     <button type="button" className="ca-zine-play" title={t('frameToolbar.playFullscreen')}
       aria-label={t('frameToolbar.playFullscreen')} onClick={() => { editor.complete(); openBookPreview(pages, active) }}>
       <span className="ca-icon">{Icons.play}</span>

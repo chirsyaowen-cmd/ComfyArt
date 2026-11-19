@@ -3,6 +3,7 @@ import { atom, getSnapshot, loadSnapshot, useValue, type Editor } from 'tldraw'
 
 import { listVersions, loadVersion, saveVersion, type Version } from '../history'
 import { errorText } from '../jobs'
+import { restoreZineLayout } from '../zine'
 import { confirmAtom } from './Confirm'
 import { Modal } from './Modal'
 import { t, timeAgo } from '../i18n'
@@ -29,6 +30,7 @@ export function HistoryDialog({ editor, projectId, onError }: { editor: Editor; 
       try {
         await saveVersion(projectId, getSnapshot(editor.store), editor.getCurrentPageShapeIds().size)
         loadSnapshot(editor.store, await loadVersion(projectId, v.time))
+        restoreZineLayout(editor)
         close()
       } catch (e) {
         onError(errorText(e))
