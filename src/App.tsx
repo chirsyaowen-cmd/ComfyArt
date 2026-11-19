@@ -28,8 +28,7 @@ import { GeneratorShapeUtil } from './shapes/GeneratorShape'
 import { MockupShapeUtil } from './shapes/MockupShape'
 import { HoverVideoShapeUtil } from './shapes/VideoShape'
 import { AdjustPanel } from './ui/AdjustPanel'
-import { AgentPanel, chatViewAtom, type ChatView } from './ui/AgentPanel'
-import { dockAtom } from './ui/chatDock'
+import { AgentPanel } from './ui/AgentPanel'
 import { BatchRename } from './ui/BatchRename'
 import { CanvasMenu } from './ui/CanvasMenu'
 import { CanvasTools } from './ui/CanvasTools'
@@ -69,7 +68,6 @@ import { SkillsDialog } from './ui/SkillsDialog'
 import { Slideshow } from './ui/Slideshow'
 import { SmudgePanel } from './ui/SmudgePanel'
 import { Lightbox } from './ui/Lightbox'
-import { Icons } from './ui/icons'
 import { MemoryDialog } from './ui/MemoryDialog'
 import { WorkflowsDialog } from './ui/WorkflowsDialog'
 import { ModePanel } from './ui/ModePanel'
@@ -132,11 +130,8 @@ const assets: TLAssetStore = {
 export function App({ id }: { id: string }) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const setError = reportError
-  const chat = useValue(chatViewAtom)
-  const setChat = (view: ChatView) => chatViewAtom.set(view)
   const [stale, setStale] = useState(false)
   const staleRef = useRef(false)
-  const dock = useValue(dockAtom)
   const dark = useValue('dark mode', () => editor?.user.getIsDarkMode() ?? false, [editor])
 
   useEffect(() => {
@@ -219,29 +214,16 @@ export function App({ id }: { id: string }) {
   }, [editor, id])
 
   return (
-    <div className="ca-root" data-chat={chat} data-dock={dock}>
-      {editor && chat !== 'closed' && (
-        <AgentPanel
-          editor={editor}
-          projectId={id}
-          max={chat === 'max'}
-          onMax={() => setChat(chat === 'max' ? 'open' : 'max')}
-          onCollapse={() => setChat('closed')}
-          onError={setError}
-        />
-      )}
+    <div className="ca-root">
       <div className="ca-main">
         {editor && (
           <TopBar
             editor={editor}
-            left={chat === 'closed' && (
+            left={
               <ProjectHeader editor={editor} projectId={id}>
                 <NoticeCenter editor={editor} />
-                <button type="button" className="ca-bar__btn ca-bar__btn--icon" title={t('app.expandChat')} onClick={() => setChat('open')}>
-                  <span className="ca-icon">{dock === 'left' ? Icons.panel : Icons.panelRight}</span>
-                </button>
               </ProjectHeader>
-            )}
+            }
           />
         )}
         <div className="ca-body">
@@ -284,6 +266,7 @@ export function App({ id }: { id: string }) {
               <Dock onError={setError} />
               <CanvasTools zoom={<Zoom />} />
             </Tldraw>
+            {editor && <AgentPanel editor={editor} onError={setError} />}
           </div>
           {editor && <SidePanel editor={editor} onError={setError} />}
         </div>

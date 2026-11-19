@@ -170,8 +170,6 @@
   gap: 6px;
 }
 
-.ca-root[data-dock="right"] { flex-direction: row-reverse; }
-.ca-root[data-dock="right"] .ca-agent { border-right: none; border-left: .5px solid var(--ca-border); }
 .ca-customize { width: 240px; max-height: 480px; overflow-y: auto; }
 .ca-customize__check { width: 16px; height: 16px; color: var(--ca-strong); }
 .ca-gen__refmode { position: absolute; left: 4px; right: 4px; bottom: 4px; padding: 0 4px; border-radius: 6px; background: rgba(0,0,0,.55); color: #fff; font: 500 10px/16px var(--ca-font); text-align: center; cursor: pointer; }
@@ -283,7 +281,6 @@
 .ca-details__detail[data-error] { color: #dc2626; }
 .ca-memory__log { font-size: 13px; }
 .ca-ref__name { display: flex; align-items: center; gap: 6px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ca-chat__empty .ca-panel__primary { height: 32px; margin-top: 8px; padding: 0 16px; border: none; border-radius: 8px; background: var(--ca-strong); color: var(--ca-float); font: inherit; cursor: pointer; }
 .ca-ability { align-items: flex-start; padding: 8px 0; }
 .ca-ability .ca-menu__grow { display: flex; flex-direction: column; gap: 2px; }
 .ca-chip__name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -299,7 +296,6 @@
 .ca-each[data-on] { background: var(--ca-active); }
 .ca-chip--image .ca-each__role { position: absolute; top: auto; right: auto; left: 50%; bottom: -9px; width: auto; height: 16px; transform: translateX(-50%); padding: 0 5px; border: .5px solid var(--ca-border); border-radius: 6px; background: var(--ca-float); color: var(--ca-text); font: 500 9px/14px var(--ca-font); white-space: nowrap; cursor: pointer; }
 .ca-chip--image .ca-each__role[data-shared] { background: var(--ca-strong); color: var(--ca-float); }
-.ca-composer__chips:has(.ca-each__role) { padding-bottom: 10px; }
 .ca-reframe__hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; border: 2px dashed var(--ca-border); border-radius: var(--ca-frame-r, 0); color: var(--ca-muted); font: 400 28px/1.4 var(--ca-font); text-align: center; pointer-events: none; }
 .ca-refbtn { white-space: nowrap; flex: none; }
 .ca-refbtn[data-on] { background: var(--ca-active); }
