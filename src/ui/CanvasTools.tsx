@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { DefaultMinimap, useEditor, useValue } from 'tldraw'
 
 import { ColorPicker } from './ColorPicker'
@@ -6,23 +6,35 @@ import { Icons } from './icons'
 import { sideAtom, type Side } from './SidePanel'
 import { t } from '../i18n'
 
-const DEFAULT_BG = '#F5F5F5'
-const DEFAULT_DARK_BG = '#1A1A1A'
-
 function Background() {
   const editor = useEditor()
-  const bg = useValue('canvas bg', () => String(editor.getDocumentSettings().meta.bg ?? (editor.user.getIsDarkMode() ? DEFAULT_DARK_BG : DEFAULT_BG)), [editor])
+  const bg = useValue('canvas bg', () => {
+    const saved = editor.getDocumentSettings().meta.bg
+    return typeof saved === 'string' ? saved : ''
+  }, [editor])
 
-  useEffect(() => {
-    editor.getContainer().style.setProperty('--ca-canvas', bg)
+  useLayoutEffect(() => {
+    const style = editor.getContainer().style
+    style.setProperty('--ca-canvas', bg)
+    return () => { style.removeProperty('--ca-canvas') }
   }, [editor, bg])
 
   const set = (value: string) => {
-    const doc = editor.getDocumentSettings()
-    editor.updateDocumentSettings({ meta: { ...doc.meta, bg: value } })
+    if (value === bg) return
+    const meta = { ...editor.getDocumentSettings().meta }
+    if (value) meta.bg = value
+    else delete meta.bg
+    editor.updateDocumentSettings({ meta })
   }
 
-  return <ColorPicker value={bg} title={t('canvasTools.canvasBackgroundColor')} onChange={set} />
+  return (
+    <ColorPicker
+      value={bg}
+      title={t('canvasTools.canvasBackgroundColor')}
+      defaultOption={{ label: t('canvasTools.followTheme'), background: 'var(--ca-canvas-default)' }}
+      onChange={set}
+    />
+  )
 }
 
 function BackToContent() {
