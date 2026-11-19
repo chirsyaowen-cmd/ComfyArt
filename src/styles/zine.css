@@ -9,15 +9,10 @@
   pointer-events: none;
   border-radius: var(--ca-frame-r);
 }
-[data-zine-default-edge]::after {
-  border: calc(1px * var(--tl-scale)) solid rgb(50 55 59 / 14%);
-}
 [data-zine-side='left']::after {
-  border-right-width: 0;
   background: linear-gradient(to left, rgb(42 39 35 / 8%), transparent 12px);
 }
 [data-zine-side='right']::after {
-  border-left-width: 0;
   background: linear-gradient(to right, rgb(42 39 35 / 5%), transparent 8px);
 }
 [data-zine-active] .tl-frame-heading-hit-area::after {
