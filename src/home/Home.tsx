@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { botEnabledAtom, loadProviders } from '../bot'
 import { thumbUrl, uploadImage, viewUrl } from '../comfy'
-import { t } from '../i18n'
+import { lang, t } from '../i18n'
 import { errorText } from '../jobs'
 import { newProject, openView, type ProjectEntry } from '../projects'
 import { loadSkills, type Skill } from '../skills'
@@ -102,6 +102,9 @@ export function Home() {
         <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = '' }} />
       </div>
       {error && <div className="ca-landing__error" onClick={() => setError('')}>{error}</div>}
+      <button type="button" className="ca-landing__chip" onClick={() => newProject({ format: 'zine' })}>
+        <span className="ca-icon">{Icons.plus}</span>{lang === 'zh' ? '新建 Zine' : 'New Zine'}
+      </button>
       <div className="ca-landing__quick">
         <span className="ca-landing__hint">{t('home.letAgentHelp')}</span>
         {QUICK.map(([icon, label, prompt]) => (

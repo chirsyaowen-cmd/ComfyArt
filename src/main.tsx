@@ -12,11 +12,13 @@ await (await import('./theme')).initTheme()
 const params = new URL(location.href).searchParams
 const project = params.get('project')
 const root = createRoot(document.getElementById('root')!)
-const { NEW_PARAM, projectExists } = await import('./projects')
+const { NEW_PARAM, loadProject } = await import('./projects')
 
-if (project && (params.has(NEW_PARAM) || await projectExists(project))) {
+const snapshot = project ? await loadProject(project) : null
+
+if (project && (params.has(NEW_PARAM) || snapshot)) {
   const { App } = await import('./App')
-  root.render(<StrictMode><App id={project} /></StrictMode>)
+  root.render(<StrictMode><App id={project} snapshot={snapshot} /></StrictMode>)
 } else {
   const { HomeApp } = await import('./home/HomeApp')
   root.render(<StrictMode><HomeApp view={project ? { missing: project } : params.get('view') === 'projects' ? 'projects' : 'home'} /></StrictMode>)
