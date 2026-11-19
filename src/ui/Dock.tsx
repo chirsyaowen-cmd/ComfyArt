@@ -1,3 +1,4 @@
+import { fileInsertionPoint } from '../zine'
 import { useRef, useState } from 'react'
 import { useEditor, useValue } from 'tldraw'
 
@@ -105,7 +106,7 @@ export function Dock({ onError }: { onError: (msg: string) => void }) {
           multiple
           hidden
           accept="image/*,video/*,.pdf,.json,.lottie,.html,.htm,.glb,.gltf,.obj,.fbx,.stl,.ply,.mp3,.wav,.flac,.ogg,.m4a,.opus"
-          onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) void editor.putExternalContent({ type: 'files', files, point: editor.getViewportPageBounds().center }); e.target.value = '' }}
+          onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) void editor.putExternalContent({ type: 'files', files, point: fileInsertionPoint(editor) }); e.target.value = '' }}
         />
         <input ref={layout} type="file" hidden accept=".json" onChange={(e) => { const f = e.target.files?.[0]; if (f) importLayout(editor, f).catch((err) => onError(errorText(err))); e.target.value = '' }} />
 
