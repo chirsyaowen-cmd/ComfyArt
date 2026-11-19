@@ -19,15 +19,29 @@ export function Popover({ trigger, children, side = 'bottom', align = 'start', o
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
 
   useLayoutEffect(() => {
-    if (!open || !anchor.current || !panel.current) return
-    const a = anchor.current.getBoundingClientRect()
-    const p = panel.current.getBoundingClientRect()
-    let left = align === 'start' ? a.left : align === 'end' ? a.right - p.width : a.left + a.width / 2 - p.width / 2
-    left = Math.min(Math.max(left, EDGE), innerWidth - p.width - EDGE)
-    let top = side === 'top' ? a.top - p.height - GAP : a.bottom + GAP
-    if (top < EDGE) top = a.bottom + GAP
-    if (top + p.height > innerHeight - EDGE) top = Math.max(EDGE, a.top - p.height - GAP)
-    setPos({ left, top })
+    const triggerEl = anchor.current
+    const menuEl = panel.current
+    if (!open || !triggerEl || !menuEl) return
+    const place = () => {
+      const a = triggerEl.getBoundingClientRect()
+      const p = menuEl.getBoundingClientRect()
+      let left = align === 'start' ? a.left : align === 'end' ? a.right - p.width : a.left + a.width / 2 - p.width / 2
+      left = Math.min(Math.max(left, EDGE), innerWidth - p.width - EDGE)
+      let top = side === 'top' ? a.top - p.height - GAP : a.bottom + GAP
+      if (top < EDGE) top = a.bottom + GAP
+      if (top + p.height > innerHeight - EDGE) top = Math.max(EDGE, a.top - p.height - GAP)
+      setPos({ left, top })
+    }
+    place()
+    const chat = triggerEl.closest('.ca-agent')
+    if (!chat) return
+    const observer = new ResizeObserver(place)
+    observer.observe(chat)
+    window.addEventListener('resize', place)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', place)
+    }
   }, [open, side, align, contentKey])
 
   useEffect(() => {

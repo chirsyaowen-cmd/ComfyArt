@@ -19,7 +19,6 @@ import { createGenerator } from '../generate'
 import { toMedia } from '../jobs'
 import { KIND_LABELS, libraryAtom, saveLibrary, type LibraryKind } from '../library'
 import type { GeneratorShape } from '../shapes/GeneratorShape'
-import { chatViewAtom } from './AgentPanel'
 import { renameAtom } from './BatchRename'
 import { importFiles } from './DropHandlers'
 import { exportAtom } from './ExportDialog'
@@ -56,7 +55,6 @@ function sendToGenerator(editor: Editor, shape: TLImageShape) {
 
 function sendToChat(ids: TLShapeId[]) {
   extraRefsAtom.set([...extraRefsAtom.get().filter((id) => !ids.includes(id)), ...ids])
-  if (chatViewAtom.get() === 'closed') chatViewAtom.set('open')
 }
 
 function imageSrcs(editor: Editor): string[] {

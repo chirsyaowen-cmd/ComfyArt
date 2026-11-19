@@ -4,7 +4,6 @@ import { useValue, type Editor } from 'tldraw'
 import { openChat } from '../bot'
 import { clearNotices, currentProject, markRead, noticesAtom, removeNotice, type Notice, type NoticeKind } from '../notices'
 import { openProject } from '../projects'
-import { chatViewAtom } from './AgentPanel'
 import { Icons } from './icons'
 import { Popover } from './Popover'
 import { reveal } from './TaskDetails'
@@ -27,7 +26,6 @@ export function NoticeCenter({ editor }: { editor: Editor }) {
     if (n.project !== currentProject()) return openProject(n.project)
     if (n.chat) {
       void openChat(n.chat)
-      if (chatViewAtom.get() === 'closed') chatViewAtom.set('open')
     }
     if (n.srcs?.[0]) reveal(editor, n.srcs[0])
   }

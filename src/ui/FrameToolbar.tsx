@@ -5,7 +5,6 @@ import { useActions, useEditor, useValue, type Box, type Editor, type JsonObject
 import { openChat } from '../bot'
 import { refLinkedOf, setRefLinked } from '../chatFrame'
 import { isBoard, renderBoard } from '../compose'
-import { chatViewAtom } from './AgentPanel'
 import { ComposePanel } from './ComposePanel'
 import { errorText, mediaAsset } from '../jobs'
 import { download } from '../psd'
@@ -191,7 +190,7 @@ export function FrameToolbar({ onError }: { onError: (msg: string) => void }) {
   return (
     <div ref={bar} className="ca-bar ca-toolbar" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()}>
       {typeof frame.meta.chatId === 'string' && (
-        <button type="button" className="ca-bar__btn" title={t('chatFrame.locateChatTip')} onClick={() => { chatViewAtom.set('open'); openChat(frame.meta.chatId as string).catch((e) => onError(errorText(e))) }}>
+        <button type="button" className="ca-bar__btn" title={t('chatFrame.locateChatTip')} onClick={() => { openChat(frame.meta.chatId as string).catch((e) => onError(errorText(e))) }}>
           <span className="ca-icon">{Icons.agent}</span><span>{t('chatFrame.locateChat')}</span>
         </button>
       )}

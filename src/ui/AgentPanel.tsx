@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { atom, useValue, type Editor, type TLShapeId } from 'tldraw'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { useValue, type Editor, type TLShapeId } from 'tldraw'
 
-import { draftAtom, isRefShape, sendToAgent, uploadRefs, type RefShape } from '../agent'
+import { isRefShape, sendToAgent, type RefShape } from '../agent'
 import { botEnabledAtom, branchFrom, chatIdAtom, chatsAtom, deleteChat, messagesAtom, openChat, providersAtom, stopTurn, type BotMessage } from '../bot'
 import { chatFrameOf, locateChatFrame } from '../chatFrame'
 import { errorText } from '../jobs'
@@ -9,31 +9,15 @@ import { libraryAtom } from '../library'
 import { loadSkills } from '../skills'
 import { botSettingsOpenAtom } from './AgentPicker'
 import { dockAtom } from './chatDock'
-import { libraryTabAtom } from './LibraryPanel'
-import { sideAtom } from './SidePanel'
 import { AssistantBlocks, textOf, UserMessage } from './ChatMessage'
-import { Composer, FILE_ACCEPT } from './Composer'
+import { Composer } from './Composer'
 import { Icons } from './icons'
-import { NoticeCenter } from './NoticeCenter'
 import { Popover } from './Popover'
-import { ProjectHeader } from './ProjectHeader'
 import { detailsAtom } from './TaskDetails'
 import { CopyButton } from './CopyButton'
 import { t } from '../i18n'
 
 const NEAR_BOTTOM = 80
-
-function pickFiles(use: (files: File[]) => void) {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = FILE_ACCEPT
-  input.multiple = true
-  input.onchange = () => use(Array.from(input.files ?? []))
-  input.click()
-}
-
-export type ChatView = 'open' | 'max' | 'closed'
-export const chatViewAtom = atom<ChatView>('chat view', 'open')
 
 function History({ onError }: { onError: (msg: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -87,12 +71,8 @@ async function resend(editor: Editor, m: BotMessage) {
   await sendToAgent(editor, textOf(m), refsOf(editor, m), skill, kits, docs)
 }
 
-export function AgentPanel({ editor, projectId, max, onMax, onCollapse, onError }: {
+export function AgentPanel({ editor, onError }: {
   editor: Editor
-  projectId: string
-  max: boolean
-  onMax: () => void
-  onCollapse: () => void
   onError: (msg: string) => void
 }) {
   const messages = useValue(messagesAtom)
@@ -106,31 +86,46 @@ export function AgentPanel({ editor, projectId, max, onMax, onCollapse, onError 
   const canBranch = providers.find((p) => p.id === chat?.provider)?.branch ?? false
   const fail = (e: unknown) => onError(errorText(e))
 
+  const content = useRef<HTMLDivElement>(null)
+  const follow = useRef(true)
+  const previousTop = useRef(0)
   const [away, setAway] = useState(false)
-  const count = useRef(0)
+  const [height, setHeight] = useState(0)
   const toBottom = () => list.current?.scrollTo({ top: list.current.scrollHeight })
   const onScroll = () => {
     const el = list.current!
-    setAway(el.scrollHeight - el.scrollTop - el.clientHeight > NEAR_BOTTOM)
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM) follow.current = true
+    else if (el.scrollTop < previousTop.current) follow.current = false
+    previousTop.current = el.scrollTop
+    setAway(!follow.current)
   }
 
-  useEffect(() => {
-    const sent = messages.length > count.current && messages[messages.length - 1]?.role === 'user'
-    count.current = messages.length
-    if (sent || !away) toBottom()
-  }, [messages])
+  useLayoutEffect(() => {
+    const body = content.current!
+    const viewport = list.current!
+    const observer = new ResizeObserver((entries) => {
+      if (entries.some((entry) => entry.target === body)) {
+        setHeight(body.offsetHeight)
+      }
+      if (follow.current) toBottom()
+    })
+    observer.observe(body)
+    observer.observe(body.parentElement!)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
 
-  useEffect(() => {
-    count.current = 0
+  const lastUser = messages[messages.map((m) => m.role).lastIndexOf('user')]
+  useLayoutEffect(() => {
+    follow.current = true
     setAway(false)
     toBottom()
-  }, [chat?.id])
-
-  const lastUser = messages.map((m) => m.role).lastIndexOf('user')
+  }, [chat?.id, lastUser?.id])
 
   return (
-    <aside className="ca-agent" data-max={max || undefined}>
-      <ProjectHeader editor={editor} projectId={projectId}>
+    <aside className="ca-agent" data-dock={dock} aria-label={t('canvasChat.chat')}>
+      <div className="ca-agent__head">
+        <span className="ca-agent__title">{chat?.title || t('agentPanel.newChat')}</span>
         <div className="ca-split">
           <button type="button" className="ca-bar__btn ca-bar__btn--icon" title={t('agentPanel.createChat')} onClick={() => void openChat(null)}>
             <span className="ca-icon">{Icons.page}</span>
@@ -142,60 +137,42 @@ export function AgentPanel({ editor, projectId, max, onMax, onCollapse, onError 
             <span className="ca-icon">{Icons.frame}</span>
           </button>
         )}
-        <NoticeCenter editor={editor} />
-        <button type="button" className="ca-bar__btn ca-bar__btn--icon ca-wide-only" title={max ? t('agentPanel.restoreChat') : t('agentPanel.maximizeChat')} data-on={max || undefined} onClick={onMax}>
-          <span className="ca-icon">{Icons.expandPanel}</span>
-        </button>
-        <button type="button" className="ca-bar__btn ca-bar__btn--icon" title={t('agentPanel.collapseChat')} onClick={onCollapse}>
-          <span className="ca-icon">{dock === 'left' ? Icons.panel : Icons.panelRight}</span>
-        </button>
-      </ProjectHeader>
-      <div ref={list} className="ca-chat" onScroll={onScroll}>
         {enabled === false && (
-          <div className="ca-chat__empty">
-            <span className="ca-chat__hello">{Icons.agent}</span>
-            <div>{t('agentPanel.agentIsNotEnabledYet')}</div>
-            <div className="ca-chat__hint">{t('agentPanel.enableMcpAndAgentIn')}</div>
-            <button type="button" className="ca-panel__primary" onClick={() => botSettingsOpenAtom.set(true)}>{t('agentPanel.openAgentSettings')}</button>
-          </div>
+          <button type="button" className="ca-bar__btn" title={t('agentPanel.agentIsNotEnabledYet')} onClick={() => botSettingsOpenAtom.set(true)}>
+            {t('agentPanel.openAgentSettings')}
+          </button>
         )}
-        {enabled !== false && messages.length === 0 && (
-          <div className="ca-chat__empty">
-            <span className="ca-chat__hello">{Icons.agent}</span>
-            <div>{t('agentPanel.describeWhatYouWantTo')}</div>
-            <div className="ca-chat__hint">{t('agentPanel.selectImagesOnTheCanvas')}</div>
-            <div className="ca-chat__starts">
-              <button type="button" className="ca-chat__start" onClick={() => pickFiles((files) => void uploadRefs(editor, files).catch(fail))}><span className="ca-icon">{Icons.upload}</span>{t('agentPanel.uploadReference')}</button>
-              <button type="button" className="ca-chat__start" onClick={() => draftAtom.set('/')}><span className="ca-icon">{Icons.skill}</span>{t('agentPanel.startFromSkill')}</button>
-              <button type="button" className="ca-chat__start" onClick={() => { libraryTabAtom.set('brand'); sideAtom.set('assets') }}><span className="ca-icon">{Icons.assets}</span>{t('agentPanel.useBrandKit')}</button>
-            </div>
-          </div>
-        )}
-        {messages.map((m, i) => (m.role === 'user'
-          ? <UserMessage key={m.id} editor={editor} m={m} onBranch={canBranch && !busy ? () => void branchFrom(m.id).catch(fail) : undefined} />
-          : (
-            <div key={m.id} className="ca-chat__bot">
-              <AssistantBlocks editor={editor} m={m} />
-              {m.status === 'streaming' && (
-                <div className="ca-chat__thinking">
-                  <span>{m.blocks.length ? t('agentPanel.working') : t('agentPanel.thinking')}</span>
-                  <button type="button" className="ca-panel__chip" onClick={() => void stopTurn().catch(fail)}>{t('agentPanel.stop')}</button>
-                </div>
-              )}
-              {m.status === 'aborted' && <div className="ca-chat__hint">{t('agentPanel.stopped')}</div>}
-              {m.status !== 'streaming' && (
-                <div className="ca-chat__acts ca-chat__acts--bot">
-                  {!busy && i === messages.length - 1 && lastUser === i - 1 && (
-                    <button type="button" className="ca-history__del" title={t('common.regenerate')} onClick={() => void resend(editor, messages[i - 1]).catch(fail)}>{Icons.replace}</button>
-                  )}
-                  <CopyButton text={textOf(m)} />
-                  <button type="button" className="ca-history__del" title={t('agentPanel.taskDetails')} onClick={() => detailsAtom.set(m.id)}>{Icons.files}</button>
-                </div>
-              )}
-            </div>
-          )))}
       </div>
-      {away && <button type="button" className="ca-chat__jump" title={t('agentPanel.jumpToLatest')} onClick={toBottom}><span className="ca-icon">{Icons.chevron}</span></button>}
+      <div ref={list} className="ca-chat" onScroll={onScroll}>
+        <div className="ca-chat__reveal" data-streaming={busy || undefined} style={{ height: busy ? height : undefined }}>
+          <div ref={content} className="ca-chat__content">
+            {messages.map((m, i) => (m.role === 'user'
+              ? <UserMessage key={m.id} editor={editor} m={m} onBranch={canBranch && !busy ? () => void branchFrom(m.id).catch(fail) : undefined} />
+              : (
+                <div key={m.id} className="ca-chat__bot">
+                  <AssistantBlocks editor={editor} m={m} />
+                  {m.status === 'streaming' && (
+                    <div className="ca-chat__thinking">
+                      <span>{m.blocks.length ? t('agentPanel.working') : t('agentPanel.thinking')}</span>
+                      <button type="button" className="ca-panel__chip" onClick={() => void stopTurn().catch(fail)}>{t('agentPanel.stop')}</button>
+                    </div>
+                  )}
+                  {m.status === 'aborted' && <div className="ca-chat__hint">{t('agentPanel.stopped')}</div>}
+                  {m.status !== 'streaming' && (
+                    <div className="ca-chat__acts ca-chat__acts--bot">
+                      {!busy && i === messages.length - 1 && lastUser && lastUser.id === messages[i - 1]?.id && (
+                        <button type="button" className="ca-history__del" title={t('common.regenerate')} onClick={() => void resend(editor, lastUser).catch(fail)}>{Icons.replace}</button>
+                      )}
+                      <CopyButton text={textOf(m)} />
+                      <button type="button" className="ca-history__del" title={t('agentPanel.taskDetails')} onClick={() => detailsAtom.set(m.id)}>{Icons.files}</button>
+                    </div>
+                  )}
+                </div>
+              )))}
+          </div>
+        </div>
+      </div>
+      {away && <div className="ca-chat__jump-slot"><button type="button" className="ca-chat__jump" title={t('agentPanel.jumpToLatest')} onClick={toBottom}><span className="ca-icon">{Icons.chevron}</span></button></div>}
       <Composer editor={editor} busy={busy} onError={onError} />
     </aside>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useValue, type Editor, type TLShapeId } from 'tldraw'
 
 import { agentModeAtom, directSettingsAtom, DOC_ACCEPT, docsAtom, draftAtom, eachLine, eachRuns, extraRefsAtom, generateDirect, isRefShape, kitsAtom, refKindOf, sendToAgent, srcOf, uploadRefs, type DirectSettings, type RefShape } from '../agent'
@@ -27,7 +27,7 @@ import { isEnter } from './keys'
 const REVIEW_PROMPT = t('composer.canvasReviewUseGetCanvas')
 const SKILL_PROMPT = t('composer.turnTheApproachCompletedIn')
 
-export const FILE_ACCEPT = `image/*,video/*,audio/*,${DOC_ACCEPT}`
+const FILE_ACCEPT = `image/*,video/*,audio/*,${DOC_ACCEPT}`
 
 function imageName(editor: Editor, s: RefShape) {
   if (refKindOf(s) === 'audio') return (s as AudioShape).props.name || t('composer.audio')
@@ -129,8 +129,30 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
   const kitMentions = at ? library.filter((k) => k.name.toLowerCase().includes(at[1].toLowerCase()) && !kits.some((x) => x.id === k.id)).slice(0, 8) : []
   const clearAt = () => draftAtom.set(draft.slice(0, at!.index) + (at!.index ? ' ' : ''))
 
+  const composer = useRef<HTMLDivElement>(null)
+  const suggesting = !!slash && filtered.length > 0 || mentions.length > 0 || kitMentions.length > 0
+  useLayoutEffect(() => {
+    if (!suggesting || !composer.current) return
+    const el = composer.current
+    const place = () => {
+      const { top, bottom } = el.getBoundingClientRect()
+      const below = window.innerHeight - bottom
+      el.toggleAttribute('data-suggest-above', top > below)
+      el.style.setProperty('--suggest-space', `${Math.max(0, Math.max(top, below) - 12)}px`)
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(el.parentElement!)
+    window.addEventListener('resize', place)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', place)
+    }
+  }, [suggesting])
+
   return (
     <div
+      ref={composer}
       className="ca-composer"
       data-drop={drop || undefined}
       onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDrop(true) } }}
@@ -161,49 +183,51 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           ))}
         </div>
       )}
-      {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
-        <div className="ca-composer__chips">
-          {kits.map((k) => (
-            <span key={k.id} className="ca-chip">
-              <span className="ca-icon">{Icons.assets}</span>{k.name}
-              <button type="button" title={t('common.remove')} onClick={() => kitsAtom.set(kits.filter((x) => x.id !== k.id))}>{Icons.close}</button>
-            </span>
-          ))}
-          {skill && (
-            <span className="ca-chip">
-              <span className="ca-icon">{Icons.skill}</span>{skill.name}
-              <button type="button" title={t('common.remove')} onClick={() => skillAtom.set(null)}>{Icons.close}</button>
-            </span>
-          )}
-          {mode === 'agent' && docs.map((d) => (
-            <span key={d.src} className="ca-chip" title={d.name}>
-              <span className="ca-icon">{Icons.page}</span><span className="ca-chip__name">{d.name}</span>
-              <button type="button" title={t('common.remove')} onClick={() => docsAtom.set(docs.filter((x) => x.src !== d.src))}>{Icons.close}</button>
-            </span>
-          ))}
-          {refs.map((r) => (
-            <span key={r.id} className="ca-chip ca-chip--image" data-audio={refKindOf(r) === 'audio' || undefined} title={imageName(editor, r)}>
-              <RefThumb editor={editor} s={r} />
-              <button type="button" title={t('common.remove')} onClick={() => removeRef(r.id)}>{Icons.close}</button>
-              {each.on && refs.length > 1 && <EachRole shared={each.isShared(r.id)} onToggle={() => each.toggleShared(r.id)} />}
-            </span>
-          ))}
-        </div>
-      )}
-      <textarea
-        className="ca-composer__input"
-        value={draft}
-        placeholder={t('composer.describeYourDesignNeedsFor')}
-        onChange={(e) => draftAtom.set(e.target.value)}
-        onPaste={(e) => { const files = imageFiles(e.clipboardData); if (!files.length) return; e.preventDefault(); e.stopPropagation(); void uploadRefs(editor, files).catch(fail) }}
-        onKeyDown={(e) => {
-          e.stopPropagation()
-          if (isEnter(e) && !e.shiftKey && !slash && !mentions.length && !kitMentions.length) {
-            e.preventDefault()
-            send()
-          }
-        }}
-      />
+      <div className="ca-composer__entry">
+        {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
+          <div className="ca-composer__chips">
+            {kits.map((k) => (
+              <span key={k.id} className="ca-chip">
+                <span className="ca-icon">{Icons.assets}</span>{k.name}
+                <button type="button" title={t('common.remove')} onClick={() => kitsAtom.set(kits.filter((x) => x.id !== k.id))}>{Icons.close}</button>
+              </span>
+            ))}
+            {skill && (
+              <span className="ca-chip">
+                <span className="ca-icon">{Icons.skill}</span>{skill.name}
+                <button type="button" title={t('common.remove')} onClick={() => skillAtom.set(null)}>{Icons.close}</button>
+              </span>
+            )}
+            {mode === 'agent' && docs.map((d) => (
+              <span key={d.src} className="ca-chip" title={d.name}>
+                <span className="ca-icon">{Icons.page}</span><span className="ca-chip__name">{d.name}</span>
+                <button type="button" title={t('common.remove')} onClick={() => docsAtom.set(docs.filter((x) => x.src !== d.src))}>{Icons.close}</button>
+              </span>
+            ))}
+            {refs.map((r) => (
+              <span key={r.id} className="ca-chip ca-chip--image" data-audio={refKindOf(r) === 'audio' || undefined} title={imageName(editor, r)}>
+                <RefThumb editor={editor} s={r} />
+                <button type="button" title={t('common.remove')} onClick={() => removeRef(r.id)}>{Icons.close}</button>
+                {each.on && refs.length > 1 && <EachRole shared={each.isShared(r.id)} onToggle={() => each.toggleShared(r.id)} />}
+              </span>
+            ))}
+          </div>
+        )}
+        <textarea
+          className="ca-composer__input"
+          value={draft}
+          placeholder={t('composer.describeYourDesignNeedsFor')}
+          onChange={(e) => draftAtom.set(e.target.value)}
+          onPaste={(e) => { const files = imageFiles(e.clipboardData); if (!files.length) return; e.preventDefault(); e.stopPropagation(); void uploadRefs(editor, files).catch(fail) }}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (isEnter(e) && !e.shiftKey && !slash && !mentions.length && !kitMentions.length) {
+              e.preventDefault()
+              send()
+            }
+          }}
+        />
+      </div>
       <div className="ca-composer__foot">
         <input ref={file} type="file" accept={FILE_ACCEPT} multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = '' }} />
         <Popover
