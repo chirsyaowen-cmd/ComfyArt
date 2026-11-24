@@ -371,6 +371,8 @@
   "composer.skillCreator": "技能创建器",
   "composer.skillName": "技能名称",
   "composer.turnTheApproachCompletedIn": "把这段对话里完成的做法整理成一个可复用的技能：写清交付物、比例、风格规则和提示词要点（instructions 用英文），然后用 skill 工具 action=\"save\" 保存，名称用中文。",
+  "cropBar.circle": "圆形",
+  "cropBar.gestures": "在图片上滚动以缩放，拖动以调整取景",
   "cropBar.free": "自由",
   "cropBar.original": "原始比例",
   "cropBar.reset": "重置",

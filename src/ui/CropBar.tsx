@@ -5,6 +5,7 @@ import { Icons } from './icons'
 import { Popover } from './Popover'
 import { useElementSize } from './selection'
 import { t } from '../i18n'
+import { useCropWheel } from './useCropWheel'
 import { isEnter } from './keys'
 
 const EDGE = 8
@@ -13,25 +14,26 @@ const GAP = 16
 interface Frac { x: number; y: number; w: number; h: number }
 
 const PRESETS: [string, number, string][] = [
-  ['free', 0, ''], ['original', -1, ''],
+  ['free', 0, ''], ['original', -1, ''], ['circle', 1, ''],
   ['1:1', 1, 'Instagram'], ['4:5', 4 / 5, 'Instagram'], ['3:4', 3 / 4, t('cropBar.xiaohongshu')], ['9:16', 9 / 16, 'Story · TikTok'],
   ['16:9', 16 / 9, 'YouTube'], ['2:3', 2 / 3, 'Pinterest'], ['3:2', 3 / 2, ''], ['1.91:1', 1.91, 'Facebook · X'],
 ]
 
-const presetLabel = (id: string) => (id === 'free' ? t('cropBar.free') : id === 'original' ? t('cropBar.original') : id)
+const presetLabel = (id: string) => ['free', 'original', 'circle'].includes(id) ? t(`cropBar.${id}`) : id
 
 function fracOf(shape: TLImageShape): Frac {
   const c = shape.props.crop
   return c ? { x: c.topLeft.x, y: c.topLeft.y, w: c.bottomRight.x - c.topLeft.x, h: c.bottomRight.y - c.topLeft.y } : { x: 0, y: 0, w: 1, h: 1 }
 }
 
-function setFrac(editor: Editor, shape: TLImageShape, next: Frac) {
+function setFrac(editor: Editor, shape: TLImageShape, next: Frac, isCircle = false) {
   const cur = fracOf(shape)
   const [fullW, fullH] = [shape.props.w / cur.w, shape.props.h / cur.h]
   const off = Vec.Rot({ x: (next.x - cur.x) * fullW, y: (next.y - cur.y) * fullH }, shape.rotation)
+  editor.markHistoryStoppingPoint('crop frame')
   editor.updateShape<TLImageShape>({
     id: shape.id, type: 'image', x: shape.x + off.x, y: shape.y + off.y,
-    props: { w: fullW * next.w, h: fullH * next.h, crop: { topLeft: { x: next.x, y: next.y }, bottomRight: { x: next.x + next.w, y: next.y + next.h } } },
+    props: { w: fullW * next.w, h: fullH * next.h, crop: { isCircle, topLeft: { x: next.x, y: next.y }, bottomRight: { x: next.x + next.w, y: next.y + next.h } } },
   })
 }
 
@@ -45,7 +47,8 @@ function PxInput({ value, onCommit }: { value: number; onCommit: (v: number) => 
   useEffect(() => setText(String(value)), [value])
   const commit = () => {
     const v = Math.round(Number(text))
-    if (v > 0) onCommit(v)
+    if (v === value) return
+    if (v > 0 && Number.isFinite(v)) onCommit(v)
     else setText(String(value))
   }
   return (
@@ -65,8 +68,9 @@ export function CropBar() {
   const shape = useValue('cropping image', () => {
     const id = editor.getCroppingShapeId()
     const s = id ? editor.getShape(id) : null
-    return s?.type === 'image' ? (s as TLImageShape) : null
+    return s && editor.isShapeOfType(s, 'image') ? s : null
   }, [editor])
+  useCropWheel(editor, shape?.id)
   const rect = useValue('crop rect', () => {
     if (!shape) return null
     const b = editor.getShapePageBounds(shape.id)
@@ -75,7 +79,7 @@ export function CropBar() {
     const z = editor.pageToViewport({ x: b.maxX, y: b.maxY })
     return { l: a.x, t: a.y, r: z.x, b: z.y }
   }, [editor, shape?.id])
-  const [preset, setPreset] = useState('free')
+  const [rectPreset, setPreset] = useState('free')
   const [open, setOpen] = useState(false)
   const bar = useRef<HTMLDivElement>(null)
   const size = useElementSize(bar, { w: 420, h: 44 })
@@ -88,21 +92,30 @@ export function CropBar() {
   const { w: iw, h: ih } = asset.props
   const cur = fracOf(shape)
   const [pw, ph] = [Math.round(cur.w * iw), Math.round(cur.h * ih)]
-  const ratio = PRESETS.find(([id]) => id === preset)?.[1] ?? 0
+  const isCircle = !!shape.props.crop?.isCircle
+  const preset = isCircle ? 'circle' : rectPreset
+  const ratio = isCircle ? cur.w * iw / (cur.h * ih) : PRESETS.find(([id]) => id === preset)?.[1] ?? 0
 
   const apply = (id: string) => {
-    setPreset(id)
+    setPreset(id === 'circle' ? 'free' : id)
     setOpen(false)
     const r = PRESETS.find(([p]) => p === id)![1]
     if (r === -1) return setFrac(editor, shape, { x: 0, y: 0, w: 1, h: 1 })
-    if (!r) return
+    if (id === 'circle') {
+      const side = Math.min(shape.props.w, shape.props.h)
+      return setFrac(editor, shape, centered(cur, cur.w * side / shape.props.w, cur.h * side / shape.props.h), true)
+    }
+    if (!r) {
+      if (isCircle) setFrac(editor, shape, cur)
+      return
+    }
     const w = Math.min(iw, ih * r)
     setFrac(editor, shape, centered(cur, w / iw, w / r / ih))
   }
   const resize = (wpx: number, hpx: number) => {
     const w = Math.min(wpx, iw)
     const h = Math.min(hpx, ih)
-    setFrac(editor, shape, centered(cur, w / iw, h / ih))
+    setFrac(editor, shape, centered(cur, w / iw, h / ih), isCircle)
   }
   const setW = (v: number) => (ratio > 0 ? resize(Math.min(v, iw, ih * ratio), Math.min(v, iw, ih * ratio) / ratio) : resize(v, ph))
   const setH = (v: number) => (ratio > 0 ? resize(Math.min(v, ih, iw / ratio) * ratio, Math.min(v, ih, iw / ratio)) : resize(pw, v))
@@ -117,7 +130,7 @@ export function CropBar() {
   if (top + size.h > host.height - 72) top = Math.max(EDGE, rect.t - GAP - size.h)
 
   return (
-    <div ref={bar} className="ca-bar ca-toolbar ca-crop" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()}>
+    <div ref={bar} title={t('cropBar.gestures')} className="ca-bar ca-toolbar ca-crop" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()}>
       <Popover
         open={open}
         onOpenChange={setOpen}
