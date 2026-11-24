@@ -4,7 +4,7 @@ import { importPhotos, isPhoto } from './photoImport'
 import { beginRoadmapTurn, roadmap } from './roadmap'
 import { getZinePages } from './zine'
 import { commentTarget } from './actions'
-import { botEnabledAtom, logDirect, sendMessage, settingsAtom, type BotBlock } from './bot'
+import { botEnabledAtom, logDirect, sendMessage, type BotBlock } from './bot'
 import { capRefs, createGenerator, generate, nearestRatio } from './generate'
 import { DURATIONS, VIDEO_RATIOS } from './genOptions'
 import { uploadImage, viewUrl, type RefKind } from './comfy'
@@ -13,7 +13,6 @@ import { describeItem, itemImages, linkedKit, type LibraryItem } from './library
 import { ask, ocrLines, parseJson, transcribeFile } from './llm'
 import { AUDIO, AUDIO_SIZE, type AudioShape } from './shapes/EmbedShapes'
 import { refFrameContents, refFrameOf, refLinkedOf } from './chatFrame'
-import { memoryPrompt } from './memory'
 import { modelOf } from './models'
 import type { CommentShape } from './shapes/CommentShape'
 import { GENERATOR, type GeneratorShape } from './shapes/GeneratorShape'
@@ -109,7 +108,6 @@ export async function sendToAgent(editor: Editor, text: string, refs: RefShape[]
     docs,
     kits: kits.map((k) => ({ name: k.name, description: describeItem(k), images: itemImages(k) })),
     ...(skill ? { skill: skill.name } : {}),
-    memory: settingsAtom.get()['memory-enabled'] === false ? '' : memoryPrompt(),
     ...(context ? { context } : {}),
   })
 }

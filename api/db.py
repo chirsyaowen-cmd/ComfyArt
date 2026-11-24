@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Engine,
     Float,
     ForeignKey,
@@ -84,6 +85,41 @@ class ProjectVersion(Base):
     time:     Mapped[int] = mapped_column(Integer)
     count:    Mapped[int] = mapped_column(Integer, default=0)
     snapshot: Mapped[str] = mapped_column(Text)
+
+
+class Memory(Base):
+    __tablename__ = "comfyart_memories"
+    __table_args__ = (
+        CheckConstraint("(scope = 'project' AND project IS NOT NULL AND project <> '') OR "
+                        "(scope IN ('global', 'legacy') AND project IS NULL)"),
+        Index("ix_comfyart_memory_scope", "user", "scope", "project"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user: Mapped[str] = mapped_column(String)
+    scope: Mapped[str] = mapped_column(String)
+    project: Mapped[Optional[str]] = mapped_column(String)
+    text: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String)
+    time: Mapped[int] = mapped_column(Integer)
+    source_message_id: Mapped[Optional[str]] = mapped_column(String)
+
+
+class MemoryEvent(Base):
+    __tablename__ = "comfyart_memory_events"
+    seq: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user: Mapped[str] = mapped_column(String)
+    scope: Mapped[str] = mapped_column(String)
+    project: Mapped[Optional[str]] = mapped_column(String)
+    time: Mapped[int] = mapped_column(Integer)
+    action: Mapped[str] = mapped_column(String)
+    text: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String)
+
+
+class ChatMemoryContext(Base):
+    __tablename__ = "comfyart_chat_memory_context"
+    chat_id: Mapped[str] = mapped_column(ForeignKey("comfyart_chats.id", ondelete="CASCADE"), primary_key=True)
+    digest: Mapped[str] = mapped_column(String)
 
 
 class Migration(Base):

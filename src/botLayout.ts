@@ -5,13 +5,11 @@ import { thumbUrl, viewUrl } from './comfy'
 import { roadmap, roadmapSource, updateRoadmap } from './roadmap'
 import { frameFacts, placeProjectPhoto, projectPhotos } from './roadmapPhotos'
 import { getZinePages } from './zine'
-import { settingsAtom } from './bot'
 import { placeInChatFrame } from './chatFrame'
 import { placeHtml } from './embeds'
 import { genInfoOf } from './generate'
 import { type ErrorSink, fileSrc, GAP, jobOf, mediaAsset } from './jobs'
 import { describeItem, itemImages, libraryAtom, linkedKit } from './library'
-import { correct, forget, memoryAtom, remember } from './memory'
 import { buildSlides } from './slides'
 import { exportImage } from './shapes/ArtboardShape'
 import { COMMENT } from './shapes/CommentShape'
@@ -238,17 +236,6 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
     editor.select(...shapes.map((s: TLShape) => s.id))
     editor.zoomToSelection({ animation: { duration: 200 } })
     return { selected: shapes.map((s: TLShape) => s.id) }
-  },
-  memory: async (_editor, args) => {
-    if (settingsAtom.get()['memory-enabled'] === false && args.action !== 'forget') throw new Error('the user turned memory off; do not read or save memories')
-    if (args.action === 'list') return { memories: memoryAtom.get().map((m) => ({ text: m.text, category: m.category ?? 'about' })) }
-    if (args.action === 'add') {
-      await remember([{ text: String(args.text), category: args.category }], t('botCommands.chat'))
-      return { added: args.text }
-    }
-    if (args.action === 'correct') return { corrected: await correct([{ old: String(args.old), new: String(args.new) }], t('botCommands.chat')) }
-    if (args.action === 'forget') return { forgotten: await forget([String(args.text)], t('botCommands.chat')) }
-    throw new Error('action must be list, add, correct or forget')
   },
   skill: async (_editor, args) => {
     const skills = await loadSkills()

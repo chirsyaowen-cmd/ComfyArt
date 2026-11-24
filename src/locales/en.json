@@ -1,4 +1,12 @@
 {
+  "memory.scope": "Applies to",
+  "memory.scopeProject": "This project",
+  "memory.scopeGlobal": "Preferences for all projects",
+  "memory.legacy": "Legacy memories",
+  "memory.legacyHint": "These notes are excluded from chats. Assign preferences to a scope to use them. Project titles come from the project record.",
+  "memory.assignProject": "Use in this project",
+  "memory.assignGlobal": "Use in all projects",
+
   "photo.exposure": "Exposure",
   "photo.brightness": "Brightness",
   "photo.vibrance": "Vibrance",
