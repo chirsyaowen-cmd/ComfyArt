@@ -59,7 +59,7 @@ export function TaskDetails({ editor }: { editor: Editor }) {
   const index = messages.findIndex((m) => m.id === id)
   if (index < 0) return null
   const m = messages[index]
-  const request = messages.slice(0, index).reverse().find((x) => x.role === 'user')
+  const request = messages.slice(0, index).reverse().find((x) => x.role === 'user' || x.role === 'system')
   const close = () => detailsAtom.set(null)
   const outputs = outputsOf(m.blocks)
   const requestText = request?.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('')

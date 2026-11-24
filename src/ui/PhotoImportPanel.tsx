@@ -1,24 +1,16 @@
-import { useEffect } from 'react'
 import { useValue, type Editor } from 'tldraw'
 
 import { photoDragProps, placeAsset } from '../assets'
 import { viewUrl, thumbUrl } from '../comfy'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
-import { photoImportAtom, refreshPhotos, retryPhoto } from '../photoImport'
+import { photoImportAtom, retryPhoto } from '../photoImport'
 import { getZinePages, activeZineIndex } from '../zine'
 
 export function PhotoImportPanel({ editor, onError }: { editor: Editor; onError: (msg: string) => void }) {
   const rows = useValue(photoImportAtom)
   const stored = rows.filter(row => row.stage.kind === 'stored')
   const ready = rows.filter(row => row.stage.kind === 'stored' && row.stage.photo.state === 'ready')
-  const pending = stored.some(row => row.stage.kind === 'stored' && row.stage.photo.state === 'pending')
-  useEffect(() => {
-    if (!pending) return
-    void refreshPhotos()
-    const timer = window.setInterval(() => void refreshPhotos(), 800)
-    return () => clearInterval(timer)
-  }, [pending])
   const page = useValue('photo destination', () => getZinePages(editor).length ? activeZineIndex(editor) + 1 : 0, [editor])
   return <div className="ca-photo-import">
     <div role="status">{t('photoImport.progress', stored.length, rows.length, ready.length)}</div>

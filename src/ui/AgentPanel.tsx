@@ -146,7 +146,9 @@ export function AgentPanel({ editor, onError }: {
       <div ref={list} className="ca-chat" onScroll={onScroll}>
         <div className="ca-chat__reveal" data-streaming={busy || undefined} style={{ height: busy ? height : undefined }}>
           <div ref={content} className="ca-chat__content">
-            {messages.map((m, i) => (m.role === 'user'
+            {messages.map((m, i) => (m.role === 'system'
+              ? <div key={m.id} className="ca-chat__notice"><strong>{t('composer.scheduledTask')}</strong> {textOf(m)}</div>
+              : m.role === 'user'
               ? <UserMessage key={m.id} editor={editor} m={m} onBranch={canBranch && !busy ? () => void branchFrom(m.id).catch(fail) : undefined} />
               : (
                 <div key={m.id} className="ca-chat__bot">

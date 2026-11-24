@@ -53,10 +53,11 @@ async def test_canvas_tool_is_relayed_to_the_project_page(bot_client):
     await _open(bot_client, "other", "tab-0")
     await _open(bot_client, "proj-7")
     chat = chat_store.create_chat(user="default", project="proj-7", provider="codex")
-    call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}",
+    call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}&roadmap_turn=first",
                                                json=_rpc("tools/call", {"name": "get_canvas", "arguments": {}})))
     commands = await _answer_commands(bot_client, lambda c: {"ok": True, "result": {"shapes": [], "page": "page:1"}})
     data = await (await call).json()
+    assert commands[0]["roadmap_turn"] == "first"
     assert commands[0]["action"] == "get_canvas" and commands[0]["project"] == "proj-7" and commands[0]["_sid"] == "tab-1"
     assert data["result"]["isError"] is False
     assert '"page": "page:1"' in data["result"]["content"][0]["text"]

@@ -71,15 +71,26 @@ async def test_send_streams_blocks_and_titles_the_chat(bot_client, fake_provider
 async def test_messages_queue_while_busy_and_stop_aborts(bot_client, fake_provider):
     fake_provider.gate = asyncio.Event()
     chat = await _chat(bot_client)
-    await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "one"})
-    second = await (await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "two"})).json()
+    await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "one", "roadmap_turn": "first"})
+    second = await (await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "two", "roadmap_turn": "second"})).json()
     assert second["queued"] is True
     await asyncio.sleep(0.15)
+    assert fake_provider.last_turn.mcp_endpoint.endswith("roadmap_turn=first")
     assert (await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/stop")).status == 200
     fake_provider.gate = None
     data = await wait_bot_done(bot_client, chat["id"])
     statuses = [m["status"] for m in data["messages"] if m["role"] == "assistant"]
     assert statuses == ["aborted", "done"]
+    assert fake_provider.last_turn.mcp_endpoint.endswith("roadmap_turn=second")
+
+
+async def test_scheduled_request_has_its_own_source(bot_client, fake_provider):
+    chat = await _chat(bot_client)
+    await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "review", "source": "schedule"})
+    data = await wait_bot_done(bot_client, chat["id"])
+    trigger, reply = data["messages"]
+    assert trigger["role"] == "system" and reply["parent_id"] == trigger["id"]
+    assert {"type": "trigger", "name": "schedule"} in trigger["blocks"]
 
 
 async def test_ask_answer_round_trip(bot_client, fake_provider):

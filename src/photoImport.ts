@@ -9,7 +9,7 @@ export const isHeif = (file: File) => /\.hei[cf]s?$/i.test(file.name) || /^image
 export const isPhoto = (file: File) => file.type.startsWith('image/') || isHeif(file) || /\.(jpe?g|png|webp|gif|avif)$/i.test(file.name)
 
 type ThumbState = 'pending' | 'ready' | 'failed'
-type Uploaded = { key: string; ref: ImageRef; state: ThumbState }
+export type Uploaded = { key: string; ref: ImageRef; state: ThumbState }
 type Stage = { kind: 'waiting' | 'uploading' | 'missing' } | { kind: 'error'; message: string } | { kind: 'stored'; photo: Uploaded }
 type Entry = { id: string; name: string; size: number; modified: number; stage: Stage }
 

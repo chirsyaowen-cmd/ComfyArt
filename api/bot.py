@@ -169,6 +169,11 @@ async def bot_send(request: web.Request) -> web.Response:
     display_blocks = [{"type": r["kind"], "url": r["src"], "shape": r["id"]} for r in refs]
     display_blocks += [{"type": "file", "url": d["src"], "name": d["name"]} for d in docs]
     display_blocks += [{"type": "kit", "name": k["name"]} for k in kits]
+    if body.get("roadmap_turn"):
+        display_blocks.append({"type": "roadmap_turn", "token": str(body["roadmap_turn"])})
+    if body.get("source") == "schedule":
+        display_blocks.append({"type": "trigger", "name": "schedule"})
+        lines.append("[Automatic scheduled task. Only carry out this scheduled request.]")
     if skill_name:
         display_blocks.append({"type": "skill", "name": skill_name})
     if text:

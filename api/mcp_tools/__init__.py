@@ -22,7 +22,7 @@ TOOLS: dict[str, dict] = {
         "handler": _server_info,
     },
 }
-CANVAS_TOOLS = ("get_canvas", "view_canvas", "brand_kits", "add_text", "add_shape", "create_frame",
+CANVAS_TOOLS = ("get_canvas", "update_roadmap", "place_photo", "view_canvas", "brand_kits", "add_text", "add_shape", "create_frame",
                 "update_shapes", "delete_shapes", "focus", "memory", "skill", "create_slides", "vectorize_image")
 TOOLS.update({name: canvas.TOOLS[name] for name in CANVAS_TOOLS})
 TOOLS.update(vectorcraft.TOOLS)

@@ -35,7 +35,7 @@ export interface BotBlock {
   detail?: Record<string, any>
 }
 export interface BotUsage { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cost_usd?: number }
-export interface BotMessage { id: string; chat_id: string; parent_id: string | null; role: 'user' | 'assistant'; blocks: BotBlock[]; status: string; usage: BotUsage | null; created_at: number }
+export interface BotMessage { id: string; chat_id: string; parent_id: string | null; role: 'user' | 'assistant' | 'system'; blocks: BotBlock[]; status: string; usage: BotUsage | null; created_at: number }
 export interface BotChat { id: string; user: string; project: string; title: string; provider: string; run_mode: 'auto' | 'ask'; pinned: boolean; archived: boolean; busy?: boolean; created_at: number; updated_at: number }
 export interface ModelOption { value: string; label: string; group: string }
 export interface ProviderInfo { id: string; label: string; available: boolean; version: string; detail: string; logged_in: boolean | null; stateful: boolean; attachments: boolean; branch: boolean; models: string[]; model_options?: ModelOption[] }
@@ -46,6 +46,8 @@ export const TOOL_LABELS: Record<string, string> = {
   tool_search: t('bot.findTools'),
   server_info: t('bot.checkStatus'),
   get_canvas: t('bot.viewCanvas'),
+  update_roadmap: t('road.title'),
+  place_photo: t('road.place'),
   view_canvas: t('bot.lookAtCanvas'),
   view_video: t('bot.watchVideo'),
   list_models: t('bot.viewModels'),
@@ -177,7 +179,7 @@ async function ensureChat(): Promise<BotChat> {
   return chat
 }
 
-export interface SendInput { text: string; refs: { id: string; src: string; name: string; kind: 'image' | 'video' | 'audio'; transcript?: string }[]; docs: { src: string; name: string }[]; kits: { name: string; description: string; images: string[] }[]; skill?: string; memory?: string; context?: string }
+export interface SendInput { source?: 'schedule'; roadmap_turn?: string; text: string; refs: { id: string; src: string; name: string; kind: 'image' | 'video' | 'audio'; transcript?: string }[]; docs: { src: string; name: string }[]; kits: { name: string; description: string; images: string[] }[]; skill?: string; memory?: string; context?: string }
 
 export async function sendMessage(input: SendInput) {
   const chat = await ensureChat()

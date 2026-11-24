@@ -1,4 +1,5 @@
 import asyncio
+from contextvars import ContextVar
 
 from aiohttp import web
 from .. import runtime
@@ -9,6 +10,7 @@ from ._common import json_body, routes
 DEFAULT_TIMEOUT_S = 20.0
 
 RELAY = CommandRelay("comfyart-mcp-command", runtime.send_event)
+ROADMAP_TURN = ContextVar("roadmap_turn", default="")
 _pages: dict[str, str] = {}
 
 
@@ -38,7 +40,8 @@ async def submit_command(action: str, payload: dict, project: str,
                          timeout: float = DEFAULT_TIMEOUT_S, chat: str = "") -> dict:
     client, project = _target(project)
     try:
-        return await RELAY.submit({"action": action, "project": project, "chat": chat, "args": payload},
+        return await RELAY.submit({"action": action, "project": project, "chat": chat, "args": payload,
+                                   "roadmap_turn": ROADMAP_TURN.get()},
                                   sid=client, timeout=timeout)
     except asyncio.TimeoutError:
         if client not in _open_pages():

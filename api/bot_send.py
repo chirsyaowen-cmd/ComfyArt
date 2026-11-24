@@ -127,8 +127,9 @@ def compose_provider_text(text: str, *, skill_name: str = "", memory: str = "",
 
 def queue_or_begin(chat: dict, *, text: str, provider_text: str,
                    attachments: list[dict], display_blocks: list[dict]) -> tuple[dict, Optional[dict]]:
+    role = "system" if any(b.get("type") == "trigger" for b in display_blocks) else "user"
     if chat["id"] in ACTIVE_TURNS:
-        user_msg = chat_store.create_message(chat_id=chat["id"], role="user", blocks=display_blocks, status="queued")
+        user_msg = chat_store.create_message(chat_id=chat["id"], role=role, blocks=display_blocks, status="queued")
         QUEUED.setdefault(chat["id"], []).append({
             "user_msg": user_msg,
             "text": text,
@@ -137,7 +138,7 @@ def queue_or_begin(chat: dict, *, text: str, provider_text: str,
         })
         broadcast("message_queued", {"chat_id": chat["id"], "user_message": user_msg})
         return user_msg, None
-    user_msg = chat_store.create_message(chat_id=chat["id"], role="user", blocks=display_blocks)
+    user_msg = chat_store.create_message(chat_id=chat["id"], role=role, blocks=display_blocks)
     assistant_msg = RUNNER.begin(chat, text=text, provider_text=provider_text,
                                  attachments=attachments, user_msg=user_msg)
     return user_msg, assistant_msg
