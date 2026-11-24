@@ -14,8 +14,8 @@ function Thumb({ item }: { item: AssetItem }) {
   return <img src={thumbUrl(item.src)} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />
 }
 
-export function AssetGrid({ onPick, only }: { onPick: (item: AssetItem) => void; only?: AssetItem['kind'] }) {
-  const [tab, setTab] = useState(TABS[0][0])
+export function AssetGrid({ onPick, only, initialTab = TABS[0][0] }: { initialTab?: string; onPick: (item: AssetItem) => void; only?: AssetItem['kind'] }) {
+  const [tab, setTab] = useState(initialTab)
   const [search, setSearch] = useState('')
   const [items, setItems] = useState<AssetItem[] | null>(null)
   const [next, setNext] = useState<string | null>(null)

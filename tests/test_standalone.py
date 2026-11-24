@@ -42,3 +42,20 @@ async def test_two_editors_cannot_overwrite_each_other(bot_client):
     assert (await bot_client.put(url, json={"snapshot": {}}, headers={"If-Match": initial})).status == 412
     assert (await bot_client.put(url, json={"snapshot": {}})).status == 412
     assert (await (await bot_client.get(url)).json()) == {"title": "newer"}
+
+
+async def test_photo_library_lists_uploaded_images_by_name():
+    async with TestClient(TestServer(create_app())) as client:
+        for name in ("试刊 A.jpg", "试刊 B.png", "试刊说明.txt"):
+            data = FormData(quote_fields=False)
+            data.add_field("image", name.encode(), filename=name, content_type="application/octet-stream")
+            assert (await client.post("/api/upload/image", data=data)).status == 200
+        query = {"tags_any": "input", "name_contains": "试刊", "limit": 1}
+        first = await (await client.get("/api/assets", params=query)).json()
+        second = await (await client.get("/api/assets", params={**query, "after": first["next_cursor"]})).json()
+        items = first["assets"] + second["assets"]
+        assert {item["name"] for item in items} == {"试刊 A.jpg", "试刊 B.png"}
+        assert second["next_cursor"] is None
+        for item in items:
+            response = await client.get(item["preview_url"])
+            assert await response.read() == item["name"].encode()

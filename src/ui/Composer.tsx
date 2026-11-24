@@ -4,7 +4,9 @@ import { useValue, type Editor, type TLShapeId } from 'tldraw'
 import { agentModeAtom, directSettingsAtom, DOC_ACCEPT, docsAtom, draftAtom, eachLine, eachRuns, extraRefsAtom, generateDirect, isRefShape, kitsAtom, refKindOf, sendToAgent, srcOf, uploadRefs, type DirectSettings, type RefShape } from '../agent'
 import { EachButton, EachRole, useEach } from './EachToggle'
 import { RefFrameButton } from './RefFrameButton'
-import { botEnabledAtom, messagesAtom } from '../bot'
+import { describeZine, inspectZine } from '../zineReview'
+import { ZinePhotoPrompt } from './ZinePhotoPrompt'
+import { botEnabledAtom, chatIdAtom, messagesAtom } from '../bot'
 import { imageUrl } from '../comfy'
 import { VIDEO_RATIOS } from '../genOptions'
 import { errorText } from '../jobs'
@@ -62,6 +64,18 @@ function DirectPills({ editor, video }: { editor: Editor; video: boolean }) {
 }
 
 export function Composer({ editor, busy, onError }: { editor: Editor; busy: boolean; onError: (msg: string) => void }) {
+  const chatId = useValue(chatIdAtom)
+  const [photoPromptChat, setPhotoPromptChat] = useState<string | null | undefined>(undefined)
+  function reviewCanvas() {
+    setMenu(null)
+    const book = inspectZine(editor)
+    if (book && !book.occupied.length) {
+      setPhotoPromptChat(chatId)
+      return
+    }
+    setPhotoPromptChat(undefined)
+    void sendToAgent(editor, book ? t('zineReview.manual') : REVIEW_PROMPT, [], null, [], [], book ? describeZine(book) : '').catch(fail)
+  }
   const started = useValue('chat started', () => messagesAtom.get().length > 0, [])
   const draft = useValue(draftAtom)
   const mode = useValue(agentModeAtom)
@@ -183,6 +197,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           ))}
         </div>
       )}
+      {photoPromptChat === chatId && <ZinePhotoPrompt editor={editor} />}
       <div className="ca-composer__entry">
         {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
           <div className="ca-composer__chips">
@@ -247,7 +262,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
                 <span className="ca-icon">{Icons.upload}</span><span className="ca-menu__grow">{t('common.uploadFile')}</span>
               </button>
               <div className="ca-menu__sep" />
-              <button type="button" className="ca-menu__item" onClick={() => { setMenu(null); void sendToAgent(editor, REVIEW_PROMPT, [], null).catch(fail) }}>
+              <button type="button" className="ca-menu__item" onClick={reviewCanvas}>
                 <span className="ca-icon">{Icons.search}</span><span className="ca-menu__grow">{t('composer.canvasReview')}</span>
               </button>
               <button type="button" className="ca-menu__item" onClick={() => { setMenu(null); schedulesOpenAtom.set(draft.trim() ? { prompt: draft.trim() } : {}) }}>

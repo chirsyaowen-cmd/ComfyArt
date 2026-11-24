@@ -1,4 +1,4 @@
-import type { Editor } from 'tldraw'
+import { Box, type Editor, type TLShapeId } from 'tldraw'
 
 import { api, readUserJson, uploadImage, viewUrl, writeUserJson } from './comfy'
 import { botEnabledAtom, settingsAtom, type BotMessage } from './bot'
@@ -9,6 +9,7 @@ import { currentProject, notify } from './notices'
 import { exportImage } from './shapes/ArtboardShape'
 import { loadSkills, saveSkill, slug } from './skills'
 import { onComfyEvent } from './ws'
+import { describeZine, emptyBookMessage, inspectZine } from './zineReview'
 import { lang, t } from './i18n'
 
 export type Ability = 'memory' | 'skills' | 'review'
@@ -95,8 +96,8 @@ async function onTurnDone(e: { chat_id: string; message_id: string; status: stri
   if (plan?.skills) await evolveSkill(plan.skills)
 }
 
-function layoutContext(editor: Editor) {
-  return JSON.stringify(editor.getCurrentPageShapes().map(shape => ({
+function layoutContext(editor: Editor, ids: Set<TLShapeId>) {
+  return JSON.stringify(editor.getCurrentPageShapes().filter(shape => ids.has(shape.id)).map(shape => ({
     id: shape.id, parent: shape.parentId, type: shape.type,
     bounds: editor.getShapePageBounds(shape)?.toJson(),
     text: 'text' in shape.props ? shape.props.text : undefined,
@@ -105,10 +106,12 @@ function layoutContext(editor: Editor) {
 }
 
 async function review(editor: Editor) {
-  const ids = [...editor.getCurrentPageShapeIds()]
-  if (ids.length < REVIEW_MIN_SHAPES) return
+  const book = inspectZine(editor)
+  const ids = book ? book.reviewPages : [...editor.getCurrentPageShapeIds()]
+  if (!book && ids.length < REVIEW_MIN_SHAPES) return
   const project = currentProject()
-  const layout = layoutContext(editor)
+  const layout = book && !book.occupied.length ? emptyBookMessage(book)
+    : [book && describeZine(book), layoutContext(editor, editor.getShapeAndDescendantIds(ids))].filter(Boolean).join('\n')
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(layout))
   const sig = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
   const go = await withState((s) => {
@@ -117,10 +120,14 @@ async function review(editor: Editor) {
     return true
   })
   if (!go) return
-  const bounds = editor.getCurrentPageBounds()!
+  if (book && !book.occupied.length) {
+    await notify({ project, kind: 'suggestion', title: t('proactive.reviewTitle'), body: layout, action: 'zine-photos' })
+    return
+  }
+  const bounds = Box.Common(ids.flatMap(id => editor.getShapePageBounds(id) ?? []))
   const { blob } = await exportImage(editor, ids, { format: 'png', background: true, scale: Math.min(1, REVIEW_PX / Math.max(bounds.w, bounds.h)) })
   const src = viewUrl(await uploadImage(blob, `review-${project}.png`))
-  const issues = parseJson(await ask('Review this canvas.', REVIEW_SYSTEM, [src], layout))?.issues
+  const issues = parseJson(await ask(book ? describeZine(book) : 'Review this canvas.', REVIEW_SYSTEM, [src], layout))?.issues
   if (Array.isArray(issues) && issues.length) await notify({ project, kind: 'suggestion', title: t('proactive.reviewTitle'), body: issues.map((x) => `• ${x}`).join('\n') })
 }
 

@@ -40,3 +40,6 @@
 .ca-book-preview { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #242322; color: #fff; }
 .ca-book-preview::backdrop { background: #242322; }
 .ca-book-loading { display: grid; height: 100%; place-content: center; }
+
+.ca-zine-photo { padding: 8px 4px; font-size: 13px; line-height: 1.5; }
+.ca-zine-photo__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

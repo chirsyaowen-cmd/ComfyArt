@@ -5,7 +5,7 @@ import { uuid } from './id'
 import { readLocal, writeLocal } from './localPrefs'
 
 export type NoticeKind = 'task' | 'suggestion' | 'comment' | 'schedule'
-export interface Notice { id: string; kind: NoticeKind; title: string; body?: string; time: number; read?: boolean; project: string; chat?: string; srcs?: string[] }
+export interface Notice { id: string; kind: NoticeKind; title: string; body?: string; time: number; read?: boolean; project: string; chat?: string; action?: 'zine-photos'; srcs?: string[] }
 
 const FILE = 'comfyart/notices.json'
 const MAX_NOTICES = 200
