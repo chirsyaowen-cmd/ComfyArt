@@ -5,6 +5,7 @@ from typing import Any, Coroutine
 from urllib.parse import parse_qs, urlparse
 
 from pathlib import Path
+from . import heif
 from ..runtime import DATA, confined, routes
 from aiohttp import web
 _TASKS: set[asyncio.Task] = set()
@@ -60,7 +61,7 @@ def write_json(path: str, data) -> None:
     os.replace(tmp, path)
 
 
-def view_path(url: str) -> str:
+def view_path(url: str, *, original=False) -> str:
     query = parse_qs(urlparse(url).query)
     name = (query.get("filename") or [""])[0]
     subfolder = (query.get("subfolder") or [""])[0]
@@ -70,4 +71,6 @@ def view_path(url: str) -> str:
     path = confined(DATA / kind, str(Path(subfolder) / name))
     if not path.is_file():
         raise ValueError(f"file not found: {name}")
+    if not original and path.suffix.lower() in heif.SUFFIXES:
+        path = heif.rendition(path, DATA / "photo-renditions")
     return str(path)

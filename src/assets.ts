@@ -25,7 +25,7 @@ export async function listAssets(tags: string, search: string, after?: string): 
   return { items, next: next_cursor ?? null }
 }
 
-export async function placeAsset(editor: Editor, item: AssetItem, pageId?: TLShapeId): Promise<TLShapeId> {
+export async function placeAsset(editor: Editor, item: Pick<AssetItem, 'src' | 'name' | 'kind'>, pageId?: TLShapeId): Promise<TLShapeId> {
   const m = await toMedia(refFromUrl(item.src), item.kind)
   if (pageId) {
     const page = editor.getShape<TLFrameShape>(pageId)

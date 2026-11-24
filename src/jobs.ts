@@ -72,7 +72,7 @@ export function placeMedia(editor: Editor, m: Media, name: string, x: number, y:
     id: assetId,
     typeName: 'asset',
     type: m.kind,
-    props: { name, src: m.src, w: m.w, h: m.h, mimeType: m.kind === 'video' ? 'video/mp4' : m.ref.filename.endsWith('.svg') ? 'image/svg+xml' : m.ref.filename.endsWith('.webp') ? 'image/webp' : 'image/png', isAnimated: m.kind === 'video' || m.ref.filename.endsWith('.webp') },
+    props: { name, src: m.src, w: m.w, h: m.h, mimeType: m.kind === 'video' ? 'video/mp4' : m.ref.filename.endsWith('.svg') ? 'image/svg+xml' : /\.(jpe?g|hei[cf]s?)$/i.test(m.ref.filename) ? 'image/jpeg' : m.ref.filename.endsWith('.webp') ? 'image/webp' : 'image/png', isAnimated: m.kind === 'video' || m.ref.filename.endsWith('.webp') },
     meta: {},
   } as any])
   const id = createShapeId()

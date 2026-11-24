@@ -1,7 +1,12 @@
 import { useEffect } from 'react'
 import { defaultHandleExternalFileContent, useEditor, useToasts, useTranslation, type Editor, type TLShape } from 'tldraw'
 
-import { fileInsertionPoint, selectZinePage, getZinePages } from '../zine'
+import { placeAsset } from '../assets'
+import { viewUrl } from '../comfy'
+import { PHOTO_ACCEPT, importPhotos, isHeif, isPhoto, photoImportAtom, uploadPhoto } from '../photoImport'
+import { libraryTabAtom } from './LibraryPanel'
+import { sideAtom } from './SidePanel'
+import { activeZineIndex, fileInsertionPoint, selectZinePage, getZinePages } from '../zine'
 import { placeEmbed } from '../embeds'
 import { errorText } from '../jobs'
 import { isPdf, placePdf } from '../pdf'
@@ -11,7 +16,7 @@ const GAP = 20
 export function importFiles(editor: Editor, accept: string) {
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = accept
+  input.accept = accept === 'image/*' ? PHOTO_ACCEPT : accept
   input.multiple = true
   input.onchange = () => {
     const files = Array.from(input.files ?? [])
@@ -38,11 +43,28 @@ export function DropHandlers({ onError }: { onError: (msg: string) => void }) {
   const msg = useTranslation()
 
   useEffect(() => {
+    if (photoImportAtom.get().length) {
+      libraryTabAtom.set('import')
+      sideAtom.set('assets')
+    }
     editor.registerExternalContentHandler('files', async ({ point, files }) => {
+      const pages = getZinePages(editor)
+      const photos = files.filter(isPhoto)
+      const batch = photos.length > 1 && pages.length > 0
+      if (batch) {
+        importPhotos(photos)
+        libraryTabAtom.set('import')
+        sideAtom.set('assets')
+      }
       const rest: File[] = []
       for (const file of files) {
+        if (batch && isPhoto(file)) continue
         try {
-          if (isPdf(file)) await placePdf(editor, file, point)
+          if (isHeif(file)) {
+            const page = pages.find(id => point && editor.getShapePageBounds(id)?.containsPoint(point)) ?? pages[activeZineIndex(editor)]
+            const photo = await uploadPhoto(file)
+            await placeAsset(editor, { name: file.name, src: viewUrl(photo.ref), kind: 'image' }, page)
+          } else if (isPdf(file)) await placePdf(editor, file, point)
           else if (!(await placeEmbed(editor, file, point))) rest.push(file)
         } catch (e) {
           onError(errorText(e))
