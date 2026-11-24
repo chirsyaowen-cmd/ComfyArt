@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { nextStep, reviseRoadmap } from '../src/roadmapModel.ts'
+import { nextStep, repeatsLastCompletion, reviseRoadmap } from '../src/roadmapModel.ts'
 
 const frames = ['shape:front', 'shape:left', 'shape:right']
 function book() {
@@ -59,4 +59,19 @@ test('validate explicit book frames atomically and keep step identity when renam
   assert.equal(plan.steps.find(s => s.title === '内页').id, 'spread')
   assert.deepEqual(plan.steps[0].targetFrameIds, [])
   assert.throws(() => change(plan, { action: 'create', id: 'theme' }), /already exists/)
+})
+
+test('a duplicate completion acknowledges the saved decision and only that decision', () => {
+  const prior = change(book(), { id: 'cover', action: 'start' })
+  const done = { id: 'cover', action: 'done' }
+  for (const reason of ['已应用照片调整', '保留原图']) {
+    const plan = change(prior, { ...done, reason })
+    assert.ok(repeatsLastCompletion(plan, prior.revision, [done]))
+    assert.ok(repeatsLastCompletion(plan, prior.revision, [{ ...done, reason }]))
+    assert.equal(repeatsLastCompletion(plan, prior.revision, [{ ...done, reason: 'different decision' }]), false)
+    assert.equal(repeatsLastCompletion(plan, prior.revision, [done, { action: 'start', id: 'spread' }]), false)
+    assert.equal(repeatsLastCompletion(plan, prior.revision - 1, [done]), false)
+    const resumed = change(plan, { action: 'start', id: 'cover' })
+    assert.equal(repeatsLastCompletion(resumed, plan.revision, [done]), false)
+  }
 })

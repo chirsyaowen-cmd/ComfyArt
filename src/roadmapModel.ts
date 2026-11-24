@@ -11,6 +11,14 @@ export function applies(step: Step, frame: TLShapeId) {
   return step.scope === 'book' || step.targetFrameIds.includes(frame)
 }
 
+export function repeatsLastCompletion(plan: Roadmap, expected: number, changes: Change[]) {
+  if (expected !== plan.revision - 1 || !Array.isArray(changes) || changes.length !== 1) return false
+  const change = changes[0]
+  if (change?.action !== 'done' || !plan.steps.some(s => s.id === change.id && s.status === 'done')) return false
+  return plan.decisions.some(d => d.revision === plan.revision && d.stepId === change.id && d.action === 'done' &&
+    (change.reason === undefined || change.reason === d.reason))
+}
+
 export function nextStep(plan: Roadmap) {
   const remaining = plan.steps.filter(s => s.status !== 'done')
   if (remaining.every(s => s.status === 'deferred')) return undefined

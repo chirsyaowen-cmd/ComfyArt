@@ -84,7 +84,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
       const context = describeZine(book!) + '\nThe attached cover photo is ' + photo.id +
         '. Inspect the attachment or use view_canvas with ids containing that shape ID. Read get_canvas.book_frames for the cover frame_version. ' +
         'Use adjust_photo once with a concrete plain-language suggestion and ordered parameters suited to the image and user intent. ' +
-        'The suggestion should be one short, friendly question about how the picture will look. After applying, give a single sentence pointing to the controls. It asks for confirmation itself. Follow the project goal and the actual light and dark areas. For a two-ink look, desaturate then map shadows and highlights to colors you choose. ' +
+        'The suggestion should be one short, friendly question about how the picture will look. After applying, give a single sentence pointing to the controls. It asks for confirmation and records the cover-photo decision in the roadmap itself. Treat its completed_step_id as final. Follow the project goal and the actual light and dark areas. For a two-ink look, desaturate then map shadows and highlights to colors you choose. ' +
         'For other images choose appropriate colors or contrast alone. If pixels are unavailable, tell the user.'
       void sendToAgent(editor, t('photo.review'), [photo], null, [], [], context).catch(fail)
       return

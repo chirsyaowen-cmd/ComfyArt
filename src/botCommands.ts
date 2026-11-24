@@ -225,12 +225,14 @@ const HANDLERS: Record<string, Handler> = {
       if (bounds) editor.zoomToBounds(bounds, { inset: 120, targetZoom: 1 })
       enterMode('photoAdjust')
     }
+    const result = { id: photo.id, status: args.keep ? 'kept_original' : 'applied' }
     const plan = roadmap(editor)
     if (coverPhoto(editor)?.id === photo.id && plan.steps.some(s => s.id === COVER_PHOTO_STEP)) {
-      updateRoadmap(editor, plan.revision, [{ id: COVER_PHOTO_STEP, action: 'done',
+      const updated = updateRoadmap(editor, plan.revision, [{ id: COVER_PHOTO_STEP, action: 'done',
         reason: args.keep ? '保留原图' : '已应用照片调整' }], 'button')
+      return { ...result, roadmap: { revision: updated.revision, completed_step_id: COVER_PHOTO_STEP } }
     }
-    return { id: photo.id, status: args.keep ? 'kept_original' : 'applied' }
+    return result
   },
   vectorcraft_photo_source: (editor, args) => {
     const photo = imageOf(editor, args.id)

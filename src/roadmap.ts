@@ -4,7 +4,7 @@ import { getZinePages, zineSpreads } from './zine'
 import { adjustedOf } from './imageOps'
 import { uuid } from './id'
 
-import { reviseRoadmap, type Step, type Roadmap, type Source, type Change } from './roadmapModel'
+import { repeatsLastCompletion, reviseRoadmap, type Step, type Roadmap, type Source, type Change } from './roadmapModel'
 
 export const COVER_PHOTO_STEP = 'cover-photo-adjust'
 
@@ -82,10 +82,11 @@ export function trackRoadmap(editor: Editor) {
   })
 }
 export function updateRoadmap(editor: Editor, expected: number, changes: Change[], source: Source) {
+  const original = roadmap(editor)
+  if (repeatsLastCompletion(original, expected, changes)) return original
   assertRevision(editor, expected)
   const frames = getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame')
   if (!frames.length) throw new Error('Expected a Zine project')
-  const original = roadmap(editor)
   const plan = reviseRoadmap(original, frames, changes, source)
   if (plan === original) return plan
   previous.set(editor, { saved: original, revision: plan.revision })
