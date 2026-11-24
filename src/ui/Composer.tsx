@@ -6,6 +6,7 @@ import { EachButton, EachRole, useEach } from './EachToggle'
 import { RefFrameButton } from './RefFrameButton'
 import { PHOTO_ACCEPT } from '../photoImport'
 import { guideShown, roadmapGuide } from '../roadmapGuide'
+import { coverPhoto, COVER_PHOTO_STEP, roadmap } from '../roadmap'
 import { describeZine, inspectZine } from '../zineReview'
 import { ZinePhotoPrompt } from './ZinePhotoPrompt'
 import { botEnabledAtom, chatIdAtom, messagesAtom } from '../bot'
@@ -77,6 +78,17 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
       return
     }
     setPhotoPromptChat(undefined)
+    const photo = book && coverPhoto(editor)
+    const step = photo && roadmap(editor).steps.find(s => s.id === COVER_PHOTO_STEP)
+    if (photo && step && (step.status === 'pending' || step.status === 'in_progress')) {
+      const context = describeZine(book!) + '\nThe attached cover photo is ' + photo.id +
+        '. Inspect the attachment or use view_canvas with ids containing that shape ID. Read get_canvas.book_frames for the cover frame_version. ' +
+        'Use adjust_photo once with a concrete plain-language suggestion and ordered parameters suited to the image and user intent. ' +
+        'The suggestion should be one short, friendly question about how the picture will look. After applying, give a single sentence pointing to the controls. It asks for confirmation itself. Follow the project goal and the actual light and dark areas. For a two-ink look, desaturate then map shadows and highlights to colors you choose. ' +
+        'For other images choose appropriate colors or contrast alone. If pixels are unavailable, tell the user.'
+      void sendToAgent(editor, t('photo.review'), [photo], null, [], [], context).catch(fail)
+      return
+    }
     void sendToAgent(editor, book ? t('zineReview.manual') : REVIEW_PROMPT, [], null, [], [], book ? describeZine(book) : '').catch(fail)
   }
   const started = useValue('chat started', () => messagesAtom.get().length > 0, [])

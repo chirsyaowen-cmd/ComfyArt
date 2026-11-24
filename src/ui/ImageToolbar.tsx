@@ -32,7 +32,7 @@ const EDGE = 8
 const AUTO_LAYERS = 4
 const BAR_KEY = 'comfyart.toolbar'
 const DEFAULT_PINNED = ['chat', 'crop', 'transform']
-const ALL_TOOLS = ['chat', 'crop', 'transform', 'adjust', 'effects', 'vectorize', 'ocr', 'info', 'preview', 'export']
+const ALL_TOOLS = ['chat', 'crop', 'transform', 'photoAdjust', 'adjust', 'effects', 'vectorize', 'ocr', 'info', 'preview', 'export']
 
 interface BarPrefs { pinned: string[]; names: boolean; seen: string[] }
 
@@ -185,6 +185,7 @@ export function ImageToolbar({ onError }: { onError: (msg: string) => void }) {
     { id: 'move', icon: Icons.hand, label: t('common.moveObject'), run: mode$('move') },
     { id: 'ocr', icon: Icons.textTool, label: t('imageToolbar.extractText'), run: () => void ocr() },
     { id: 'crop', icon: Icons.crop, label: t('imageToolbar.crop'), run: () => editor.setCroppingShape(shape.id) },
+    { id: 'photoAdjust', icon: Icons.adjust, label: t('photo.' + (shape.meta.lastPhotoTool && shape.meta.lastPhotoTool !== 'photoAdjust' ? shape.meta.lastPhotoTool : 'tools')), run: mode$('photoAdjust') },
     { id: 'adjust', icon: Icons.adjust, label: t('common.adjust'), run: mode$('adjust') },
     { id: 'effects', icon: Icons.effects, label: t('common.effects'), run: mode$('effects') },
     { id: 'smudge', icon: Icons.doodle, label: t('common.smudge'), run: mode$('smudge') },
@@ -210,7 +211,9 @@ export function ImageToolbar({ onError }: { onError: (msg: string) => void }) {
   ]
   const usable = tools.filter((t) => t.when !== false && ALL_TOOLS.includes(t.id)).sort((a, b) => ALL_TOOLS.indexOf(a.id) - ALL_TOOLS.indexOf(b.id))
   const pinned = usable.filter((t) => prefs.pinned.includes(t.id))
-  const unpinned = usable.filter((t) => !prefs.pinned.includes(t.id))
+  const recent = usable.find(t => t.id === 'photoAdjust' && shape.meta.lastPhotoTool && !prefs.pinned.includes(t.id))
+  if (recent) pinned.push(recent)
+  const unpinned = usable.filter(t => !pinned.includes(t))
   const barTool = (t: Tool) => (t.menu
     ? <Popover key={t.id} open={menu === t.id} onOpenChange={toggle(t.id)} trigger={({ open, toggle: tg }) => <Btn icon={t.icon} label={t.label} open={open} onClick={tg} />}>{t.menu}</Popover>
     : <Btn key={t.id} icon={t.icon} label={t.label} hint={t.hint} onClick={t.run!} />)

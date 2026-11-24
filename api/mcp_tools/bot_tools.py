@@ -50,13 +50,15 @@ async def _await_ask(chat_id: str, state, spec: dict, *,
     return outcome
 
 
-async def ask_user(args: dict) -> dict:
+async def ask_user(args: dict, *, kind: str = "") -> dict:
     chat_id, state = bot_turn_state()
     if not chat_id:
         raise ValueError("ask_user is only available inside ComfyArt Agent chats")
     if state is None:
         raise ValueError("no active Agent turn for this chat")
     spec = bot_asks.validate_spec(args)
+    if kind:
+        spec["kind"] = kind
     outcome = await _await_ask(chat_id, state, spec)
     if outcome["status"] != "answered":
         return {"status": outcome["status"],

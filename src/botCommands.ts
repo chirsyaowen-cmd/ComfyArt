@@ -8,7 +8,11 @@ import { editElements } from './elements'
 import { bakeToImage, createMockup } from './mockup'
 import { api, viewUrl } from './comfy'
 import { getZinePages } from './zine'
-import { checkRoadmapTurn, roadmap } from './roadmap'
+import { enterMode } from './ui/mode'
+import { adjustedOf, applyAdjust, sourceAsset } from './imageOps'
+import { adjustedCanvas, loadImage, NO_ADJUST } from './adjust'
+import { frameFacts } from './roadmapPhotos'
+import { coverPhoto, COVER_PHOTO_STEP, updateRoadmap, checkRoadmapTurn, roadmap } from './roadmap'
 import { LAYOUT_HANDLERS, shapeOf, type Args, type Handler } from './botLayout'
 import { placeInChatFrame } from './chatFrame'
 import { capRefs, createGenerator, generate } from './generate'
@@ -184,6 +188,14 @@ function waitResults(editor: Editor, ids: string[], timeout: number) {
   })
 }
 
+function adjustmentTarget(editor: Editor, args: Args) {
+  const shape = imageOf(editor, args.id)
+  const frame = getZinePages(editor).find(id => editor.getShapeAndDescendantIds([id]).has(shape.id))
+  if (!frame || frameFacts(editor, frame).frame_version !== args.frame_version ||
+      editor.getAncestorPageId(shape.id) !== editor.getCurrentPageId()) throw new Error('Photo or page changed. Review it again.')
+  return shape
+}
+
 const HANDLERS: Record<string, Handler> = {
   ...LAYOUT_HANDLERS,
   add_search_references: (editor, args) => {
@@ -193,6 +205,32 @@ const HANDLERS: Record<string, Handler> = {
       sideAtom.set('references')
     }
     return { added }
+  },
+  photo_adjust_target: (editor, args) => {
+    const photo = adjustmentTarget(editor, args)
+    return { asset: photo.props.assetId }
+  },
+  apply_photo_recipe: async (editor, args, _onError, _chat, checkTask) => {
+    const photo = adjustmentTarget(editor, args)
+    if (photo.props.assetId !== args.asset) throw new Error('Photo was replaced')
+    if (!args.keep) {
+      const source = sourceAsset(editor, photo)?.props.src
+      if (!source) throw new Error('Original photo is unavailable')
+      const img = await loadImage(source)
+      const adjust = adjustedOf(photo)?.adjust ?? NO_ADJUST
+      await applyAdjust(editor, photo, adjust, () => adjustedCanvas(img, adjust), args.recipe,
+        () => { checkTask(); adjustmentTarget(editor, args) })
+      editor.select(photo.id)
+      const bounds = editor.getShapePageBounds(photo)
+      if (bounds) editor.zoomToBounds(bounds, { inset: 120, targetZoom: 1 })
+      enterMode('photoAdjust')
+    }
+    const plan = roadmap(editor)
+    if (coverPhoto(editor)?.id === photo.id && plan.steps.some(s => s.id === COVER_PHOTO_STEP)) {
+      updateRoadmap(editor, plan.revision, [{ id: COVER_PHOTO_STEP, action: 'done',
+        reason: args.keep ? '保留原图' : '已应用照片调整' }], 'button')
+    }
+    return { id: photo.id, status: args.keep ? 'kept_original' : 'applied' }
   },
   vectorcraft_photo_source: (editor, args) => {
     const photo = imageOf(editor, args.id)
@@ -320,11 +358,12 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
               throw new Error('TASK_SUPERSEDED: start a fresh request from the Zine editor')
             return msg.roadmap_turn ? checkRoadmapTurn(editor, msg.roadmap_turn) : undefined
           }
-          const readOnly = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source'].includes(msg.action)
+          const readOnly = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source', 'photo_adjust_target'].includes(msg.action)
           const active = readOnly ? undefined : guard()
           if (!readOnly && msg.action !== 'update_roadmap') editor.markHistoryStoppingPoint(`agent:${msg.action}`)
           const result = handler(editor, msg.args ?? {}, onError, msg.chat ?? '', guard)
           if (active && msg.action === 'update_roadmap') active.revision = roadmap(editor).revision
+          if (active && msg.action === 'apply_photo_recipe') return Promise.resolve(result).then(value => { active.revision = roadmap(editor).revision; return value })
           return result
         })
         .then((result) => reply({ ok: true, result }), (e) => reply({ ok: false, error: errorText(e) }))

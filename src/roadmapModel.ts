@@ -1,7 +1,7 @@
 import type { TLShapeId } from 'tldraw'
 
 type Status = 'pending' | 'in_progress' | 'deferred' | 'done'
-export type Step = { id: string; type: string; title: string; targetFrameIds: TLShapeId[]; scope: 'frames' | 'book'; status: Status; startedByCanvas?: true }
+export type Step = { id: string; type: string; title: string; targetFrameIds: TLShapeId[]; scope: 'frames' | 'book'; status: Status; sourceSignature?: string; startedByCanvas?: true }
 export type Source = 'chat' | 'button' | 'schedule'
 type Decision = { stepId: string; action: string; reason: string; source: Source; revision: number }
 export type Roadmap = { goal: string; currentStepId: string | null; steps: Step[]; decisions: Decision[]; revision: number }

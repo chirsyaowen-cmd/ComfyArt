@@ -16,7 +16,7 @@ const GAP = 12
 const EDGE = 8
 const PROMPT_MODES: Mode[] = ['quick']
 const TITLES: Record<Mode, string> = {
-  quick: t('common.quickEdit'), text: t('common.editText'), erase: t('common.eraser'), angles: t('common.multiAngle'), expand: t('common.expand'), animate: t('common.animateImage'), layers: t('imageToolbar.customSplit'), separate: t('imageToolbar.separateRegions'), adjust: t('common.adjust'), effects: t('common.effects'), inpaint: t('common.inpaint'), style: t('common.styleTransfer'), move: t('common.moveObject'), smudge: t('common.smudge'),
+  photoAdjust: t('photo.tools'), quick: t('common.quickEdit'), text: t('common.editText'), erase: t('common.eraser'), angles: t('common.multiAngle'), expand: t('common.expand'), animate: t('common.animateImage'), layers: t('imageToolbar.customSplit'), separate: t('imageToolbar.separateRegions'), adjust: t('common.adjust'), effects: t('common.effects'), inpaint: t('common.inpaint'), style: t('common.styleTransfer'), move: t('common.moveObject'), smudge: t('common.smudge'),
 }
 const RATIO_GROUPS: [string, [string, number][]][] = [
   [t('modePanel.general'), [[t('modePanel.free'), 0], [t('modePanel.original'), -1], [t('modePanel.square'), 1], [t('modePanel.landscape'), 16 / 9], [t('modePanel.portrait'), 9 / 16], ['4:3', 4 / 3], ['3:4', 3 / 4]]],
@@ -96,7 +96,7 @@ export function ModePanel({ onError }: { onError: (msg: string) => void }) {
     exitMode()
   }, [shape])
 
-  useEscape(!!mode, exitMode)
+  useEscape(!!mode && !OWN_PANEL.includes(mode), exitMode)
 
   if (!mode || OWN_PANEL.includes(mode) || !shape || !rect) return null
   const asset = shape.props.assetId ? editor.getAsset(shape.props.assetId) : null

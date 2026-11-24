@@ -7,7 +7,7 @@ from ..bot.mcp_server import McpServer, rpc_error
 from . import chat_store
 from ._common import routes
 from .mcp_commands import ROADMAP_TURN
-from .mcp_tools import TOOLS, bot_tools, vectorcraft
+from .mcp_tools import TOOLS, bot_tools, photo_adjust, vectorcraft
 from .mcp_tools._context import BOT_CHAT_ID, PROJECT
 from .settings import mcp_enabled
 
@@ -21,7 +21,7 @@ INSTRUCTIONS = (
 
 
 def _tool_visible(name: str) -> bool:
-    return (name not in bot_tools.TOOLS and name not in vectorcraft.TOOLS) or bool(BOT_CHAT_ID.get())
+    return (name not in bot_tools.TOOLS and name not in vectorcraft.TOOLS and name not in photo_adjust.TOOLS) or bool(BOT_CHAT_ID.get())
 
 
 SERVER = McpServer(name="comfyart-mcp", title="ComfyArt", version=VERSION, instructions=INSTRUCTIONS,

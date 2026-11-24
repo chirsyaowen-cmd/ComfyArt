@@ -1,9 +1,35 @@
-import { react, type Editor } from 'tldraw'
+import { react, type Editor, type TLImageShape } from 'tldraw'
 import { t } from './i18n'
 import { getZinePages, zineSpreads } from './zine'
+import { adjustedOf } from './imageOps'
 import { uuid } from './id'
 
 import { reviseRoadmap, type Step, type Roadmap, type Source, type Change } from './roadmapModel'
+
+export const COVER_PHOTO_STEP = 'cover-photo-adjust'
+
+export function coverPhoto(editor: Editor) {
+  const page = getZinePages(editor)[0]
+  if (!page) return undefined
+  const photos = Array.from(editor.getShapeAndDescendantIds([page]), id => editor.getShape(id))
+    .filter((s): s is TLImageShape => s?.type === 'image' && !!s.props.assetId)
+  return photos.sort((a, b) => b.props.w * b.props.h - a.props.w * a.props.h)[0]
+}
+
+function syncCoverPhoto(editor: Editor, plan: Roadmap): Roadmap {
+  const photo = coverPhoto(editor)
+  const key = photo && photo.id + '/' + (adjustedOf(photo)?.source ?? photo.props.assetId)
+  const prior = plan.steps.find(s => s.id === COVER_PHOTO_STEP)
+  if (prior?.sourceSignature === key) return plan
+  const steps = plan.steps.filter(s => s.id !== COVER_PHOTO_STEP)
+  const cover = steps.findIndex(s => s.type === 'cover')
+  if (cover < 0) return plan
+  if (key) steps.splice(cover + 1, 0, { id: COVER_PHOTO_STEP, type: 'photo_adjust', title: t('photo.road'),
+    sourceSignature: key, scope: 'frames', targetFrameIds: steps[cover].targetFrameIds, status: 'pending' })
+  return { ...plan, steps, decisions: plan.decisions.filter(d => d.stepId !== COVER_PHOTO_STEP),
+    currentStepId: !key && plan.currentStepId === COVER_PHOTO_STEP ? steps[cover].id : plan.currentStepId,
+    revision: plan.revision + 1 }
+}
 
 function defaultRoadmap(editor: Editor): Roadmap {
   const pages = getZinePages(editor)
@@ -36,7 +62,8 @@ export function trackRoadmap(editor: Editor) {
   if (!editor.getDocumentSettings().meta.roadmap) save(editor, defaultRoadmap(editor))
   return react('infer only the start of page design', () => {
     const plan = roadmap(editor)
-    const steps = plan.steps.map(step => {
+    const updated = syncCoverPhoto(editor, plan)
+    const steps = updated.steps.map(step => {
       if (step.status !== 'pending' && !step.startedByCanvas) return step
       if (!['cover', 'back_cover', 'spread'].includes(step.type)) return step
       const occupied = step.targetFrameIds.some(id => editor.getSortedChildIdsForParent(id).length > 0)
@@ -47,10 +74,10 @@ export function trackRoadmap(editor: Editor) {
       }
       return step
     })
-    if (steps.some((step, i) => step !== plan.steps[i])) {
+    if (updated !== plan || steps.some((step, i) => step !== plan.steps[i])) {
       const prior = previous.get(editor)
       if (prior?.revision === plan.revision) prior.revision++
-      save(editor, { ...plan, steps, revision: plan.revision + 1 })
+      save(editor, { ...updated, steps, revision: plan.revision + 1 })
     }
   })
 }

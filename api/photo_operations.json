@@ -1,0 +1,125 @@
+{
+  "saturation": {
+    "command": "layer.newAdjustmentLayer.hueSaturation",
+    "parameter": "saturation",
+    "min": -100,
+    "max": 100,
+    "initial": -100
+  },
+  "contrast": {
+    "command": "layer.newAdjustmentLayer.brightnessContrast",
+    "parameter": "contrast",
+    "min": -50,
+    "max": 100,
+    "initial": 10
+  },
+  "exposure": {
+    "command": "layer.newAdjustmentLayer.exposure",
+    "parameter": "exposure",
+    "min": -5,
+    "max": 5,
+    "initial": 1
+  },
+  "brightness": {
+    "command": "layer.newAdjustmentLayer.brightnessContrast",
+    "parameter": "brightness",
+    "min": -150,
+    "max": 150,
+    "initial": 12
+  },
+  "vibrance": {
+    "command": "layer.newAdjustmentLayer.vibrance",
+    "parameter": "vibrance",
+    "min": -100,
+    "max": 100,
+    "initial": 20
+  },
+  "hue": {
+    "command": "layer.newAdjustmentLayer.hueSaturation",
+    "parameter": "hue",
+    "min": -180,
+    "max": 180,
+    "initial": 12
+  },
+  "threshold": {
+    "command": "layer.newAdjustmentLayer.threshold",
+    "parameter": "level",
+    "min": 1,
+    "max": 255,
+    "initial": 128
+  },
+  "posterize": {
+    "command": "layer.newAdjustmentLayer.posterize",
+    "parameter": "levels",
+    "min": 2,
+    "max": 255,
+    "initial": 5
+  },
+  "shadowLift": {
+    "command": "image.adjustments.shadowsHighlights",
+    "parameter": "shadowAmount",
+    "min": 0,
+    "max": 100,
+    "initial": 20,
+    "fixed": {
+      "highlightAmount": 0
+    }
+  },
+  "highlightRecovery": {
+    "command": "image.adjustments.shadowsHighlights",
+    "parameter": "highlightAmount",
+    "min": 0,
+    "max": 100,
+    "initial": 15,
+    "fixed": {
+      "shadowAmount": 0
+    }
+  },
+  "sharpen": {
+    "command": "filter.sharpen.unsharpMask",
+    "parameter": "amount",
+    "min": 1,
+    "max": 200,
+    "initial": 45
+  },
+  "noiseReduction": {
+    "command": "filter.noise.reduceNoise",
+    "parameter": "strength",
+    "min": 0,
+    "max": 10,
+    "initial": 4
+  },
+  "grain": {
+    "command": "filter.noise.addNoise",
+    "parameter": "amount",
+    "min": 1,
+    "max": 60,
+    "initial": 8,
+    "fixed": {
+      "monochromatic": true,
+      "seed": 37,
+      "distribution": "gaussian"
+    }
+  },
+  "blur": {
+    "command": "filter.blur.gaussianBlur",
+    "parameter": "radius",
+    "min": 1,
+    "max": 80,
+    "initial": 4
+  },
+  "halftone": {
+    "command": "filter.pixelate.colorHalftone",
+    "parameter": "maxRadius",
+    "min": 4,
+    "max": 64,
+    "initial": 6
+  },
+  "mosaic": {
+    "command": "filter.pixelate.mosaic",
+    "parameter": "cellSize",
+    "min": 2,
+    "max": 150,
+    "initial": 10
+  }
+}
