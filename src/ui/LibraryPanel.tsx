@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { atom, useValue, type Editor } from 'tldraw'
 
 import { kitsAtom } from '../agent'
 import { placeAsset } from '../assets'
 import { KIND_LABELS, libraryAtom, saveLibrary, type LibraryItem, type LibraryKind } from '../library'
 import { newProject } from '../projects'
+import { activeZineIndex, getZinePages } from '../zine'
+import { PHOTO_ACCEPT, importPhotos, photoImportAtom } from '../photoImport'
+import { PhotoImportPanel } from './PhotoImportPanel'
 import { AssetGrid } from './AssetPicker'
 import { confirmAtom } from './Confirm'
 import { Icons } from './icons'
@@ -13,7 +16,7 @@ import { Popover } from './Popover'
 import { t } from '../i18n'
 import { uuid } from '../id'
 
-type Tab = 'files' | LibraryKind
+type Tab = 'files' | 'import' | LibraryKind
 export const libraryTabAtom = atom<Tab>('library tab', 'files')
 const TABS: [Tab, string][] = [['files', t('libraryPanel.files')], ['brand', t('library.brandKit')], ['character', t('library.character')], ['product', t('library.product')], ['custom', t('common.custom')]]
 
@@ -53,6 +56,8 @@ function LibCard({ item, save }: { item: LibraryItem; save: (list: LibraryItem[]
 
 export function LibraryPanel({ editor, onError }: { editor: Editor; onError: (msg: string) => void }) {
   const tab = useValue(libraryTabAtom)
+  const rows = useValue(photoImportAtom)
+  const input = useRef<HTMLInputElement>(null)
   const setTab = (t: Tab) => libraryTabAtom.set(t)
   const library = useValue(libraryAtom)
   const items = library.filter((i) => i.kind === tab)
@@ -66,10 +71,21 @@ export function LibraryPanel({ editor, onError }: { editor: Editor; onError: (ms
   return (
     <div className="ca-lib">
       <div className="ca-utabs" role="tablist">
-        {TABS.map(([t, label]) => <button key={t} type="button" role="tab" aria-selected={tab === t} className="ca-utabs__tab" data-on={tab === t || undefined} onClick={() => setTab(t)}>{label}</button>)}
+        {TABS.map(([t, label]) => <button key={t} type="button" role="tab" aria-selected={tab === t || (tab === 'import' && t === 'files')} className="ca-utabs__tab" data-on={tab === t || (tab === 'import' && t === 'files') || undefined} onClick={() => setTab(t)}>{label}</button>)}
       </div>
-      {tab === 'files' && <AssetGrid onPick={(item) => void placeAsset(editor, item)} />}
-      {tab !== 'files' && (
+      {(tab === 'files' || tab === 'import') && <div className="ca-photo-actions">
+        <button className="ca-panel__chip" onClick={() => input.current?.click()}>{t('photoImport.add')}</button>
+        {!!rows.length && <button className="ca-panel__chip" onClick={() => setTab(tab === 'files' ? 'import' : 'files')}>
+          {t(tab === 'files' ? 'photoImport.batch' : 'libraryPanel.files')}</button>}
+        <input ref={input} type="file" hidden multiple accept={PHOTO_ACCEPT} onChange={e => {
+          const files = Array.from(e.target.files ?? [])
+          if (files.length) { importPhotos(files); setTab('import') }
+          e.target.value = ''
+        }} />
+      </div>}
+      {tab === 'import' && <PhotoImportPanel editor={editor} onError={onError} />}
+      {tab === 'files' && <AssetGrid dragPhotos onPick={item => void placeAsset(editor, item, item.kind === 'image' ? getZinePages(editor)[activeZineIndex(editor)] : undefined).catch(e => onError(String(e)))} />}
+      {tab !== 'files' && tab !== 'import' && (
         <>
           <button type="button" className="ca-lib__new" onClick={() => create(tab)}>
             <span className="ca-icon">{Icons.plus}</span>{t('libraryPanel.newItem', KIND_LABELS[tab])}

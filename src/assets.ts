@@ -1,6 +1,8 @@
-import type { Editor, TLFrameShape, TLShapeId } from 'tldraw'
+import type { Editor, TLFrameShape, TLShapeId, VecLike } from 'tldraw'
 
-import { api, refFromUrl } from './comfy'
+import { api, isViewUrl, refFromUrl } from './comfy'
+import { getZinePages } from './zine'
+import type { DragEvent } from 'react'
 import { t } from './i18n'
 import { placeMedia, toMedia, type MediaKind } from './jobs'
 
@@ -25,20 +27,43 @@ export async function listAssets(tags: string, search: string, after?: string): 
   return { items, next: next_cursor ?? null }
 }
 
-export async function placeAsset(editor: Editor, item: AssetItem, pageId?: TLShapeId): Promise<TLShapeId> {
-  const m = await toMedia(refFromUrl(item.src), item.kind)
-  if (pageId) {
-    const page = editor.getShape<TLFrameShape>(pageId)
-    if (!page || page.type !== 'frame') throw new Error(t('home.projectNotFound'))
-    const w = Math.min(m.w, page.props.w, page.props.h * m.w / m.h)
-    editor.markHistoryStoppingPoint('place photo in zine')
-    const id = placeMedia(editor, m, item.name, (page.props.w - w) / 2, (page.props.h - w * m.h / m.w) / 2, w, pageId)
-    editor.select(id)
-    return id
+const PHOTO_DRAG_TYPE = 'application/x-comfyart-photo'
+
+export function photoDragProps(src: string, name: string) {
+  return {
+    draggable: true,
+    onDragStart(event: DragEvent<HTMLButtonElement>) {
+      event.dataTransfer.setData(PHOTO_DRAG_TYPE, JSON.stringify({ src, name }))
+      event.dataTransfer.effectAllowed = 'copy'
+    },
   }
-  const center = editor.getViewportPageBounds().center
-  const w = Math.min(m.w, 512)
-  const id = placeMedia(editor, m, item.name, center.x - w / 2, center.y - w * m.h / m.w / 2, w)
+}
+
+export function dropLibraryPhoto(editor: Editor, transfer: DataTransfer, point: VecLike, onError: (e: unknown) => void) {
+  const raw = transfer.getData(PHOTO_DRAG_TYPE)
+  if (!raw) return false
+  try {
+    const photo: unknown = JSON.parse(raw)
+    if (typeof photo === 'object' && photo !== null && 'src' in photo && typeof photo.src === 'string'
+      && isViewUrl(photo.src) && 'name' in photo && typeof photo.name === 'string') {
+      const page = getZinePages(editor).find(id => editor.getAncestorPageId(id) === editor.getCurrentPageId()
+        && editor.getShapePageBounds(id)?.containsPoint(point))
+      void placeAsset(editor, { src: photo.src, name: photo.name, kind: 'image' }, page, point).catch(onError)
+    }
+  } catch (e) { onError(e) }
+  return true
+}
+
+export async function placeAsset(editor: Editor, item: Pick<AssetItem, 'src' | 'name' | 'kind'>, pageId?: TLShapeId, point?: VecLike): Promise<TLShapeId> {
+  const canvasId = editor.getCurrentPageId()
+  const m = await toMedia(refFromUrl(item.src), item.kind)
+  const page = pageId ? editor.getShape<TLFrameShape>(pageId) : undefined
+  if (pageId && page?.type !== 'frame') throw new Error(t('home.projectNotFound'))
+  const w = page ? Math.min(m.w, page.props.w, page.props.h * m.w / m.h) : Math.min(m.w, 512)
+  let center = point ?? editor.getViewportPageBounds().center
+  if (page) center = point ? editor.getPointInShapeSpace(page, point) : { x: page.props.w / 2, y: page.props.h / 2 }
+  editor.markHistoryStoppingPoint('place asset')
+  const id = placeMedia(editor, m, item.name, center.x - w / 2, center.y - w * m.h / m.w / 2, w, page?.id ?? (point ? canvasId : undefined))
   editor.select(id)
   return id
 }

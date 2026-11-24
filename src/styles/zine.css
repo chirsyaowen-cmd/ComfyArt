@@ -43,3 +43,7 @@
 
 .ca-zine-photo { padding: 8px 4px; font-size: 13px; line-height: 1.5; }
 .ca-zine-photo__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+.ca-photo-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.ca-photo-import { font-size: 13px; line-height: 1.5; }
+.ca-photo-import p { margin: 8px 0; }

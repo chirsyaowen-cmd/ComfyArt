@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { listAssets, type AssetItem } from '../assets'
+import { listAssets, photoDragProps, type AssetItem } from '../assets'
 import { thumbUrl } from '../comfy'
 import { errorText } from '../jobs'
 import { t } from '../i18n'
@@ -8,13 +8,13 @@ import { Icons } from './icons'
 
 const TABS: [string, string][] = [['input,output', t('common.all')], ['output', t('common.generate')], ['input', t('assetPicker.upload')]]
 
-function Thumb({ item }: { item: AssetItem }) {
+function Thumb({ item, draggable }: { item: AssetItem; draggable?: boolean }) {
   const [broken, setBroken] = useState(false)
   if (broken) return <span className="ca-side__missing">{item.kind === 'video' ? Icons.video : Icons.image}</span>
-  return <img src={thumbUrl(item.src)} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />
+  return <img draggable={draggable} src={thumbUrl(item.src)} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />
 }
 
-export function AssetGrid({ onPick, only, initialTab = TABS[0][0] }: { initialTab?: string; onPick: (item: AssetItem) => void; only?: AssetItem['kind'] }) {
+export function AssetGrid({ onPick, only, dragPhotos, initialTab = TABS[0][0] }: { dragPhotos?: boolean; initialTab?: string; onPick: (item: AssetItem) => void; only?: AssetItem['kind'] }) {
   const [tab, setTab] = useState(initialTab)
   const [search, setSearch] = useState('')
   const [items, setItems] = useState<AssetItem[] | null>(null)
@@ -69,8 +69,8 @@ export function AssetGrid({ onPick, only, initialTab = TABS[0][0] }: { initialTa
       {!error && items?.length === 0 && !next && <div className="ca-side__empty">{t('assetPicker.noAssetsYet')}</div>}
       <div className="ca-assets__grid">
         {items?.map((i) => (
-          <button key={i.id} type="button" className="ca-side__cell" title={i.name} onClick={() => onPick(i)}>
-            <Thumb item={i} />
+          <button key={i.id} type="button" className="ca-side__cell" title={i.name} {...(dragPhotos && i.kind === 'image' ? photoDragProps(i.src, i.name) : {})} onClick={() => onPick(i)}>
+            <Thumb item={i} draggable={dragPhotos && i.kind === 'image' ? false : undefined} />
             {i.kind === 'video' && <span className="ca-side__badge">{Icons.video}</span>}
           </button>
         ))}

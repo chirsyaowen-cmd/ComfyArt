@@ -1,6 +1,6 @@
 import { getAssetUrlsByImport } from '@tldraw/assets/imports.vite'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Tldraw, useValue, type Editor, type TLAssetStore, type TLComponents, type TLEditorSnapshot, type TLShape } from 'tldraw'
+import { Tldraw, useValue, type Editor, type TLAssetStore, type TLComponents, type TLEditorSnapshot, type TldrawOptions, type TLShape } from 'tldraw'
 import 'tldraw/tldraw.css'
 
 import { isViewUrl, thumbSize, thumbUrl, uploadImage, viewUrl } from './comfy'
@@ -35,6 +35,7 @@ import { CanvasTools } from './ui/CanvasTools'
 import { CommentPanel } from './ui/CommentPanel'
 import { Confirm } from './ui/Confirm'
 import { Dock } from './ui/Dock'
+import { dropLibraryPhoto } from './assets'
 import { DropHandlers } from './ui/DropHandlers'
 import { ErrorToasts, reportError } from './ui/ErrorToasts'
 import { EmbedToolbar, HtmlPreview } from './ui/EmbedToolbar'
@@ -131,6 +132,11 @@ const assets: TLAssetStore = {
 
 export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot | null }) {
   const [editor, setEditor] = useState<Editor | null>(null)
+  const editorRef = useRef<Editor | null>(null)
+  const onDropOnCanvas = useCallback<NonNullable<TldrawOptions['experimental__onDropOnCanvas']>>(({ point, event }) => {
+    const ed = editorRef.current
+    return ed ? dropLibraryPhoto(ed, event.dataTransfer, point, e => reportError(errorText(e))) : false
+  }, [])
   const setError = reportError
   const [stale, setStale] = useState(false)
   const staleRef = useRef(false)
@@ -146,11 +152,12 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
 
   const onMount = useCallback((ed: Editor) => {
     ed.user.updateUserPreferences({ colorScheme: themeAtom.get(), locale: lang === 'zh' ? 'zh-cn' : 'en' })
+    editorRef.current = ed
     setEditor(ed)
     restoreZineLayout(ed)
     const stopFrames = registerFrameRules(ed)
     const stopCrop = registerCropRule(ed)
-    return () => { stopFrames(); stopCrop() }
+    return () => { editorRef.current = null; stopFrames(); stopCrop() }
   }, [])
 
   useEffect(() => {
@@ -238,6 +245,7 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
           {editor && <SidePanel editor={editor} left onError={setError} />}
           <div className="ca-canvas">
             <Tldraw
+              options={{ experimental__onDropOnCanvas: onDropOnCanvas }}
               snapshot={snapshot ?? undefined}
               assets={assets}
               assetUrls={assetUrls}

@@ -4,7 +4,7 @@ from pathlib import Path
 from aiohttp import web
 
 from . import runtime
-from .api import bot, bot_complete, files, mcp, pdf, projects, providers, settings, thumbs
+from .api import bot, bot_complete, files, mcp, pdf, photo_import, projects, providers, settings, thumbs
 
 DIST = Path(__file__).resolve().parent / "dist"
 
@@ -46,6 +46,7 @@ async def redirect(request):
 
 def create_app():
     app = web.Application(middlewares=[local_only], client_max_size=64 * 1024**2)
+    app.cleanup_ctx.append(photo_import.import_worker)
     for route in runtime.routes:
         app.router.add_route(route.method, "/api" + route.path, route.handler, **route.kwargs)
     # Thumbnail URLs live in saved snapshots. The agent connects here over MCP.

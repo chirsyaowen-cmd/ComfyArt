@@ -106,8 +106,8 @@ async def list_assets(request):
 @routes.get("/view")
 async def view(request):
     try:
-        path = view_path(str(request.rel_url))
-    except ValueError:
+        path = await asyncio.to_thread(view_path, str(request.rel_url))
+    except (ValueError, OSError):
         raise web.HTTPNotFound()
     return web.FileResponse(path, headers={"X-Content-Type-Options": "nosniff",
                                           "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'"})

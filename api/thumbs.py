@@ -6,6 +6,8 @@ import uuid
 from aiohttp import web
 from PIL import Image, ImageOps
 
+from pathlib import Path
+from . import heif
 from ._common import app_path, routes, view_path
 from ..bot.media_sheet import video_frames
 from .bot_media import VIDEO_EXT
@@ -20,7 +22,9 @@ def _size(max_edge: int) -> int:
 
 
 def thumb_for(url: str, max_edge: int) -> str:
-    src = view_path(url)
+    src = view_path(url, original=True)
+    if Path(src).suffix.lower() in heif.SUFFIXES:
+        return str(heif.rendition(Path(src), Path(app_path("thumbs")), _size(max_edge)))
     if src.lower().endswith(".svg"):
         return src
     size = _size(max_edge)
