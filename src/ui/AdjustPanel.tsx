@@ -4,6 +4,9 @@ import { useEditor, useValue, type TLImageShape } from 'tldraw'
 import { adjustedCanvas, autoAdjust, loadImage, NO_ADJUST, type Adjust } from '../adjust'
 import { adjustedOf, applyAdjust, sourceAsset } from '../imageOps'
 import { errorText } from '../jobs'
+import { PhotoRecipeControls } from './PhotoRecipeControls'
+import { recipeOf, renderRecipe, needsFullPreview, type PhotoRecipe } from '../photoRecipe'
+import { Icons } from './icons'
 import { ColorPicker } from './ColorPicker'
 import { exitMode, modeAtom } from './mode'
 import { useElementSize, useSelectedImage, useSelectionRect } from './selection'
@@ -52,35 +55,54 @@ export function AdjustPanel({ onError }: { onError: (msg: string) => void }) {
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState(0)
   const [compare, setCompare] = useState(false)
-  const active = mode === 'adjust' || mode === 'effects'
+  const editing = mode === 'adjust' || mode === 'photoAdjust'
+  const photoTab = TABS.length
+  const [recipe, setRecipe] = useState<PhotoRecipe>([])
+  const active = editing || mode === 'effects'
   const src = shape ? sourceAsset(editor, shape)?.props.src : null
 
   useEffect(() => {
     setAdjust(shape ? { ...NO_ADJUST, ...adjustedOf(shape)?.adjust } : NO_ADJUST)
+    setRecipe(shape ? recipeOf(shape) : [])
+    setTab(mode === 'photoAdjust' ? photoTab : 0)
     setImg(null)
-    if (mode !== 'adjust' || !src) return
+    if (!editing || !src) return
     let alive = true
     loadImage(src).then((i) => alive && setImg(i)).catch((e) => onError(String(e)))
     return () => { alive = false }
-  }, [mode, src, onError])
+  }, [mode, src, shape?.id, shape?.props.assetId, onError])
 
   const crop = shape?.props.crop
   const flip = `${shape?.props.flipX ? -1 : 1},${shape?.props.flipY ? -1 : 1}`
   useEffect(() => {
     if (!img || !preview.current) return
-    const out = adjustedCanvas(img, adjust, PREVIEW_SIDE)
-    const [x0, y0, x1, y1] = crop ? [crop.topLeft.x, crop.topLeft.y, crop.bottomRight.x, crop.bottomRight.y] : [0, 0, 1, 1]
-    const [sx, sy, sw, sh] = [x0 * out.width, y0 * out.height, (x1 - x0) * out.width, (y1 - y0) * out.height]
-    const [fx, fy] = flip.split(',').map(Number)
-    const c = preview.current
-    c.width = Math.max(1, Math.round(sw))
-    c.height = Math.max(1, Math.round(sh))
-    const ctx = c.getContext('2d')!
-    ctx.setTransform(fx, 0, 0, fy, fx < 0 ? c.width : 0, fy < 0 ? c.height : 0)
-    ctx.drawImage(out, sx, sy, sw, sh, 0, 0, c.width, c.height)
-  }, [img, adjust, crop, flip])
+    const controller = new AbortController()
+    const draw = async () => {
+      const base = adjustedCanvas(img, compare ? NO_ADJUST : adjust, !compare && needsFullPreview(recipe) ? Infinity : PREVIEW_SIDE)
+      const out = compare ? base : await renderRecipe(base, recipe, controller.signal)
+      if (controller.signal.aborted || !preview.current) return
+      const [x0, y0, x1, y1] = crop ? [crop.topLeft.x, crop.topLeft.y, crop.bottomRight.x, crop.bottomRight.y] : [0, 0, 1, 1]
+      const [sx, sy, sw, sh] = [x0 * out.width, y0 * out.height, (x1 - x0) * out.width, (y1 - y0) * out.height]
+      const [fx, fy] = flip.split(',').map(Number)
+      const c = preview.current
+      c.width = Math.max(1, Math.round(sw))
+      c.height = Math.max(1, Math.round(sh))
+      const ctx = c.getContext('2d')!
+      ctx.setTransform(fx, 0, 0, fy, fx < 0 ? c.width : 0, fy < 0 ? c.height : 0)
+      ctx.drawImage(out, sx, sy, sw, sh, 0, 0, c.width, c.height)
+    }
+    const timer = window.setTimeout(() => void draw().catch(e => { if (!controller.signal.aborted) onError(errorText(e)) }), recipe.length && !compare ? 180 : 0)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [img, adjust, crop, flip, recipe, compare, onError])
 
-  useEscape(active, exitMode)
+  const dirty = !!shape && (KEYS.some(k => adjust[k] !== (adjustedOf(shape)?.adjust[k] ?? 0)) ||
+    JSON.stringify(recipe) !== JSON.stringify(recipeOf(shape)))
+  function close() {
+    if (busy) return
+    if (editing && tab === photoTab && dirty) void apply()
+    else exitMode()
+  }
+  useEscape(active, close)
 
   useEffect(() => {
     if (active && !shape) exitMode()
@@ -93,11 +115,11 @@ export function AdjustPanel({ onError }: { onError: (msg: string) => void }) {
   const effects = effectsOf(shape)
   const setEffects = (patch: Partial<Effects>) => editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', meta: { ...shape.meta, effects: { ...effects, ...patch } as any } })
 
-  const apply = async () => {
-    if (!img) return
+  async function apply() {
+    if (!img || !shape) return
     setBusy(true)
     try {
-      await applyAdjust(editor, shape, KEYS.some((k) => adjust[k]) ? adjust : null, () => adjustedCanvas(img, adjust))
+      await applyAdjust(editor, shape, KEYS.some((k) => adjust[k]) ? adjust : null, () => adjustedCanvas(img, adjust), recipe)
       exitMode()
     } catch (e) {
       onError(errorText(e))
@@ -108,21 +130,22 @@ export function AdjustPanel({ onError }: { onError: (msg: string) => void }) {
 
   return (
     <>
-      {mode === 'adjust' && img && (
-        <canvas ref={preview} className="ca-adjust__preview" style={{ visibility: compare ? 'hidden' : undefined, left: rect.l, top: rect.t, width: rect.r - rect.l, height: rect.b - rect.t }} />
+      {editing && img && (
+        <canvas ref={preview} className="ca-adjust__preview" style={{ left: rect.l, top: rect.t, width: rect.r - rect.l, height: rect.b - rect.t }} />
       )}
-      <div ref={panel} className="ca-panel" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
-        <div className="ca-panel__head"><span>{mode === 'adjust' ? t('common.adjust') : t('common.effects')}</span></div>
-        {mode === 'adjust' ? (
+      <div ref={panel} className={'ca-panel' + (editing && tab === photoTab ? ' ca-photo-panel' : '')} style={{ left, top }} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
+        <div className="ca-panel__head"><span>{editing ? t('common.adjust') : t('common.effects')}</span><button className="ca-panel__icon" title={t('common.close')} disabled={busy} onClick={close}>{Icons.close}</button></div>
+        {editing ? (
           <>
             <div className="ca-panel__chips">
+              <button type="button" className="ca-panel__chip" data-on={tab === photoTab || undefined} onClick={() => setTab(photoTab)}>{t('photo.tools')}</button>
               {TABS.map(([label], i) => <button key={label} type="button" className="ca-panel__chip" data-on={tab === i || undefined} onClick={() => setTab(i)}>{label}</button>)}
             </div>
-            {TABS[tab][1].map(([key, label, min]) => (
+            {tab === photoTab ? <PhotoRecipeControls recipe={recipe} change={setRecipe} /> : TABS[tab][1].map(([key, label, min]) => (
               <Slider key={key} label={label} value={adjust[key]} min={min} max={100} onChange={(v) => setAdjust({ ...adjust, [key]: v })} />
             ))}
             <div className="ca-panel__chips">
-              <button type="button" className="ca-panel__chip" disabled={!img} onClick={() => img && setAdjust({ ...adjust, ...autoAdjust(img) })}>{t('common.auto')}</button>
+              {tab !== photoTab && <button type="button" className="ca-panel__chip" disabled={!img} onClick={() => img && setAdjust({ ...adjust, ...autoAdjust(img) })}>{t('common.auto')}</button>}
               <button
                 type="button"
                 className="ca-panel__chip"
@@ -153,10 +176,10 @@ export function AdjustPanel({ onError }: { onError: (msg: string) => void }) {
           </>
         )}
         <div className="ca-panel__foot">
-          {mode === 'adjust' ? (
+          {editing ? (
             <>
-              <button type="button" className="ca-panel__secondary" onClick={() => setAdjust(NO_ADJUST)}>{t('adjustPanel.reset')}</button>
-              <button type="button" className="ca-panel__primary" disabled={busy || KEYS.every((k) => adjust[k] === (adjustedOf(shape)?.adjust[k] ?? 0))} onClick={() => void apply()}>{busy ? t('adjustPanel.processing') : t('adjustPanel.apply')}</button>
+              <button type="button" className="ca-panel__secondary" onClick={() => { setAdjust(NO_ADJUST); setRecipe([]) }}>{t('adjustPanel.reset')}</button>
+              <button type="button" className="ca-panel__primary" disabled={busy || !img} onClick={() => dirty ? void apply() : exitMode()}>{busy ? t('adjustPanel.processing') : (tab === photoTab || !dirty ? t('common.done') : t('adjustPanel.apply'))}</button>
             </>
           ) : (
             <button type="button" className="ca-panel__primary" onClick={exitMode}>{t('common.done')}</button>

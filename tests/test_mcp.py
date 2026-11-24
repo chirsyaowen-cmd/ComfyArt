@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from conftest import SENT, write_settings
 from ComfyArt import runtime
 
 from ComfyArt.api import chat_store, mcp_commands
-from ComfyArt.api.mcp_tools import bot_tools, vectorcraft
+from ComfyArt.api.mcp_tools import bot_tools, photo_adjust, vectorcraft
 from ComfyArt.api.bot_turns import ACTIVE_TURNS
 from ComfyArt.bot.turns import TurnState
 from ComfyArt.bot.guide import CORE_MCP_TOOLS
@@ -43,10 +44,22 @@ async def test_mcp_is_off_by_default(bot_client):
 async def test_tools_list_matches_the_core_list(bot_client):
     tools = (await (await bot_client.post("/comfyart/mcp", json=_rpc("tools/list"))).json())["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert names == set(CORE_MCP_TOOLS) - set(bot_tools.TOOLS) - set(vectorcraft.TOOLS)
+    assert names == set(CORE_MCP_TOOLS) - set(bot_tools.TOOLS) - set(vectorcraft.TOOLS) - set(photo_adjust.TOOLS)
+
     chat = chat_store.create_chat(user="default", project="p", provider="codex")
     with_chat = await (await bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc("tools/list"))).json()
     assert set(bot_tools.TOOLS) <= {t["name"] for t in with_chat["result"]["tools"]}
+
+
+async def test_project_chat_discovers_photo_operations(bot_client):
+    chat = chat_store.create_chat(user="default", project="photo-test", provider="deepseek-harness")
+    path = "/comfyart/mcp?bot_chat=" + chat["id"]
+    listing = await (await bot_client.post(path, json=_rpc("tools/list"))).json()
+    assert {"adjust_photo", "list_photo_adjustments"} <= {t["name"] for t in listing["result"]["tools"]}
+    result = await (await bot_client.post(path, json=_rpc("tools/call", {"name": "list_photo_adjustments"}))).json()
+    operations = json.loads(result["result"]["content"][0]["text"])["operations"]
+    assert operations["gradientMap"]["command"] == "layer.newAdjustmentLayer.gradientMap"
+    assert operations["halftone"]["min"] == 4
 
 
 async def test_canvas_tool_is_relayed_to_the_project_page(bot_client):

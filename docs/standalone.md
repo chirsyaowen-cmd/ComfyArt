@@ -42,6 +42,14 @@ DSH 调用 `vectorcraft_color_blocks(shape_id, colors)`。工具从当前作品�
 
 已用实拍照片验证四色处理，PNG 像素与 SVG 路径填色一致，重开后原图和结果仍能并排显示。
 
+## 调整小志封面照片
+
+封面放入照片后，在对话框「添加 → 画布巡检」查看建议。点「试一试」会应用方案并打开照片调整面板。点「保留原图」也会结束这一步。Agent 可用 `list_photo_adjustments` 查看 17 种可组合的操作，包括渐变映射、阴影和高光、锐化、降噪、胶片颗粒、彩色网点和像素化。面板的「添加调整」读取同一份清单。
+
+服务端安装 PhotoCraft CLI 0.23.1，把 `photocraft-cli` 加入 PATH，或设置 `PHOTOCRAFT_CLI` 为可执行文件绝对路径。此发布版的 `mcp --no-gpu` 默认启动无桌面进程。每次渲染只读写独立的临时目录。使用官方 API Key 时，DSH 默认用支持图片的 `deepseek-flash`；显式选择的模型优先。
+
+其他图片处理能力及接入状态见[小志图片处理清单](zine-photo-tools.md)。
+
 ## 功能边界
 
 | 功能 | 独立版行为 |

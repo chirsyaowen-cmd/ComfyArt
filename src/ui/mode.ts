@@ -2,8 +2,8 @@ import { atom } from 'tldraw'
 
 import type { Pads, Stroke } from '../actions'
 
-export type Mode = 'quick' | 'text' | 'erase' | 'angles' | 'expand' | 'animate' | 'layers' | 'separate' | 'adjust' | 'effects' | 'inpaint' | 'style' | 'move' | 'smudge'
-export const OWN_PANEL: Mode[] = ['adjust', 'effects', 'inpaint', 'style', 'move', 'smudge']
+export type Mode = 'quick' | 'text' | 'erase' | 'angles' | 'expand' | 'animate' | 'layers' | 'separate' | 'photoAdjust' | 'adjust' | 'effects' | 'inpaint' | 'style' | 'move' | 'smudge'
+export const OWN_PANEL: Mode[] = ['adjust', 'photoAdjust', 'effects', 'inpaint', 'style', 'move', 'smudge']
 
 export const modeAtom = atom<Mode | null>('mode', null)
 export const strokesAtom = atom<Stroke[]>('strokes', [])

@@ -52,6 +52,7 @@ function Ask({ b }: { b: BotBlock }) {
   const [picked, setPicked] = useState<string[]>([])
   const [other, setOther] = useState('')
   const [error, setError] = useState('')
+  const immediate = b.kind === 'run_approval' || b.kind === 'photo_adjust'
   const multi = (b.max_selections ?? 1) > 1
   const options = b.options ?? []
   if (b.status !== 'pending') {
@@ -70,12 +71,12 @@ function Ask({ b }: { b: BotBlock }) {
       <div className="ca-ask__title">{b.prompt}{multi && <span className="ca-menu__key">{t('chatMessage.multipleChoice')}</span>}</div>
       <div className="ca-panel__chips">
         {options.map((o) => (
-          <button key={o.id} type="button" className="ca-panel__chip" title={o.description} data-on={picked.includes(o.id) || undefined} onClick={() => (b.kind === 'run_approval' ? submit([o.id]) : toggle(o.id))}>{o.label}</button>
+          <button key={o.id} type="button" className="ca-panel__chip" title={o.description} data-on={picked.includes(o.id) || undefined} onClick={() => (immediate ? submit([o.id]) : toggle(o.id))}>{o.label}</button>
         ))}
       </div>
       {b.allow_other && <input className="ca-panel__input" value={other} placeholder={t('chatMessage.orWriteYourOwn')} onChange={(e) => setOther(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />}
       {error && <div className="ca-chat__hint">{error}</div>}
-      {b.kind !== 'run_approval' && (
+      {!immediate && (
         <div className="ca-panel__foot">
           <button type="button" className="ca-panel__primary" disabled={!picked.length && !other.trim()} onClick={() => submit(picked)}>{t('chatMessage.submit')}</button>
         </div>

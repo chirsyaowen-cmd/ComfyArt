@@ -19,7 +19,7 @@ export function ZinePhotoPrompt({ editor, actionsOnly = false }: { editor: Edito
   if (!guide) return <button className="ca-panel__chip" onClick={() => roadmapOpen.set(true)}>{t('road.title')}</button>
   const { step, targets, photos, revision } = guide
   const target = targets.find(id => id === page) ?? targets[0]
-  const pick = step.scope === 'frames' && target && step.status !== 'deferred'
+  const pick = step.type !== 'photo_adjust' && step.scope === 'frames' && target && step.status !== 'deferred'
   const pages = getZinePages(editor)
   const choose = async (key: string) => {
     const version = frameFacts(editor, target).frame_version
@@ -30,6 +30,7 @@ export function ZinePhotoPrompt({ editor, actionsOnly = false }: { editor: Edito
     {!actionsOnly && <div>{guide.text}</div>}
     <div className="ca-zine-photo__actions">
       {step.status === 'deferred' && <button onClick={() => updateRoadmap(editor, revision, [{ action: 'resume', id: step.id }], 'button')}>{t('road.resume')}</button>}
+      {step.type === 'photo_adjust' && step.status !== 'deferred' && <button onClick={() => void sendToAgent(editor, t('photo.review'), [], null).catch(e => setError(errorText(e)))}>{t('photo.review')}</button>}
       {pick && !photos.length && <button onClick={() => importFiles(editor, 'image/*')}>{t('zineReview.upload')}</button>}
       {pick && !!photos.length && <>
         <button onClick={() => setPicker(!picker)}>{t('road.pick')}</button>

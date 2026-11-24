@@ -1,4 +1,4 @@
-from . import vectorcraft
+from . import photo_adjust, vectorcraft
 
 from .. import chat_store
 from . import bot_tools, canvas, image_search, media
@@ -26,6 +26,7 @@ CANVAS_TOOLS = ("get_canvas", "update_roadmap", "place_photo", "view_canvas", "b
                 "update_shapes", "delete_shapes", "focus", "memory", "skill", "create_slides", "vectorize_image")
 TOOLS.update({name: canvas.TOOLS[name] for name in CANVAS_TOOLS})
 TOOLS.update(vectorcraft.TOOLS)
+TOOLS.update(photo_adjust.TOOLS)
 TOOLS.update(media.TOOLS)
 TOOLS.update(image_search.TOOLS)
 TOOLS.update(bot_tools.TOOLS)

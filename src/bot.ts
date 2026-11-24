@@ -47,6 +47,8 @@ export const TOOL_LABELS: Record<string, string> = {
   server_info: t('bot.checkStatus'),
   get_canvas: t('bot.viewCanvas'),
   update_roadmap: t('road.title'),
+  adjust_photo: t('photo.tools'),
+  list_photo_adjustments: t('photo.tools'),
   place_photo: t('road.place'),
   view_canvas: t('bot.lookAtCanvas'),
   view_video: t('bot.watchVideo'),

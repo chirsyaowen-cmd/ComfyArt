@@ -1,6 +1,7 @@
 import { AssetRecordType, type Editor, type JsonObject, type TLAssetId, type TLImageShape } from 'tldraw'
 
-import type { Adjust } from './adjust'
+import { recipeOf, renderRecipe, type PhotoRecipe } from './photoRecipe'
+import { NO_ADJUST, type Adjust } from './adjust'
 import { uploadImage, viewUrl } from './comfy'
 import { canvasBlob } from './canvasBlob'
 
@@ -23,17 +24,16 @@ export function sourceAsset(editor: Editor, shape: TLImageShape) {
   return source?.type === 'image' && source.props.src ? source : assetOf(editor, shape)
 }
 
-async function uploadCanvas(editor: Editor, canvas: HTMLCanvasElement, name: string) {
+async function uploadCanvas(canvas: HTMLCanvasElement, name: string) {
   const ref = await uploadImage(await canvasBlob(canvas), `${name || 'image'}.png`.replace(/(\.png)+$/, '.png'))
   const assetId = AssetRecordType.createId()
-  editor.createAssets([{ id: assetId, typeName: 'asset', type: 'image', props: { name, src: viewUrl(ref), w: canvas.width, h: canvas.height, mimeType: 'image/png', isAnimated: false }, meta: {} }])
-  return assetId
+  return { id: assetId, typeName: 'asset', type: 'image', props: { name, src: viewUrl(ref), w: canvas.width, h: canvas.height, mimeType: 'image/png', isAnimated: false }, meta: {} } as const
 }
 
 function setSource(editor: Editor, shape: TLImageShape, src: string, w: number, h: number, name: string, original: string | null) {
   const assetId = AssetRecordType.createId()
   editor.createAssets([{ id: assetId, typeName: 'asset', type: 'image', props: { name, src, w, h, mimeType: 'image/png', isAnimated: false }, meta: {} }])
-  editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', props: { assetId, crop: null }, meta: { ...shape.meta, adjusted: null, original } })
+  editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', props: { assetId, crop: null }, meta: { ...shape.meta, adjusted: null, photoRecipe: [], original } })
 }
 
 export async function replacePixels(editor: Editor, shape: TLImageShape, canvas: HTMLCanvasElement) {
@@ -44,16 +44,21 @@ export async function replacePixels(editor: Editor, shape: TLImageShape, canvas:
   setSource(editor, current, viewUrl(ref), canvas.width, canvas.height, asset.props.name, originalOf(current) ?? asset.props.src)
 }
 
-export async function applyAdjust(editor: Editor, shape: TLImageShape, adjust: Adjust | null, render: () => HTMLCanvasElement) {
+export async function applyAdjust(editor: Editor, shape: TLImageShape, adjust: Adjust | null, render: () => HTMLCanvasElement,
+  recipe: PhotoRecipe = recipeOf(shape), checkTask?: () => void) {
   const source = sourceAsset(editor, shape)
-  if (!source) return
-  if (!adjust) {
-    editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', props: { assetId: source.id }, meta: { ...shape.meta, adjusted: null } })
-    return
+  if (!source) throw new Error('Original photo is unavailable')
+  const active = !!adjust || !!recipe.length
+  const asset = active ? await uploadCanvas(await renderRecipe(render(), recipe), source.props.name) : null
+  checkTask?.()
+  const current = editor.getShape<TLImageShape>(shape.id)
+  if (!current || current.props.assetId !== shape.props.assetId || current.parentId !== shape.parentId || editor.isDisposed || editor.getIsReadonly()) {
+    throw new Error('Photo changed while processing. Please review it again.')
   }
-  const assetId = await uploadCanvas(editor, render(), source.props.name)
-  const current = editor.getShape<TLImageShape>(shape.id) ?? shape
-  editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', props: { assetId }, meta: { ...current.meta, adjusted: { source: source.id, adjust } as unknown as JsonObject } })
+  if (asset) editor.createAssets([asset])
+  editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', props: { assetId: asset?.id ?? source.id },
+    meta: { ...current.meta, adjusted: active ? { source: source.id, adjust: adjust ?? NO_ADJUST } as unknown as JsonObject : null,
+      photoRecipe: recipe, ...(recipe.length ? { lastPhotoTool: recipe.some(s => s.kind === 'gradientMap') ? 'gradientMap' : recipe[recipe.length - 1].kind } : {}) } })
 }
 
 export function restoreOriginal(editor: Editor, shape: TLImageShape) {

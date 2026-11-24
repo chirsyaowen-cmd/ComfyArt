@@ -1,7 +1,7 @@
 import type { TLShapeId } from 'tldraw'
 
 type Status = 'pending' | 'in_progress' | 'deferred' | 'done'
-export type Step = { id: string; type: string; title: string; targetFrameIds: TLShapeId[]; scope: 'frames' | 'book'; status: Status; startedByCanvas?: true }
+export type Step = { id: string; type: string; title: string; targetFrameIds: TLShapeId[]; scope: 'frames' | 'book'; status: Status; sourceSignature?: string; startedByCanvas?: true }
 export type Source = 'chat' | 'button' | 'schedule'
 type Decision = { stepId: string; action: string; reason: string; source: Source; revision: number }
 export type Roadmap = { goal: string; currentStepId: string | null; steps: Step[]; decisions: Decision[]; revision: number }
@@ -9,6 +9,14 @@ export type Change = { action: string; id?: string; type?: string; title?: strin
 
 export function applies(step: Step, frame: TLShapeId) {
   return step.scope === 'book' || step.targetFrameIds.includes(frame)
+}
+
+export function repeatsLastCompletion(plan: Roadmap, expected: number, changes: Change[]) {
+  if (expected !== plan.revision - 1 || !Array.isArray(changes) || changes.length !== 1) return false
+  const change = changes[0]
+  if (change?.action !== 'done' || !plan.steps.some(s => s.id === change.id && s.status === 'done')) return false
+  return plan.decisions.some(d => d.revision === plan.revision && d.stepId === change.id && d.action === 'done' &&
+    (change.reason === undefined || change.reason === d.reason))
 }
 
 export function nextStep(plan: Roadmap) {

@@ -34,8 +34,16 @@ class StandaloneDSH(DeepSeekHarnessProvider):
             turn = replace(turn, user_text=text, attachments=[])
         return super()._prompt_blocks(turn, image_supported)
 
-    def _target_model(self, saved):
+    async def _launch(self, turn, argv):
+        # ACP advertises image input during initialization, before set_config_option.
+        model = self._default_model(turn.model)
+        return await super()._launch(replace(turn, model=model), argv)
+
+    def _default_model(self, saved):
         selected = saved or os.environ.get("COMFYART_DSH_MODEL", "")
         if not selected and os.environ.get("DEEPSEEK_API_KEY"):
-            selected = next((row["value"] for row in self._catalog if row["group"] == "deepseek-official"), "")
-        return super()._target_model(selected)
+            return '["deepseek-official","deepseek-flash"]'
+        return selected
+
+    def _target_model(self, saved):
+        return super()._target_model(self._default_model(saved))
