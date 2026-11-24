@@ -7,6 +7,7 @@ import { openProject } from '../projects'
 import { Icons } from './icons'
 import { Popover } from './Popover'
 import { reveal } from './TaskDetails'
+import { ZinePhotoPrompt } from './ZinePhotoPrompt'
 import { Chips } from './Chips'
 import { t, timeAgo } from '../i18n'
 
@@ -57,6 +58,7 @@ export function NoticeCenter({ editor }: { editor: Editor }) {
               <div className="ca-menu__grow ca-notice__text">
                 <div className="ca-notice__title">{n.title}</div>
                 {n.body && <div className="ca-notice__body">{n.body}</div>}
+                {n.action === 'zine-photos' && n.project === currentProject() && <ZinePhotoPrompt editor={editor} actionsOnly />}
                 <div className="ca-chat__hint">{timeAgo(n.time)}{n.project !== currentProject() ? t('noticeCenter.otherProject') : ''}</div>
               </div>
               {n.srcs?.[0] && (/\.(mp4|webm|mov)(&|$)/.test(n.srcs[0])
