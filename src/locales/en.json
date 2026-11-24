@@ -371,6 +371,8 @@
   "composer.skillCreator": "Skill Creator",
   "composer.skillName": "Skill name",
   "composer.turnTheApproachCompletedIn": "Turn the approach completed in this chat into a reusable skill: spell out the deliverables, aspect ratios, style rules and prompt essentials (write the instructions in English), then save it with the skill tool using action=\"save\", with an English name.",
+  "cropBar.circle": "Circle",
+  "cropBar.gestures": "Scroll over the image to zoom. Drag to reframe.",
   "cropBar.free": "Free",
   "cropBar.original": "Original",
   "cropBar.reset": "Reset",
