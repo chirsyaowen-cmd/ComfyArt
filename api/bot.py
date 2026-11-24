@@ -180,7 +180,7 @@ async def bot_send(request: web.Request) -> web.Response:
         display_blocks.append({"type": "text", "text": text})
     context = str(body.get("context") or "").strip()
     provider_text = send_core.compose_provider_text(
-        text, skill_name=skill_name, memory=str(body.get("memory") or ""), lines=[*lines, *([context] if context else [])])
+        text, skill_name=skill_name, lines=[*lines, *([context] if context else [])])
     user_msg, assistant_msg = send_core.queue_or_begin(
         chat, text=text, provider_text=provider_text,
         attachments=attachments, display_blocks=display_blocks)

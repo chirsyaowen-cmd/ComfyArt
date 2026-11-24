@@ -1,6 +1,6 @@
 from . import photo_adjust, vectorcraft
 
-from .. import chat_store
+from .. import chat_store, memory
 from . import bot_tools, canvas, image_search, media
 from ._context import BOT_CHAT_ID, PROJECT
 
@@ -23,8 +23,9 @@ TOOLS: dict[str, dict] = {
     },
 }
 CANVAS_TOOLS = ("get_canvas", "update_roadmap", "place_photo", "view_canvas", "brand_kits", "add_text", "add_shape", "create_frame",
-                "update_shapes", "delete_shapes", "focus", "memory", "skill", "create_slides", "vectorize_image")
+                "update_shapes", "delete_shapes", "focus", "skill", "create_slides", "vectorize_image")
 TOOLS.update({name: canvas.TOOLS[name] for name in CANVAS_TOOLS})
+TOOLS["memory"] = memory.TOOL
 TOOLS.update(vectorcraft.TOOLS)
 TOOLS.update(photo_adjust.TOOLS)
 TOOLS.update(media.TOOLS)

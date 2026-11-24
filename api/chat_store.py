@@ -100,6 +100,12 @@ def branch_chat(chat_id: str, message_id: str) -> Optional[dict]:
         return _chat(branch)
 
 
+def get_message(chat_id: str, message_id: str) -> Optional[dict]:
+    with db.session() as s:
+        msg = s.scalar(select(Message).where(Message.chat_id == chat_id, Message.id == message_id))
+        return _message(msg) if msg else None
+
+
 def list_messages(chat_id: str) -> list[dict]:
     with db.session() as s:
         return [_message(r) for r in s.scalars(select(Message).where(Message.chat_id == chat_id).order_by(Message.seq))]

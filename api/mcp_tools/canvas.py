@@ -277,14 +277,6 @@ SPECS: dict[str, dict] = {
     "focus": _tool(
         "Show shapes to the user: switch page if needed, select them and zoom to them.",
         {"ids": _IDS}, ["ids"]),
-    "memory": _tool(
-        "The user's long-term memory across projects. action list; add with text and category (about, "
-        "taste, work, assets); correct with old (copied exactly) and new; forget with text (copied "
-        "exactly). Save only lasting preferences the user states, not one-off requests.",
-        {"action": {"type": "string", "enum": ["list", "add", "correct", "forget"]},
-         "text": {"type": "string"}, "category": {"type": "string"},
-         "old": {"type": "string"}, "new": {"type": "string"}},
-        ["action"]),
     "skill": _tool(
         "Installed skills (instruction packs). action list; read with name (and optional path for a "
         "bundled file); save with name and instructions to store a reusable workflow the user wants "

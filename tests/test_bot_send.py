@@ -102,9 +102,9 @@ async def test_documents_send_their_text(fresh_user_dir):
         bot_send.parse_docs([{"name": "x"}])
 
 
-def test_compose_puts_memory_first_and_skill_instruction_before_the_text():
-    text = bot_send.compose_provider_text("make it", skill_name="Poster", memory="MEM", lines=["[ref]"])
-    assert text.startswith("MEM\n\nUse the ComfyArt skill 'Poster'")
+def test_compose_puts_skill_instruction_before_the_text():
+    text = bot_send.compose_provider_text("make it", skill_name="Poster", lines=["[ref]"])
+    assert text.startswith("Use the ComfyArt skill 'Poster'")
     assert text.endswith("make it\n\n[ref]")
 
 

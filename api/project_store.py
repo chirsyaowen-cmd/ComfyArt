@@ -1,11 +1,12 @@
 import hashlib
 import json
 import time
+import uuid
 from typing import Optional
 
 from sqlalchemy import delete, select, text
 
-from . import db
+from . import db, memory_store
 from .db import Project, ProjectVersion
 
 KEEP_VERSIONS = 30
@@ -87,22 +88,26 @@ def update_project(user: str, project_id: str, *, name: Optional[str] = None, pi
 
 
 def delete_project(user: str, project_id: str) -> bool:
-    with db.session() as s:
+    with memory_store.transaction(user) as s:
+        for table in (db.Memory, db.MemoryEvent):
+            s.execute(delete(table).where(table.user == user, table.project == project_id))
         gone = s.execute(delete(Project).where(Project.user == user, Project.id == project_id)).rowcount > 0
-        s.commit()
         return gone
 
 
 def duplicate_project(user: str, project_id: str, new_id: str, name: str) -> Optional[dict]:
     now = time.time()
-    with db.session() as s:
+    with memory_store.transaction(user) as s:
         row = s.get(Project, (user, project_id))
         if row is None:
             return None
         copy = Project(user=user, id=new_id, name=name, covers=row.covers, pinned=False,
                        snapshot=_renamed(row.snapshot, name), created_at=now, updated_at=now)
         s.add(copy)
-        s.commit()
+        for note in s.scalars(select(db.Memory).where(db.Memory.user == user, db.Memory.project == project_id, db.Memory.scope == "project")):
+            s.add(db.Memory(id=uuid.uuid4().hex, user=user, project=new_id, scope="project", text=note.text,
+                            category=note.category, time=note.time, source_message_id=None))
+        s.flush()
         return _entry(copy)
 
 

@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 from .. import runtime
 
 from ..bot.turns import TurnRunner
-from . import chat_store
+from . import chat_store, memory_store
 from ._common import spawn
 from .settings import SETTINGS_SPEC, get_setting
 
@@ -72,7 +72,15 @@ def unverified_write_notice(blocks: list[dict]) -> dict | None:
                     "actually done — the canvas is unchanged."}
 
 
-RUNNER = TurnRunner(
+class ProjectTurnRunner(TurnRunner):
+    def begin(self, chat, *, text, provider_text, attachments, user_msg):
+        # begin is called again when a queued message actually gets its turn.
+        prompt, token = memory_store.turn_context(chat, provider_text if provider_text is not None else text)
+        return super().begin({**chat, "resume_token": token}, text=text, provider_text=prompt,
+                             attachments=attachments, user_msg=user_msg)
+
+
+RUNNER = ProjectTurnRunner(
     label="ComfyArt", mcp_name="comfyart", store=chat_store, broadcast=broadcast, spawn=spawn,
     mcp_endpoint=_mcp_endpoint, comfy_mcp_argv=list, provider_model=provider_model,
     replay_text=blocks_text, finish_notice=unverified_write_notice,

@@ -1,15 +1,16 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { atom, useValue } from 'tldraw'
 
 import { uploadImage, viewUrl } from '../comfy'
 import { errorText } from '../jobs'
 import { libraryAtom } from '../library'
 import { ask, parseJson } from '../llm'
-import { correct, forget, MEMORY_CATEGORIES, memoryAtom, memoryLogAtom, remember, toInputs, type MemoryInput } from '../memory'
+import { editMemory, legacyAtom, loadMemory, type Scope, MEMORY_CATEGORIES, memoryAtom, memoryLogAtom, remember, toInputs, type MemoryInput } from '../memory'
 import { isPdf, uploadPdf } from '../pdf'
 import { AbilitiesPanel } from './AbilitiesPanel'
 import { Icons } from './icons'
 import { t } from '../i18n'
+import { onComfyEvent } from '../ws'
 import { isEnter } from './keys'
 import { Modal } from './Modal'
 
@@ -69,6 +70,14 @@ function Onboarding({ onDone }: { onDone: (items: MemoryInput[] | null) => void 
 export function MemoryDialog({ onError }: { onError: (msg: string) => void }) {
   const open = useValue(memoryOpenAtom)
   const memory = useValue(memoryAtom)
+  const legacy = useValue(legacyAtom)
+  const [scope, setScope] = useState<Scope>('project')
+  useEffect(() => {
+    if (!open) return
+    const refresh = () => { void loadMemory().catch(e => onError(errorText(e))) }
+    refresh()
+    return onComfyEvent('comfyart-memory', refresh)
+  }, [open, onError])
   const log = useValue(memoryLogAtom)
   const [tab, setTab] = useState('about')
   const [text, setText] = useState('')
@@ -81,7 +90,7 @@ export function MemoryDialog({ onError }: { onError: (msg: string) => void }) {
   const fail = (e: unknown) => onError(errorText(e))
   const add = () => {
     if (!text.trim()) return
-    void remember([{ text: text.trim(), category: tab }], t('frameToolbar.manual')).catch(fail)
+    void remember([{ text: text.trim(), category: tab }], t('frameToolbar.manual'), scope).catch(fail)
     setText('')
   }
   const importFiles = async (files: FileList | null) => {
@@ -98,18 +107,23 @@ export function MemoryDialog({ onError }: { onError: (msg: string) => void }) {
       found.push(...toInputs(parseJson(raw)?.memories))
     }
     if (!found.length) throw new Error(t('memoryDialog.couldntExtractAnyLong'))
-    await remember(found, t('memoryDialog.import'))
+    await remember(found, t('memoryDialog.import'), scope)
   }
-  const categoryTab = tab !== 'log' && tab !== 'abilities'
-  const shown = categoryTab ? memory.filter((m) => (m.category ?? 'about') === tab) : []
+  const categoryTab = tab !== 'log' && tab !== 'abilities' && tab !== 'legacy'
+  const shown = categoryTab ? memory.filter((m) => m.scope === scope && (m.category ?? 'about') === tab) : []
 
   return (
     <Modal title={onboarding ? t('memoryDialog.tellTheAgentAboutYourself') : t('common.memory')} className="ca-rename ca-memory" onClose={close}>
       {onboarding ? (
-        <Onboarding onDone={(items) => { setOnboarding(false); if (items?.length) void remember(items, t('memoryDialog.qa')).catch(fail) }} />
+        <Onboarding onDone={(items) => { setOnboarding(false); if (items?.length) void remember(items, t('memoryDialog.qa'), scope).catch(fail) }} />
       ) : (
         <div className="ca-rename__body">
-          <div className="ca-chat__hint">{t('memoryDialog.theAgentFollowsTheseMemories')}</div>
+          <label className="ca-style__row">{t('memory.scope')}
+            <select value={scope} onChange={e => { setScope(e.target.value === 'global' ? 'global' : 'project'); setEditing(null) }}>
+              <option value="project">{t('memory.scopeProject')}</option>
+              <option value="global">{t('memory.scopeGlobal')}</option>
+            </select>
+          </label>
           <div className="ca-style__row">
             <button type="button" className="ca-lib__new" onClick={() => setOnboarding(true)}><span className="ca-icon">{Icons.agent}</span>{t('memoryDialog.tellMeAboutYourself')}</button>
             <button type="button" className="ca-lib__new" disabled={!!busy} onClick={() => file.current?.click()}><span className="ca-icon">{Icons.upload}</span>{busy || t('memoryDialog.importFromFile')}</button>
@@ -118,12 +132,18 @@ export function MemoryDialog({ onError }: { onError: (msg: string) => void }) {
           <div className="ca-panel__chips">
             {MEMORY_CATEGORIES.map(([id, label]) => (
               <button key={id} type="button" className="ca-panel__chip" data-on={tab === id || undefined} onClick={() => setTab(id)}>
-                {label} {memory.filter((m) => (m.category ?? 'about') === id).length || ''}
+                {label} {memory.filter((m) => m.scope === scope && (m.category ?? 'about') === id).length || ''}
               </button>
             ))}
+            {legacy.length > 0 && <button type="button" className="ca-panel__chip" onClick={() => setTab('legacy')}>{t('memory.legacy')} {legacy.length}</button>}
             <button type="button" className="ca-panel__chip" data-on={tab === 'log' || undefined} onClick={() => setTab('log')}>{t('memoryDialog.evolutionLog')}</button>
             <button type="button" className="ca-panel__chip" data-on={tab === 'abilities' || undefined} onClick={() => setTab('abilities')}>{t('abilities.title')}</button>
           </div>
+          {tab === 'legacy' && <><div className="ca-chat__hint">{t('memory.legacyHint')}</div>
+            {legacy.map(m => <div key={m.id} className="ca-memory__row"><span className="ca-menu__grow">{m.text}</span>
+              {m.can_assign && <button className="ca-panel__chip" onClick={() => void editMemory('assign', { id: m.id, scope }).catch(fail)}>{t(scope === 'global' ? 'memory.assignGlobal' : 'memory.assignProject')}</button>}
+              <button className="ca-history__del" title={t('common.delete')} onClick={() => void editMemory('forget', { id: m.id }).catch(fail)}>{Icons.trash}</button>
+            </div>)}</>}
           {tab === 'abilities' && <AbilitiesPanel onError={onError} />}
           {tab === 'log' && (log.length === 0
             ? <div className="ca-side__empty">{t('memoryDialog.noEvolutionLogYet')}</div>
@@ -142,14 +162,14 @@ export function MemoryDialog({ onError }: { onError: (msg: string) => void }) {
                   autoFocus
                   className="ca-panel__input"
                   defaultValue={m.text}
-                  onBlur={(e) => { setEditing(null); const v = e.target.value.trim(); if (v && v !== m.text) void correct([{ old: m.text, new: v }], t('frameToolbar.manual')).catch(fail) }}
+                  onBlur={(e) => { setEditing(null); const v = e.target.value.trim(); if (v && v !== m.text) void editMemory('correct', { id: m.id, text: v }).catch(fail) }}
                   onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e)) e.currentTarget.blur() }}
                 />
               ) : (
                 <span className="ca-menu__grow" onDoubleClick={() => setEditing(m.id)}>{m.text}</span>
               )}
               <button type="button" className="ca-history__del" title={t('memoryDialog.correctMemory')} onClick={() => setEditing(m.id)}>{Icons.textTool}</button>
-              <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => void forget([m.text], t('frameToolbar.manual')).catch(fail)}>{Icons.trash}</button>
+              <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => void editMemory('forget', { id: m.id }).catch(fail)}>{Icons.trash}</button>
             </div>
           ))}
           {categoryTab && <div className="ca-style__row">

@@ -109,7 +109,7 @@ async def prepare_attachments(refs: list[dict], kits: list[dict], docs: list[dic
     return attachments, lines
 
 
-def compose_provider_text(text: str, *, skill_name: str = "", memory: str = "",
+def compose_provider_text(text: str, *, skill_name: str = "",
                           lines: list[str] = ()) -> str:
     provider_text = text or "Look at the attached images and tell me what you see."
     if skill_name:
@@ -120,8 +120,6 @@ def compose_provider_text(text: str, *, skill_name: str = "", memory: str = "",
             + provider_text)
     if lines:
         provider_text += "\n\n" + "\n".join(lines)
-    if memory:
-        provider_text = memory + "\n\n" + provider_text
     return provider_text
 
 

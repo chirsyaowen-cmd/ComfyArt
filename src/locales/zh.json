@@ -1,4 +1,12 @@
 {
+  "memory.scope": "适用范围",
+  "memory.scopeProject": "仅当前项目",
+  "memory.scopeGlobal": "所有项目的偏好",
+  "memory.legacy": "旧记忆",
+  "memory.legacyHint": "以下记录未用于对话。确认适用范围后，可将偏好归入相应范围。作品名以项目标题为准。",
+  "memory.assignProject": "归入当前项目",
+  "memory.assignGlobal": "设为全局偏好",
+
   "photo.exposure": "曝光",
   "photo.brightness": "亮度",
   "photo.vibrance": "自然饱和度",
