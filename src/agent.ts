@@ -1,5 +1,8 @@
 import { atom, createShapeId, type Editor, type TLImageShape, type TLShape, type TLShapeId, type TLVideoShape } from 'tldraw'
 
+import { importPhotos, isPhoto } from './photoImport'
+import { beginRoadmapTurn, roadmap } from './roadmap'
+import { getZinePages } from './zine'
 import { commentTarget } from './actions'
 import { botEnabledAtom, logDirect, sendMessage, settingsAtom, type BotBlock } from './bot'
 import { capRefs, createGenerator, generate, nearestRatio } from './generate'
@@ -47,6 +50,11 @@ const REF_LONG = 512
 const isDoc = (f: File) => DOC_ACCEPT.split(',').some((ext) => f.name.toLowerCase().endsWith(ext))
 
 export async function uploadRefs(editor: Editor, files: File[]) {
+  if (getZinePages(editor).length) {
+    const photos = files.filter(isPhoto)
+    if (photos.length) importPhotos(photos)
+    files = files.filter(f => !isPhoto(f))
+  }
   for (const f of files) {
     const kind = f.type.startsWith('video/') ? 'video' : f.type.startsWith('image/') ? 'image' : f.type.startsWith('audio/') ? 'audio' : null
     if (!kind && !isDoc(f)) continue
@@ -69,7 +77,12 @@ export async function uploadRefs(editor: Editor, files: File[]) {
   }
 }
 
-export async function sendToAgent(editor: Editor, text: string, refs: RefShape[], skill: Skill | null, kits: LibraryItem[] = [], docs: ChatDoc[] = [], context = '') {
+export async function sendToAgent(editor: Editor, text: string, refs: RefShape[], skill: Skill | null, kits: LibraryItem[] = [], docs: ChatDoc[] = [], context = '', source?: 'schedule') {
+  const roadmapTurn = beginRoadmapTurn(editor, source ?? 'chat')
+  if (roadmapTurn) context += '\n[Project Roadmap revision ' + roadmap(editor).revision +
+    '. Read get_canvas for current project photos, book frames, progress and decisions. Follow only this request. ' +
+    'For a change of direction call update_roadmap first. Use action last for “封面最后做” (last creative step before review), defer for “跳过”, then start the requested step. ' +
+    'Compare actual thumbnails with view_canvas(photo_key) for visual choices. If pixels are unavailable, be clear about that. Use place_photo only when the user asks to place a photo, using the chosen frame and current frame_version.]'
   const linked = linkedKit(editor.getDocumentSettings().meta.brandKit)
   if (linked && !kits.some((k) => k.id === linked.id)) kits = [...kits, linked]
   const frame = refLinkedOf(editor) ? refFrameOf(editor) : null
@@ -91,7 +104,7 @@ export async function sendToAgent(editor: Editor, text: string, refs: RefShape[]
     return [{ id: r.id, src, name: mediaName(editor, r), kind, ...(transcript ? { transcript } : {}) }]
   }))
   await sendMessage({
-    text,
+    text, source, roadmap_turn: roadmapTurn,
     refs: sent.flat(),
     docs,
     kits: kits.map((k) => ({ name: k.name, description: describeItem(k), images: itemImages(k) })),

@@ -28,7 +28,7 @@ export function svgRaster(src: string, w: number, h: number, scale: number): Pro
   return rasters.get(key)!
 }
 
-export async function vectorize(editor: Editor, shape: TLImageShape) {
+export async function vectorize(editor: Editor, shape: TLImageShape, check?: () => void) {
   const asset = shape.props.assetId ? editor.getAsset(shape.props.assetId) : null
   if (asset?.type !== 'image' || !asset.props.src) return
   const img = await loadImage(asset.props.src)
@@ -41,6 +41,8 @@ export async function vectorize(editor: Editor, shape: TLImageShape) {
   const svg = tracer.imagedataToSVG(ctx.getImageData(0, 0, c.width, c.height), OPTIONS)
   const name = `${(asset.props.name || 'image').replace(/\.\w+$/, '')}.svg`
   const ref = await uploadImage(new Blob([svg], { type: 'image/svg+xml' }), name)
+  check?.()
+  if (editor.getShape(shape.id) !== shape) throw new Error('Source image changed during processing')
   const b = editor.getShapePageBounds(shape)!
   const id = placeMedia(editor, { ref, src: viewUrl(ref), w: c.width, h: c.height, kind: 'image' }, t('vectorize.vector', asset.props.name), b.maxX + GAP, b.y, b.w)
   editor.select(id)

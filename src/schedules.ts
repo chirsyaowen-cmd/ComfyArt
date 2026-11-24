@@ -57,7 +57,7 @@ export function nextRun(s: Schedule): number | null {
 
 async function run(editor: Editor, s: Schedule) {
   await openChat(null)
-  await sendToAgent(editor, s.prompt, [], null)
+  await sendToAgent(editor, s.prompt, [], null, [], [], '', 'schedule')
   void notify({ kind: 'schedule', title: t('schedules.scheduledTaskStarted', s.name), body: s.prompt, chat: chatIdAtom.get() ?? undefined })
 }
 

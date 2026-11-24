@@ -1,5 +1,10 @@
 import { createShapeId, type Editor, type TLFrameShape, type TLShape, type TLShapeId } from 'tldraw'
 
+import { loadImage } from './adjust'
+import { thumbUrl, viewUrl } from './comfy'
+import { roadmap, roadmapSource, updateRoadmap } from './roadmap'
+import { frameFacts, placeProjectPhoto, projectPhotos } from './roadmapPhotos'
+import { getZinePages } from './zine'
 import { settingsAtom } from './bot'
 import { placeInChatFrame } from './chatFrame'
 import { placeHtml } from './embeds'
@@ -19,7 +24,7 @@ import { t } from './i18n'
 import { uuid } from './id'
 
 export type Args = Record<string, any>
-export type Handler = (editor: Editor, args: Args, onError: ErrorSink, chat: string) => unknown
+export type Handler = (editor: Editor, args: Args, onError: ErrorSink, chat: string, checkTask: () => void) => unknown
 
 const MAX_SHAPES = 300
 const VIEW_MAX_PX = 1024
@@ -87,15 +92,23 @@ function textProps(args: Args): Partial<TextShape['props']> {
 }
 
 export const LAYOUT_HANDLERS: Record<string, Handler> = {
+  update_roadmap: (editor, args, _onError, chat) => updateRoadmap(editor, args.expected_revision, args.changes, chat ? roadmapSource(editor) : 'chat'),
+  place_photo: (editor, args, _onError, _chat, checkTask) => placeProjectPhoto(editor, {
+    frame: args.frame, frame_version: args.frame_version, expected_revision: args.expected_revision, fit: args.fit, photo_key: args.photo_key,
+  }, checkTask),
   get_canvas: (editor, args) => {
     const page = pageOf(editor, args.page)
     const ids = [...editor.getPageShapeIds(page.id)]
     const shapes = toPageShapes(editor, ids).filter((s) => s.type !== COMMENT).slice(0, MAX_SHAPES).map((s) => describe(editor, s))
     const kit = linkedKit(editor.getDocumentSettings().meta.brandKit)
+    const uploads = projectPhotos(editor)
     return {
       project: editor.getDocumentSettings().name || undefined,
       pages: editor.getPages().map((p) => ({ id: p.id, name: p.name, current: p.id === editor.getCurrentPageId() })),
       page: page.id,
+      ...(getZinePages(editor).length ? { roadmap: roadmap(editor),
+        book_frames: getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame').map(id => frameFacts(editor, id)),
+        uploads: { batch: uploads.batch, photos: uploads.photos.map(({ key, name, state }) => ({ key, name, state })) } } : {}),
       shapes,
       truncated: ids.length > MAX_SHAPES || undefined,
       selection: editor.getSelectedShapeIds(),
@@ -103,6 +116,16 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
     }
   },
   view_canvas: async (editor, args) => {
+    if (args.photo_key) {
+      const photo = projectPhotos(editor).photos.find(p => p.key === args.photo_key && p.state === 'ready')
+      if (!photo) throw new Error('Unknown or unavailable project upload')
+      const img = await loadImage(thumbUrl(viewUrl(photo.ref), 512))
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      canvas.getContext('2d')!.drawImage(img, 0, 0)
+      return { photo_key: photo.key, name: photo.name, png: canvas.toDataURL('image/png').split(',')[1] }
+    }
     const ids = Array.isArray(args.ids) && args.ids.length ? args.ids.map((id: string) => shapeOf(editor, id).id) : [...editor.getCurrentPageShapeIds()]
     if (!ids.length) throw new Error('the page is empty')
     const shapes = toPageShapes(editor, ids)

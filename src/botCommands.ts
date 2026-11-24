@@ -7,6 +7,8 @@ import { generateAudio, imageTo3d, musicModels, viewsTo3d, voices } from './asse
 import { editElements } from './elements'
 import { bakeToImage, createMockup } from './mockup'
 import { api, viewUrl } from './comfy'
+import { getZinePages } from './zine'
+import { checkRoadmapTurn, roadmap } from './roadmap'
 import { LAYOUT_HANDLERS, shapeOf, type Args, type Handler } from './botLayout'
 import { placeInChatFrame } from './chatFrame'
 import { capRefs, createGenerator, generate } from './generate'
@@ -249,7 +251,7 @@ const HANDLERS: Record<string, Handler> = {
     return started(editor, actions.moveTarget(editor, imageOf(editor, args.id), target, Number(args.dx) || 0, Number(args.dy) || 0, onError))
   },
   style_transfer: (editor, args, onError) => started(editor, actions.styleTransfer(editor, imageOf(editor, args.id), String(args.style ?? ''), args.ref ? refUrls(editor, [args.ref])[0] : null, onError)),
-  vectorize_image: async (editor, args) => ({ id: await vectorize(editor, imageOf(editor, args.id)) }),
+  vectorize_image: async (editor, args, _onError, _chat, check) => ({ id: await vectorize(editor, imageOf(editor, args.id), check) }),
   extend_video: (editor, args, onError) => started(editor, actions.extendVideo(editor, videoOf(editor, args.id), String(args.prompt), DURATIONS.includes(args.duration) ? args.duration : DURATIONS[0], onError)),
   upscale_video: (editor, args, onError) => {
     const long = (VIDEO_TARGETS.find(([label]) => label === args.target) ?? VIDEO_TARGETS[0])[1]
@@ -303,15 +305,28 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
   void announce()
   const stops = [
     onReconnect(() => void announce()),
-    onComfyEvent('comfyart-mcp-command', (msg: { id: string; action: string; project: string; chat?: string; args: Args }) => {
-      if (msg.project !== project || isStale()) return
+    onComfyEvent('comfyart-mcp-command', (msg: { id: string; action: string; project: string; chat?: string; roadmap_turn?: string; args: Args }) => {
+      if (msg.project !== project) return
       const handler = HANDLERS[msg.action]
       const reply = (body: object) => api('/comfyart/mcp_command_result', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command_id: msg.id, ...body }) })
         .catch((e) => onError(errorText(e)))
+      if (isStale()) return void reply({ ok: false, error: 'EDITOR_STALE: reopen the project' })
       if (!handler) return void reply({ ok: false, error: `unknown command ${msg.action}` })
-      editor.markHistoryStoppingPoint(`agent:${msg.action}`)
       Promise.resolve()
-        .then(() => handler(editor, msg.args ?? {}, onError, msg.chat ?? ''))
+        .then(() => {
+          const guard = () => {
+            if (isStale() || editor.isDisposed) throw new Error('EDITOR_STALE: reopen the project')
+            if (msg.chat && !msg.roadmap_turn && getZinePages(editor).length)
+              throw new Error('TASK_SUPERSEDED: start a fresh request from the Zine editor')
+            return msg.roadmap_turn ? checkRoadmapTurn(editor, msg.roadmap_turn) : undefined
+          }
+          const readOnly = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source'].includes(msg.action)
+          const active = readOnly ? undefined : guard()
+          if (!readOnly && msg.action !== 'update_roadmap') editor.markHistoryStoppingPoint(`agent:${msg.action}`)
+          const result = handler(editor, msg.args ?? {}, onError, msg.chat ?? '', guard)
+          if (active && msg.action === 'update_roadmap') active.revision = roadmap(editor).revision
+          return result
+        })
         .then((result) => reply({ ok: true, result }), (e) => reply({ ok: false, error: errorText(e) }))
     }),
   ]

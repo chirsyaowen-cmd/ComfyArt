@@ -1,3 +1,4 @@
+import { frameFitScale } from '../assets'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { atom, useEditor, useValue, type Editor, type TLImageShape } from 'tldraw'
 
@@ -156,7 +157,7 @@ export function ImageToolbar({ onError }: { onError: (msg: string) => void }) {
   const fitFrame = (cover: boolean) => {
     if (frame?.type !== 'frame') return
     const { w: fw, h: fh } = frame.props as { w: number; h: number }
-    const k = (cover ? Math.max : Math.min)(fw / shape.props.w, fh / shape.props.h)
+    const k = frameFitScale(shape.props.w, shape.props.h, fw, fh, cover)
     const [w, h] = [shape.props.w * k, shape.props.h * k]
     editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', x: (fw - w) / 2, y: (fh - h) / 2, rotation: 0, props: { w, h } })
   }

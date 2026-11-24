@@ -54,12 +54,18 @@ export function dropLibraryPhoto(editor: Editor, transfer: DataTransfer, point: 
   return true
 }
 
-export async function placeAsset(editor: Editor, item: Pick<AssetItem, 'src' | 'name' | 'kind'>, pageId?: TLShapeId, point?: VecLike): Promise<TLShapeId> {
+export function frameFitScale(w: number, h: number, fw: number, fh: number, cover: boolean) {
+  return (cover ? Math.max : Math.min)(fw / w, fh / h)
+}
+
+export async function placeAsset(editor: Editor, item: Pick<AssetItem, 'src' | 'name' | 'kind'>, pageId?: TLShapeId, point?: VecLike, options?: { cover: boolean; check: () => void }): Promise<TLShapeId> {
   const canvasId = editor.getCurrentPageId()
   const m = await toMedia(refFromUrl(item.src), item.kind)
+  options?.check()
   const page = pageId ? editor.getShape<TLFrameShape>(pageId) : undefined
   if (pageId && page?.type !== 'frame') throw new Error(t('home.projectNotFound'))
-  const w = page ? Math.min(m.w, page.props.w, page.props.h * m.w / m.h) : Math.min(m.w, 512)
+  const scale = page ? frameFitScale(m.w, m.h, page.props.w, page.props.h, !!options?.cover) : 512 / m.w
+  const w = m.w * (options?.cover ? scale : Math.min(1, scale))
   let center = point ?? editor.getViewportPageBounds().center
   if (page) center = point ? editor.getPointInShapeSpace(page, point) : { x: page.props.w / 2, y: page.props.h / 2 }
   editor.markHistoryStoppingPoint('place asset')

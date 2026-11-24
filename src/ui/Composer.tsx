@@ -4,6 +4,8 @@ import { useValue, type Editor, type TLShapeId } from 'tldraw'
 import { agentModeAtom, directSettingsAtom, DOC_ACCEPT, docsAtom, draftAtom, eachLine, eachRuns, extraRefsAtom, generateDirect, isRefShape, kitsAtom, refKindOf, sendToAgent, srcOf, uploadRefs, type DirectSettings, type RefShape } from '../agent'
 import { EachButton, EachRole, useEach } from './EachToggle'
 import { RefFrameButton } from './RefFrameButton'
+import { PHOTO_ACCEPT } from '../photoImport'
+import { guideShown, roadmapGuide } from '../roadmapGuide'
 import { describeZine, inspectZine } from '../zineReview'
 import { ZinePhotoPrompt } from './ZinePhotoPrompt'
 import { botEnabledAtom, chatIdAtom, messagesAtom } from '../bot'
@@ -29,7 +31,7 @@ import { isEnter } from './keys'
 const REVIEW_PROMPT = t('composer.canvasReviewUseGetCanvas')
 const SKILL_PROMPT = t('composer.turnTheApproachCompletedIn')
 
-const FILE_ACCEPT = `image/*,video/*,audio/*,${DOC_ACCEPT}`
+const FILE_ACCEPT = `${PHOTO_ACCEPT},video/*,audio/*,${DOC_ACCEPT}`
 
 function imageName(editor: Editor, s: RefShape) {
   if (refKindOf(s) === 'audio') return (s as AudioShape).props.name || t('composer.audio')
@@ -65,6 +67,7 @@ function DirectPills({ editor, video }: { editor: Editor; video: boolean }) {
 
 export function Composer({ editor, busy, onError }: { editor: Editor; busy: boolean; onError: (msg: string) => void }) {
   const chatId = useValue(chatIdAtom)
+  const autoGuide = useValue('automatic roadmap guide', () => !!guideShown.get() && guideShown.get() === roadmapGuide(editor)?.signature, [editor])
   const [photoPromptChat, setPhotoPromptChat] = useState<string | null | undefined>(undefined)
   function reviewCanvas() {
     setMenu(null)
@@ -197,7 +200,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           ))}
         </div>
       )}
-      {photoPromptChat === chatId && <ZinePhotoPrompt editor={editor} />}
+      {(photoPromptChat === chatId || autoGuide) && <ZinePhotoPrompt editor={editor} />}
       <div className="ca-composer__entry">
         {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
           <div className="ca-composer__chips">

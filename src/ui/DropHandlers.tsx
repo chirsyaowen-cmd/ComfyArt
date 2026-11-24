@@ -50,7 +50,7 @@ export function DropHandlers({ onError }: { onError: (msg: string) => void }) {
     editor.registerExternalContentHandler('files', async ({ point, files }) => {
       const pages = getZinePages(editor)
       const photos = files.filter(isPhoto)
-      const batch = photos.length > 1 && pages.length > 0
+      const batch = photos.length > 0 && pages.length > 0
       if (batch) {
         importPhotos(photos)
         libraryTabAtom.set('import')

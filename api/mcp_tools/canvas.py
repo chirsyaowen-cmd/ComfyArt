@@ -44,16 +44,34 @@ def _tool(description: str, properties: dict, required: list[str] = (), **relay)
 
 
 SPECS: dict[str, dict] = {
+    "update_roadmap": _tool(
+        "Apply ordered changes together to this Zine's project roadmap. Read get_canvas first. "
+        "Stable step id; create/edit accept type, title, targetFrameIds (real frames), scope "
+        "(frames or book). move inserts before the specified step, otherwise last. defer moves "
+        "before any reserved last creative step and closing review. Use action last for “封面最后做” to reserve its position even after later skips. focus changes attention only. resume restarts deferred work. "
+        "Use goal for the project goal and reason for user decisions. update_plan is only for this turn.",
+        {"expected_revision": {"type": "integer"}, "changes": {"type": "array", "items": _schema({
+            "action": {"enum": ["create", "edit", "goal", "focus", "start", "move", "defer", "last", "resume", "done"]},
+            **{k: {"type": "string"} for k in ("id", "type", "title", "before", "reason", "goal")},
+            "scope": {"enum": ["frames", "book"]}, "targetFrameIds": _IDS}, ["action"])}},
+        ["expected_revision", "changes"]),
+    "place_photo": _tool(
+        "Place one ready project upload as a child of an explicit book frame in the focused step. "
+        "Use uploads.batch for new material. Read book_frames for frame_version. cover fills and clips; "
+        "contain fits the photo inside. This does not finish a step.",
+        {"expected_revision": {"type": "integer"}, "frame": _ID, "frame_version": {"type": "string"},
+         "photo_key": {"type": "string"}, "fit": {"enum": ["cover", "contain"]}},
+        ["expected_revision", "frame", "frame_version", "photo_key", "fit"]),
     "get_canvas": _tool(
         "List the open project: pages, the current page's frames and shapes (id, type, name or text, "
         "x/y/width/height, parent, image or video URL and its pixel size, generation prompt, the text of "
         "imported PDF pages), the selection, the linked "
-        "brand kit and running generations. page selects another page by id or name.",
+        "brand kit, Zine roadmap, book_frames with current content and frame_version, project uploads and latest batch, and running generations. page selects another page by id or name.",
         {"page": {"type": "string"}}),
     "view_canvas": _tool(
         "Render real pixels of the current page (default), of some shapes or frames (ids), so you can "
-        "see layout and results. max_px caps the long side (default 1024).",
-        {"ids": _IDS, "max_px": {"type": "integer"}}, timeout=SLOW_S),
+        "see layout and results. Alternatively pass photo_key to inspect one project upload before placing it. max_px caps the long side (default 1024).",
+        {"ids": _IDS, "photo_key": {"type": "string"}, "max_px": {"type": "integer"}}, timeout=SLOW_S),
     "list_models": _tool(
         "Installed image, video and music models with ids, what they are good at, whether they accept "
         "reference images, and supported ratios.", {}),

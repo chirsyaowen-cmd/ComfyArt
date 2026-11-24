@@ -1,7 +1,7 @@
-import { Box, type Editor, type TLShapeId } from 'tldraw'
+import { Box, react, type Editor, type TLShapeId } from 'tldraw'
 
 import { api, readUserJson, uploadImage, viewUrl, writeUserJson } from './comfy'
-import { botEnabledAtom, settingsAtom, type BotMessage } from './bot'
+import { botEnabledAtom, chatsAtom, settingsAtom, type BotMessage } from './bot'
 import { errorText, type ErrorSink } from './jobs'
 import { ask, parseJson } from './llm'
 import { logMemory, memoryAtom, remember, toInputs } from './memory'
@@ -9,7 +9,9 @@ import { currentProject, notify } from './notices'
 import { exportImage } from './shapes/ArtboardShape'
 import { loadSkills, saveSkill, slug } from './skills'
 import { onComfyEvent } from './ws'
-import { describeZine, emptyBookMessage, inspectZine } from './zineReview'
+import { currentRoadmapTurn } from './roadmap'
+import { guideShown, roadmapGuide } from './roadmapGuide'
+import { inspectZine, describeZine } from './zineReview'
 import { lang, t } from './i18n'
 
 export type Ability = 'memory' | 'skills' | 'review'
@@ -58,6 +60,7 @@ async function exchange(chatId: string, messageId: string) {
   const reply = messages.find((m) => m.id === messageId)
   const user = messages.find((m) => m.id === reply?.parent_id)
   const text = (m?: BotMessage) => m?.blocks.filter((b) => b.type === 'text').map((b) => b.text ?? '').join('').trim() ?? ''
+  if (user?.role !== 'user' || user.blocks.some(b => b.type === 'trigger')) return null
   return reply && user ? { user: text(user), reply: text(reply) } : null
 }
 
@@ -105,13 +108,14 @@ function layoutContext(editor: Editor, ids: Set<TLShapeId>) {
   })))
 }
 
-async function review(editor: Editor) {
+async function review(editor: Editor, valid: () => boolean) {
   const book = inspectZine(editor)
-  const ids = book ? book.reviewPages : [...editor.getCurrentPageShapeIds()]
+  const guide = book && roadmapGuide(editor)
+  if (book && (!guide || !guide.content || guide.step.status === 'deferred')) return
+  const ids = book && guide ? guide.targets.filter(id => editor.getShape(id)) : [...editor.getCurrentPageShapeIds()]
   if (!book && ids.length < REVIEW_MIN_SHAPES) return
   const project = currentProject()
-  const layout = book && !book.occupied.length ? emptyBookMessage(book)
-    : [book && describeZine(book), layoutContext(editor, editor.getShapeAndDescendantIds(ids))].filter(Boolean).join('\n')
+  const layout = [guide && guide.step.title, book && describeZine(book), layoutContext(editor, editor.getShapeAndDescendantIds(ids))].filter(Boolean).join('\n')
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(layout))
   const sig = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
   const go = await withState((s) => {
@@ -119,16 +123,12 @@ async function review(editor: Editor) {
     s.reviewed[project] = sig
     return true
   })
-  if (!go) return
-  if (book && !book.occupied.length) {
-    await notify({ project, kind: 'suggestion', title: t('proactive.reviewTitle'), body: layout, action: 'zine-photos' })
-    return
-  }
+  if (!go || !valid()) return
   const bounds = Box.Common(ids.flatMap(id => editor.getShapePageBounds(id) ?? []))
   const { blob } = await exportImage(editor, ids, { format: 'png', background: true, scale: Math.min(1, REVIEW_PX / Math.max(bounds.w, bounds.h)) })
   const src = viewUrl(await uploadImage(blob, `review-${project}.png`))
   const issues = parseJson(await ask(book ? describeZine(book) : 'Review this canvas.', REVIEW_SYSTEM, [src], layout))?.issues
-  if (Array.isArray(issues) && issues.length) await notify({ project, kind: 'suggestion', title: t('proactive.reviewTitle'), body: issues.map((x) => `• ${x}`).join('\n') })
+  if (valid() && Array.isArray(issues) && issues.length) await notify({ project, source: 'canvas_review', kind: 'suggestion', title: t('proactive.reviewTitle'), body: issues.map((x) => `• ${x}`).join('\n') })
 }
 
 export function startProactive(editor: Editor, onError: ErrorSink) {
@@ -136,6 +136,50 @@ export function startProactive(editor: Editor, onError: ErrorSink) {
   const stop = onComfyEvent('comfyart-bot', (e: { event: string; chat_id: string; message_id: string; status: string }) => {
     if (e.event === 'turn_done') void onTurnDone(e).catch(fail)
   })
-  const timer = window.setTimeout(() => { if (enabled('review')) void review(editor).catch(fail) }, REVIEW_DELAY)
-  return () => { stop(); clearTimeout(timer) }
+  let alive = true
+  let timer = 0
+  let last = ''
+  let priorContent = 0
+  let priorStep = ''
+  const quiet = () => alive && enabled('review') && !chatsAtom.get().some(c => c.busy)
+  const stopGuide = react('roadmap review after meaningful edits', () => {
+    const guide = roadmapGuide(editor)
+    const signature = guide?.signature ?? ''
+    const reviewEnabled = enabled('review')
+    const busy = chatsAtom.get().some(c => c.busy)
+    if (busy) guideShown.set(null)
+    if (!reviewEnabled) { clearTimeout(timer); guideShown.set(null); last = ''; return }
+    if (last === signature) return
+    clearTimeout(timer)
+    const removed = guide?.step.id === priorStep && guide.content < priorContent
+    priorContent = guide?.content ?? 0
+    priorStep = guide?.step.id ?? ''
+    last = signature
+    guideShown.set(null)
+    if (!guide || busy || removed || (!guide.photos.length && !guide.content && guide.step.status !== 'deferred')) return
+    const turn = currentRoadmapTurn(editor)
+    const valid = () => quiet() && turn === currentRoadmapTurn(editor) && roadmapGuide(editor)?.signature === signature
+    timer = window.setTimeout(() => {
+      if (!valid()) return
+      void withState(async state => {
+        const key = 'roadmap:' + currentProject()
+        if (!valid()) return
+        if (state.reviewed[key] === signature) { guideShown.set(signature); return }
+        if (!take(state, 'review')) return
+        state.reviewed[key] = signature
+        guideShown.set(signature)
+        await notify({ source: 'canvas_review', kind: 'suggestion', title: t('proactive.reviewTitle'),
+          body: guide.text, action: 'zine-photos', guideSignature: signature })
+      }).catch(fail)
+    }, 1500)
+  })
+  const visualTimer = window.setTimeout(() => {
+    if (!quiet()) return
+    const signature = roadmapGuide(editor)?.signature
+    const turn = currentRoadmapTurn(editor)
+    const shapes = editor.getCurrentPageShapes()
+    void review(editor, () => quiet() && turn === currentRoadmapTurn(editor) && roadmapGuide(editor)?.signature === signature
+      && editor.getCurrentPageShapes().length === shapes.length && shapes.every(s => editor.getShape(s.id) === s)).catch(fail)
+  }, REVIEW_DELAY)
+  return () => { alive = false; stop(); stopGuide(); guideShown.set(null); clearTimeout(timer); clearTimeout(visualTimer) }
 }
