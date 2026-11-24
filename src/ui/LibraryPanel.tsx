@@ -84,7 +84,7 @@ export function LibraryPanel({ editor, onError }: { editor: Editor; onError: (ms
         }} />
       </div>}
       {tab === 'import' && <PhotoImportPanel editor={editor} onError={onError} />}
-      {tab === 'files' && <AssetGrid onPick={item => void placeAsset(editor, item, item.kind === 'image' ? getZinePages(editor)[activeZineIndex(editor)] : undefined).catch(e => onError(String(e)))} />}
+      {tab === 'files' && <AssetGrid dragPhotos onPick={item => void placeAsset(editor, item, item.kind === 'image' ? getZinePages(editor)[activeZineIndex(editor)] : undefined).catch(e => onError(String(e)))} />}
       {tab !== 'files' && tab !== 'import' && (
         <>
           <button type="button" className="ca-lib__new" onClick={() => create(tab)}>

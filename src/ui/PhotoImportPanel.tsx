@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useValue, type Editor } from 'tldraw'
 
-import { placeAsset } from '../assets'
+import { photoDragProps, placeAsset } from '../assets'
 import { viewUrl, thumbUrl } from '../comfy'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
@@ -33,9 +33,9 @@ export function PhotoImportPanel({ editor, onError }: { editor: Editor; onError:
     <div className="ca-assets__grid">{ready.map(row => {
       if (row.stage.kind !== 'stored') return null
       const src = viewUrl(row.stage.photo.ref)
-      return <button key={row.id} title={row.name} className="ca-side__cell" onClick={() =>
+      return <button key={row.id} title={row.name} className="ca-side__cell" {...photoDragProps(src, row.name)} onClick={() =>
         void placeAsset(editor, { src, name: row.name, kind: 'image' }, getZinePages(editor)[activeZineIndex(editor)]).catch(e => onError(errorText(e)))}>
-        <img src={thumbUrl(src)} loading="lazy" decoding="async" alt="" />
+        <img draggable={false} src={thumbUrl(src)} loading="lazy" decoding="async" alt="" />
       </button>
     })}</div>
   </div>
