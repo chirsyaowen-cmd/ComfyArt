@@ -1,6 +1,6 @@
 import { react, type Editor, type TLImageShape, type TLShapeId } from 'tldraw'
 import { t } from './i18n'
-import { getZinePages, zineSpreads } from './zine'
+import { activeZineIndex, getZinePages, zineSpreads } from './zine'
 import { adjustedOf } from './imageOps'
 import { uuid } from './id'
 
@@ -131,7 +131,7 @@ export function undoRoadmap(editor: Editor) {
 }
 
 // A new user request supersedes earlier work even before it changes the roadmap.
-export type RoadmapTurn = { token: string; revision: number; source: Source; inspected: boolean
+export type RoadmapTurn = { token: string; revision: number; source: Source; frame: TLShapeId; inspected: boolean
   viewedFrames: Map<TLShapeId, string>; placedText: Set<TLShapeId> }
 const turns = new WeakMap<Editor, RoadmapTurn>()
 export function matchingRoadmapTurn(editor: Editor, token?: string) {
@@ -139,9 +139,10 @@ export function matchingRoadmapTurn(editor: Editor, token?: string) {
   return turn?.token === token ? turn : undefined
 }
 export function beginRoadmapTurn(editor: Editor, source: Source) {
-  if (!getZinePages(editor).length) return undefined
+  const pages = getZinePages(editor)
+  if (!pages.length) return undefined
   const turn: RoadmapTurn = { token: uuid(), revision: roadmap(editor).revision, source,
-    inspected: false, viewedFrames: new Map(), placedText: new Set() }
+    frame: pages[activeZineIndex(editor)], inspected: false, viewedFrames: new Map(), placedText: new Set() }
   turns.set(editor, turn)
   return turn.token
 }

@@ -107,7 +107,7 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       pages: editor.getPages().map((p) => ({ id: p.id, name: p.name, current: p.id === editor.getCurrentPageId() })),
       page: page.id,
       ...(getZinePages(editor).length ? { roadmap: roadmap(editor),
-        active_book_frame: getZinePages(editor)[activeZineIndex(editor)], book_fonts: bookFonts(editor),
+        active_book_frame: turn?.frame ?? getZinePages(editor)[activeZineIndex(editor)], book_fonts: bookFonts(editor),
         book_frames: getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame').map(id => frameFacts(editor, id)),
         uploads: { batch: uploads.batch, photos: uploads.photos.map(({ key, name, state }) => ({ key, name, state })) } } : {}),
       shapes,

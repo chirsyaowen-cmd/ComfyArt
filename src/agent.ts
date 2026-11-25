@@ -82,7 +82,7 @@ export async function sendToAgent(editor: Editor, text: string, refs: RefShape[]
     '. Read get_canvas for current project photos, book frames, progress and decisions. Follow only this request. ' +
     'For a change of direction call update_roadmap first. Use action last for “封面最后做” (last creative step before review), defer for “跳过”, then start the requested step. ' +
     'Page typography is on request, after photo treatment and before optional embellishments. For a title, caption, diary or date: ' +
-    'get_canvas first (active_book_frame is the current book page), then view_canvas with target frame ids to inspect the finished picture. ' +
+    'Use get_canvas first. For “这页” / “this page”, active_book_frame is the confirmed target at send time, even when blank or a previous turn used another page. Go directly to view_canvas(ids=[target frame(s)]). ' +
     'Preserve supplied copy exactly; when asked to write, draft from this page. Choose a readable font, size, color, frame-local x/y, width and alignment around the subject and negative space. ' +
     'Call add_text directly with frame and role. Put all requested boxes in one call using additional, e.g. a title plus a separate date. ' +
     'Use a date supplied in the request or project; if none is specified use today (' + new Date().toLocaleDateString('sv-SE') + ') for the edition date. ' +

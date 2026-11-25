@@ -157,6 +157,10 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
     editorRef.current = ed
     setEditor(ed)
     restoreZineLayout(ed)
+    if (getZinePages(ed).length) {
+      ed.selectNone()
+      focusZinePage(ed, 0)
+    }
     const stopFrames = registerFrameRules(ed)
     const stopCrop = registerCropRule(ed)
     return () => { editorRef.current = null; stopFrames(); stopCrop() }
@@ -181,7 +185,10 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
         const kit = new URL(location.href).searchParams.get('kit')
         if (!snapshot && !('brandKit' in doc.meta)) editor.updateDocumentSettings({ meta: { ...doc.meta, brandKit: kit ?? defaultKitId() } })
         const params = new URL(location.href).searchParams
-        if (!snapshot && params.has(NEW_PARAM) && params.get('format') === 'zine') createZine(editor)
+        if (!snapshot && params.has(NEW_PARAM) && params.get('format') === 'zine') {
+          createZine(editor)
+          focusZinePage(editor, 0)
+        }
         if (kit) {
           const url = new URL(location.href)
           url.searchParams.delete('kit')
@@ -191,10 +198,7 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
           if (/^Page \d+$/.test(page.name)) editor.renamePage(page.id, page.name.replace('Page', t('app.page')))
         }
         const content = editor.getCurrentPageBounds()
-        if (getZinePages(editor).length) {
-          editor.selectNone()
-          focusZinePage(editor, 0)
-        } else if (content) editor.zoomToBounds(content, { targetZoom: 1 })
+        if (!getZinePages(editor).length && content) editor.zoomToBounds(content, { targetZoom: 1 })
         editor.clearHistory()
         stopJobs = resumeJobs(editor, setError)
         stopScheduler = startScheduler(editor, setError)
