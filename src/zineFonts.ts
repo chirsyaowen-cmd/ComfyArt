@@ -15,16 +15,20 @@ const chinese: Record<TextRole, string[]> = {
   note: ['Kaiti SC', 'KaiTi', 'STKaiti'],
 }
 
-export function bookFonts(editor: Editor, pages = getZinePages(editor)) {
+export function bookFonts(editor: Editor, role?: TextRole) {
+  const sameRole = new Set<string>()
   const fonts = new Set<string>()
-  for (const id of editor.getShapeAndDescendantIds(pages)) {
+  for (const id of editor.getShapeAndDescendantIds(getZinePages(editor))) {
     const shape = editor.getShape(id)
-    if (shape?.type === TEXT) fonts.add(shape.props.font)
+    if (shape?.type === TEXT) {
+      fonts.add(shape.props.font)
+      if (role && shape.meta.textRole === role) sameRole.add(shape.props.font)
+    }
   }
   const kit = linkedKit(editor.getDocumentSettings().meta.brandKit)
   for (const f of kit?.fonts ?? []) fonts.add(f)
   for (const f of kit?.fontFiles ?? []) fonts.add(f.family)
-  return [...fonts]
+  return [...new Set([...sameRole, ...fonts])]
 }
 
 let probe: Promise<FontFace> | undefined

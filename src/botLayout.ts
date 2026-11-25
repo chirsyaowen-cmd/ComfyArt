@@ -182,7 +182,6 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
     const plan = roadmap(editor)
     const step = plan.steps.find(s => s.type === 'typography' && s.targetFrameIds.includes(frame.id))
     if (!step) throw new Error('Missing page typography step. Read get_canvas again.')
-    const fonts = bookFonts(editor, pages)
     const items: Args[] = [args, ...(args.additional ?? [])]
     const versions = new Map<TLShapeId, string>()
     const shapes = await Promise.all(items.map(async item => {
@@ -193,9 +192,10 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
         throw new Error('Inspect the target with get_canvas, then view_canvas(ids=[frame]) before placing text.')
       versions.set(parent.id, version)
       if (typeof item.text !== 'string' || !item.text.trim()) throw new Error('Expected non-empty text')
-      const font = await chooseZineFont(item.text, item.role ?? 'body', item.font, fonts)
+      const role = item.role ?? 'body'
+      const font = await chooseZineFont(item.text, role, item.font, bookFonts(editor, role))
       return { id: createShapeId(), type: TEXT, parentId: parent.id, x: Number(item.x ?? GAP), y: Number(item.y ?? GAP),
-        props: { ...textProps(item), font } } as const
+        meta: { textRole: role }, props: { ...textProps(item), font } } as const
     }))
     checkTask()
     if (roadmap(editor).revision !== plan.revision || [...versions].some(([id, version]) => frameFacts(editor, id).frame_version !== version))
