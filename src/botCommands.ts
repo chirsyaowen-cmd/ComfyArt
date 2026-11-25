@@ -365,8 +365,10 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
           if (active?.placedText.size) {
             const ids = msg.action === 'update_shapes' ? msg.args.updates?.map((u: Args) => u.id)
               : ['delete_shapes', 'focus'].includes(msg.action) ? msg.args.ids : []
-            if (ids?.some((id: TLShapeId) => active.placedText.has(id)))
-              throw new Error('Typography already placed and selected. Leave further changes to the user and report completion.')
+            if (ids?.some((id: TLShapeId) => active.placedText.has(id))) {
+              return { status: 'handed_off', applied: false, selection: editor.getSelectedShapeIds(),
+                handoff: 'The text is ready for manual editing. This follow-up was skipped. Report the completed placement.' }
+            }
           }
           if (!readOnly && msg.action !== 'update_roadmap') editor.markHistoryStoppingPoint(`agent:${msg.action}`)
           const result = handler(editor, msg.args ?? {}, onError, msg.chat ?? '', guard, matchingRoadmapTurn(editor, msg.roadmap_turn))
