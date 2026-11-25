@@ -19,13 +19,17 @@ export function repeatsLastCompletion(plan: Roadmap, expected: number, changes: 
     (change.reason === undefined || change.reason === d.reason))
 }
 
+export function onRequest(step: Step) {
+  return step.type === 'typography' || step.type === 'embellishment'
+}
+
 export function nextStep(plan: Roadmap) {
-  const remaining = plan.steps.filter(s => s.status !== 'done')
+  const remaining = plan.steps.filter(s => s.status !== 'done' && (!onRequest(s) || s.status === 'in_progress'))
   if (remaining.every(s => s.status === 'deferred')) return undefined
   return remaining.find(step => {
     if (step.status !== 'deferred') return step.type !== 'review' || remaining.every(s => s === step || s.type === 'review')
     const paused = plan.decisions.find(d => d.stepId === step.id && ['defer', 'last'].includes(d.action))
-    const earlier = plan.steps.slice(0, plan.steps.indexOf(step))
+    const earlier = plan.steps.slice(0, plan.steps.indexOf(step)).filter(s => !onRequest(s) || s.status === 'in_progress' || s.status === 'done')
     return paused && earlier.every(s => s.status === 'done' || s.status === 'deferred') &&
       earlier.some(s => s.status === 'done' && plan.decisions.some(d =>
         d.stepId === s.id && d.action === 'done' && d.revision > paused.revision))

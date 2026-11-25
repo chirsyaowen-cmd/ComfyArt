@@ -2,9 +2,10 @@ import { createShapeId, type Editor, type TLFrameShape, type TLShape, type TLSha
 
 import { loadImage } from './adjust'
 import { thumbUrl, viewUrl } from './comfy'
-import { roadmap, roadmapSource, updateRoadmap } from './roadmap'
+import { roadmap, roadmapSource, updateRoadmap, type RoadmapTurn } from './roadmap'
 import { frameFacts, placeProjectPhoto, projectPhotos } from './roadmapPhotos'
-import { getZinePages } from './zine'
+import { activeZineIndex, focusZinePage, getZinePages } from './zine'
+import { bookFonts, chooseZineFont } from './zineFonts'
 import { placeInChatFrame } from './chatFrame'
 import { placeHtml } from './embeds'
 import { genInfoOf } from './generate'
@@ -22,7 +23,7 @@ import { t } from './i18n'
 import { uuid } from './id'
 
 export type Args = Record<string, any>
-export type Handler = (editor: Editor, args: Args, onError: ErrorSink, chat: string, checkTask: () => void) => unknown
+export type Handler = (editor: Editor, args: Args, onError: ErrorSink, chat: string, checkTask: () => void, turn?: RoadmapTurn) => unknown
 
 const MAX_SHAPES = 300
 const VIEW_MAX_PX = 1024
@@ -94,17 +95,19 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
   place_photo: (editor, args, _onError, _chat, checkTask) => placeProjectPhoto(editor, {
     frame: args.frame, frame_version: args.frame_version, expected_revision: args.expected_revision, fit: args.fit, photo_key: args.photo_key,
   }, checkTask),
-  get_canvas: (editor, args) => {
+  get_canvas: (editor, args, _onError, _chat, _check, turn) => {
     const page = pageOf(editor, args.page)
     const ids = [...editor.getPageShapeIds(page.id)]
     const shapes = toPageShapes(editor, ids).filter((s) => s.type !== COMMENT).slice(0, MAX_SHAPES).map((s) => describe(editor, s))
     const kit = linkedKit(editor.getDocumentSettings().meta.brandKit)
     const uploads = projectPhotos(editor)
+    if (turn && page.id === editor.getCurrentPageId()) turn.inspected = true
     return {
       project: editor.getDocumentSettings().name || undefined,
       pages: editor.getPages().map((p) => ({ id: p.id, name: p.name, current: p.id === editor.getCurrentPageId() })),
       page: page.id,
       ...(getZinePages(editor).length ? { roadmap: roadmap(editor),
+        active_book_frame: getZinePages(editor)[activeZineIndex(editor)], book_fonts: bookFonts(editor),
         book_frames: getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame').map(id => frameFacts(editor, id)),
         uploads: { batch: uploads.batch, photos: uploads.photos.map(({ key, name, state }) => ({ key, name, state })) } } : {}),
       shapes,
@@ -113,7 +116,7 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       brand_kit: kit ? { id: kit.id, name: kit.name } : null,
     }
   },
-  view_canvas: async (editor, args) => {
+  view_canvas: async (editor, args, _onError, _chat, _check, turn) => {
     if (args.photo_key) {
       const photo = projectPhotos(editor).photos.find(p => p.key === args.photo_key && p.state === 'ready')
       if (!photo) throw new Error('Unknown or unavailable project upload')
@@ -129,7 +132,9 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
     const shapes = toPageShapes(editor, ids)
     const bounds = shapes.map((s) => editor.getShapePageBounds(s)!).reduce((a, b) => a.union(b))
     const maxPx = Math.min(2048, Number(args.max_px) || VIEW_MAX_PX)
+    const viewed = turn?.inspected ? getZinePages(editor).filter(id => ids.includes(id)).map(id => frameFacts(editor, id)) : []
     const { blob, width, height } = await exportImage(editor, ids, { format: 'png', background: true, scale: Math.min(1, maxPx / Math.max(bounds.w, bounds.h)) })
+    for (const frame of viewed) turn?.viewedFrames.set(frame.id, frame.frame_version)
     return { width, height, bounds: { x: Math.round(bounds.x), y: Math.round(bounds.y), width: Math.round(bounds.w), height: Math.round(bounds.h) }, png: await blobBase64(blob) }
   },
   brand_kits: (editor) => {
@@ -159,16 +164,53 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
     const frames = [...editor.getCurrentPageShapeIds()].filter((id) => !before.has(id) && editor.getShape(id)?.type === 'frame')
     return { frames, ids, note: ids.length ? 'images are generating: call wait_generation with ids' : undefined }
   },
-  add_text: (editor, args) => {
-    const id = createShapeId()
-    const center = editor.getViewportPageBounds().center
-    editor.createShape<TextShape>({ id, type: TEXT, x: Number(args.x ?? center.x), y: Number(args.y ?? center.y), props: textProps(args) })
-    if (args.frame) {
-      const frame = shapeOf(editor, args.frame)
-      editor.reparentShapes([id], frame.id)
-      editor.updateShape({ id, type: TEXT, x: Number(args.x ?? GAP), y: Number(args.y ?? GAP) })
+  add_text: async (editor, args, _onError, chat, checkTask, turn) => {
+    const pages = getZinePages(editor)
+    const frame = args.frame ? shapeOf(editor, args.frame) : undefined
+    if (frame && frame.type !== 'frame') throw new Error('Expected a frame from get_canvas')
+    const inBook = frame && pages.includes(frame.id)
+    if (!inBook && (args.role || args.additional?.length || (chat && pages.length && !frame)))
+      throw new Error('For Zine typography, pass the target book frame from get_canvas')
+    if (!inBook) {
+      const id = createShapeId()
+      const center = editor.getViewportPageBounds().center
+      editor.createShape<TextShape>({ id, type: TEXT, parentId: frame?.id,
+        x: Number(args.x ?? (frame ? GAP : center.x)), y: Number(args.y ?? (frame ? GAP : center.y)), props: textProps(args) })
+      return { id }
     }
-    return { id }
+
+    const plan = roadmap(editor)
+    const step = plan.steps.find(s => s.type === 'typography' && s.targetFrameIds.includes(frame.id))
+    if (!step) throw new Error('Missing page typography step. Read get_canvas again.')
+    const fonts = bookFonts(editor, pages)
+    const items: Args[] = [args, ...(args.additional ?? [])]
+    const versions = new Map<TLShapeId, string>()
+    const shapes = await Promise.all(items.map(async item => {
+      const parent = item.frame ? shapeOf(editor, item.frame) : frame
+      if (parent.type !== 'frame' || !step.targetFrameIds.includes(parent.id)) throw new Error('Text must belong to the target page or spread')
+      const version = frameFacts(editor, parent.id).frame_version
+      if (turn && turn.viewedFrames.get(parent.id) !== version)
+        throw new Error('Inspect the target with get_canvas, then view_canvas(ids=[frame]) before placing text.')
+      versions.set(parent.id, version)
+      if (typeof item.text !== 'string' || !item.text.trim()) throw new Error('Expected non-empty text')
+      const font = await chooseZineFont(item.text, item.role ?? 'body', item.font, fonts)
+      return { id: createShapeId(), type: TEXT, parentId: parent.id, x: Number(item.x ?? GAP), y: Number(item.y ?? GAP),
+        props: { ...textProps(item), font } } as const
+    }))
+    checkTask()
+    if (roadmap(editor).revision !== plan.revision || [...versions].some(([id, version]) => frameFacts(editor, id).frame_version !== version))
+      throw new Error('Target changed during placement. Read get_canvas and view_canvas again.')
+    if (!editor.canCreateShapes(shapes)) throw new Error('Cannot create the requested text boxes')
+    editor.run(() => {
+      editor.createShapes(shapes)
+      if (shapes.some(s => editor.getShape(s.id)?.parentId !== s.parentId)) throw new Error('Text placement failed')
+      focusZinePage(editor, pages.indexOf(frame.id))
+      editor.setCurrentTool('select').select(shapes[0].id)
+      updateRoadmap(editor, plan.revision, [{ id: step.id, action: 'done' }], roadmapSource(editor))
+    })
+    for (const shape of shapes) turn?.placedText.add(shape.id)
+    return { id: shapes[0].id, handoff: 'First layout complete. Reply now. The user has the text toolbar for further edits.', boxes: shapes.map(s => ({ id: s.id, frame: s.parentId, font: s.props.font })),
+      completed_step: step.id, revision: roadmap(editor).revision }
   },
   add_shape: (editor, args) => {
     const kinds = ['rect', 'ellipse', 'polygon', 'star']

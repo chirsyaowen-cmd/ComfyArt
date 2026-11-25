@@ -81,6 +81,12 @@ export async function sendToAgent(editor: Editor, text: string, refs: RefShape[]
   if (roadmapTurn) context += '\n[Project Roadmap revision ' + roadmap(editor).revision +
     '. Read get_canvas for current project photos, book frames, progress and decisions. Follow only this request. ' +
     'For a change of direction call update_roadmap first. Use action last for “封面最后做” (last creative step before review), defer for “跳过”, then start the requested step. ' +
+    'Page typography is on request, after photo treatment and before optional embellishments. For a title, caption, diary or date: ' +
+    'get_canvas first (active_book_frame is the current book page), then view_canvas with target frame ids to inspect the finished picture. ' +
+    'Preserve supplied copy exactly; when asked to write, draft from this page. Choose a readable font, size, color, frame-local x/y, width and alignment around the subject and negative space. ' +
+    'Call add_text directly with frame and role. Put all requested boxes in one call using additional, e.g. a title plus a separate date. ' +
+    'Use a date supplied in the request or project; if none is specified use today (' + new Date().toLocaleDateString('sv-SE') + ') for the edition date. ' +
+    'After add_text succeeds, stop and reply in the user’s language. The first box is selected; the user takes over in the toolbar. Skip optional stages on image-only pages. ' +
     'Compare actual thumbnails with view_canvas(photo_key) for visual choices. If pixels are unavailable, be clear about that. Use place_photo only when the user asks to place a photo, using the chosen frame and current frame_version.]'
   const linked = linkedKit(editor.getDocumentSettings().meta.brandKit)
   if (linked && !kits.some((k) => k.id === linked.id)) kits = [...kits, linked]

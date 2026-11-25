@@ -75,3 +75,18 @@ test('a duplicate completion acknowledges the saved decision and only that decis
     assert.equal(repeatsLastCompletion(resumed, plan.revision, [done]), false)
   }
 })
+
+test('image-only pages can reach review while typography and embellishments stay available', () => {
+  const plan = book()
+  plan.steps.splice(1, 0, ...['typography', 'embellishment'].map(type => ({
+    ...plan.steps[0], id: 'cover-' + type, type,
+  })))
+  const photosOnly = change(plan, ...['cover', 'spread', 'writing'].map(id => ({ action: 'done', id })))
+  assert.equal(photosOnly.currentStepId, 'review')
+  assert.equal(nextStep(photosOnly).id, 'review')
+  const requested = change(photosOnly, { action: 'start', id: 'cover-typography' })
+  assert.equal(requested.currentStepId, 'cover-typography')
+  const placed = change(requested, { action: 'done', id: 'cover-typography' })
+  assert.equal(placed.currentStepId, 'review')
+  assert.equal(placed.steps.find(s => s.type === 'embellishment').status, 'pending')
+})

@@ -18,6 +18,8 @@ export function roadmapGuide(editor: Editor) {
   const batch = new Set(lib.batch)
   const photos = lib.photos.filter(p => p.state === 'ready' && batch.has(p.key))
   const text = step.status === 'deferred' ? t('road.suggestResume', step.title)
+    : step.type === 'typography' ? t('road.requestText')
+    : step.type === 'embellishment' ? t('road.requestEmbellishment')
     : step.type === 'photo_adjust' ? t('photo.review')
     : content ? t('road.hasContent', step.title, content)
     : photos.length && targets.length && step.scope === 'frames' ? t('road.suggestPhoto', step.title)

@@ -6,6 +6,7 @@ import { thumbUrl, viewUrl } from '../comfy'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
 import { updateRoadmap } from '../roadmap'
+import { onRequest } from '../roadmapModel'
 import { roadmapGuide, roadmapOpen } from '../roadmapGuide'
 import { frameFacts, placeProjectPhoto } from '../roadmapPhotos'
 import { getZinePages } from '../zine'
@@ -19,7 +20,7 @@ export function ZinePhotoPrompt({ editor, actionsOnly = false }: { editor: Edito
   if (!guide) return <button className="ca-panel__chip" onClick={() => roadmapOpen.set(true)}>{t('road.title')}</button>
   const { step, targets, photos, revision } = guide
   const target = targets.find(id => id === page) ?? targets[0]
-  const pick = step.type !== 'photo_adjust' && step.scope === 'frames' && target && step.status !== 'deferred'
+  const pick = !onRequest(step) && step.type !== 'photo_adjust' && step.scope === 'frames' && target && step.status !== 'deferred'
   const pages = getZinePages(editor)
   const choose = async (key: string) => {
     const version = frameFacts(editor, target).frame_version

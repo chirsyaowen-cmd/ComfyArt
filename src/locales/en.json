@@ -31,6 +31,10 @@
   "photo.dark": "Shadow color",
   "photo.light": "Highlight color",
   "photo.remove": "Remove",
+  "road.typography": "{0} · Typography",
+  "road.embellishment": "{0} · Optional embellishments",
+  "road.requestText": "Ask for a title, a caption, or a layout for your own words.",
+  "road.requestEmbellishment": "Ask for an embellishment when you want one.",
   "photo.road": "Adjust cover photo",
   "photo.review": "Review the cover photo and suggest a treatment for it.",
 
