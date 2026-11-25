@@ -1,6 +1,6 @@
-import { react, type Editor, type TLImageShape } from 'tldraw'
+import { react, type Editor, type TLImageShape, type TLShapeId } from 'tldraw'
 import { t } from './i18n'
-import { getZinePages, zineSpreads } from './zine'
+import { activeZineIndex, getZinePages, zineSpreads } from './zine'
 import { adjustedOf } from './imageOps'
 import { uuid } from './id'
 
@@ -31,7 +31,7 @@ function syncCoverPhoto(editor: Editor, plan: Roadmap): Roadmap {
     revision: plan.revision + 1 }
 }
 
-function defaultRoadmap(editor: Editor): Roadmap {
+function pageSteps(editor: Editor): Step[] {
   const pages = getZinePages(editor)
   const steps: Step[] = pages.length ? zineSpreads(pages.length).map((spread, i) => {
     const frames = spread.map(index => pages[index])
@@ -40,6 +40,34 @@ function defaultRoadmap(editor: Editor): Roadmap {
       title: t('road.' + type, spread[0] + 1, spread[spread.length - 1] + 1),
       scope: 'frames', targetFrameIds: frames, status: 'pending' }
   }) : []
+  return steps
+}
+
+// Install missing page stages in saved books as well as newly added spreads.
+// Existing steps keep their order, decisions and status.
+function syncPageStages(editor: Editor, plan: Roadmap) {
+  const steps = [...plan.steps]
+  for (const page of pageSteps(editor)) {
+    let index = steps.findIndex(s => s.id === page.id)
+    if (index < 0) {
+      index = steps.findIndex(s => s.type === 'back_cover' || s.type === 'review')
+      if (index < 0) index = steps.length
+      steps.splice(index, 0, page)
+    }
+    if (steps[index + 1]?.type === 'photo_adjust') index++
+    for (const type of ['typography', 'embellishment']) {
+      const id = page.id + '-' + type
+      const existing = steps.findIndex(s => s.id === id)
+      if (existing >= 0) { index = existing; continue }
+      steps.splice(++index, 0, { id, type, scope: 'frames', targetFrameIds: page.targetFrameIds,
+        title: t('road.' + type, page.title), status: 'pending' })
+    }
+  }
+  return steps.length === plan.steps.length ? plan : { ...plan, steps }
+}
+
+function defaultRoadmap(editor: Editor): Roadmap {
+  const steps = pageSteps(editor)
   if (steps.length) steps.push({ id: 'review', type: 'review', title: t('road.review'), targetFrameIds: [], scope: 'book', status: 'pending' })
   return { goal: '', currentStepId: steps[0]?.id ?? null, steps, decisions: [], revision: 0 }
 }
@@ -62,7 +90,7 @@ export function trackRoadmap(editor: Editor) {
   if (!editor.getDocumentSettings().meta.roadmap) save(editor, defaultRoadmap(editor))
   return react('infer only the start of page design', () => {
     const plan = roadmap(editor)
-    const updated = syncCoverPhoto(editor, plan)
+    const updated = syncPageStages(editor, syncCoverPhoto(editor, plan))
     const steps = updated.steps.map(step => {
       if (step.status !== 'pending' && !step.startedByCanvas) return step
       if (!['cover', 'back_cover', 'spread'].includes(step.type)) return step
@@ -103,10 +131,18 @@ export function undoRoadmap(editor: Editor) {
 }
 
 // A new user request supersedes earlier work even before it changes the roadmap.
-const turns = new WeakMap<Editor, { token: string; revision: number; source: Source }>()
+export type RoadmapTurn = { token: string; revision: number; source: Source; frame: TLShapeId; inspected: boolean
+  viewedFrames: Map<TLShapeId, string>; placedText: Set<TLShapeId> }
+const turns = new WeakMap<Editor, RoadmapTurn>()
+export function matchingRoadmapTurn(editor: Editor, token?: string) {
+  const turn = turns.get(editor)
+  return turn?.token === token ? turn : undefined
+}
 export function beginRoadmapTurn(editor: Editor, source: Source) {
-  if (!getZinePages(editor).length) return undefined
-  const turn = { token: uuid(), revision: roadmap(editor).revision, source }
+  const pages = getZinePages(editor)
+  if (!pages.length) return undefined
+  const turn: RoadmapTurn = { token: uuid(), revision: roadmap(editor).revision, source,
+    frame: pages[activeZineIndex(editor)], inspected: false, viewedFrames: new Map(), placedText: new Set() }
   turns.set(editor, turn)
   return turn.token
 }

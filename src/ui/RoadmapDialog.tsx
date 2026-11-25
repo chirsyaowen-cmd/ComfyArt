@@ -4,12 +4,16 @@ import { t } from '../i18n'
 import { errorText } from '../jobs'
 import { applies } from '../roadmapModel'
 import { canUndoRoadmap, roadmap, undoRoadmap, updateRoadmap } from '../roadmap'
-import { roadmapOpen } from '../roadmapGuide'
+import { roadmapGuide, roadmapOpen } from '../roadmapGuide'
 import { activeZineIndex, getZinePages } from '../zine'
 import { Modal } from './Modal'
 
 export function RoadmapDialog({ editor }: { editor: Editor }) {
   const plan = useValue('project roadmap', () => roadmap(editor), [editor])
+  const suggested = useValue('typography review suggestion', () => {
+    const step = roadmapGuide(editor)?.step
+    return step?.type === 'typography' && step.status === 'pending' ? step.id : null
+  }, [editor])
   const undo = useValue('undo roadmap', () => canUndoRoadmap(editor), [editor])
   const [filter, setFilter] = useState(false)
   const [error, setError] = useState('')
@@ -27,6 +31,7 @@ export function RoadmapDialog({ editor }: { editor: Editor }) {
       return <li key={s.id} aria-current={plan.currentStepId === s.id ? 'step' : undefined}>
         <strong>{s.title}</strong> · {t('road.' + s.status)}
         {plan.currentStepId === s.id && <small> · {t('road.current')}</small>}
+        {suggested === s.id && <small> · {t('road.reviewSuggestion')}</small>}
         {decision?.reason && <div>{decision.reason}</div>}
         <div className="ca-zine-photo__actions">
           {s.status === 'deferred'

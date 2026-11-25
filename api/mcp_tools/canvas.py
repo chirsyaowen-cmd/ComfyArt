@@ -43,6 +43,11 @@ def _tool(description: str, properties: dict, required: list[str] = (), **relay)
     return {"description": description, "inputSchema": _schema(properties, required), "relay": relay}
 
 
+_TEXT_BOX = {"text": {"type": "string"}, "x": _POINT, "y": _POINT, "width": _POINT, "font_size": _POINT,
+             "color": {"type": "string"}, "font": {"type": "string"},
+             "role": {"enum": ["title", "body", "date", "caption", "note"]},
+             "align": {"enum": ["left", "center", "right"]}, "frame": _PLACE["frame"]}
+
 SPECS: dict[str, dict] = {
     "update_roadmap": _tool(
         "Apply ordered changes together to this Zine's project roadmap. Read get_canvas first. "
@@ -247,10 +252,12 @@ SPECS: dict[str, dict] = {
         ["slides"], approval="制作 PPT"),
     "add_text": _tool(
         "Add an editable text shape. font_size in px, color as hex, font family name (brand fonts work), "
-        "width wraps the text. x/y are page coordinates, or relative to frame when frame is given.",
-        {"text": {"type": "string"}, "x": _POINT, "y": _POINT, "width": _POINT, "font_size": _POINT,
-         "color": {"type": "string"}, "font": {"type": "string"},
-         "align": {"type": "string", "enum": ["left", "center", "right"]}, "frame": _PLACE["frame"]},
+        "width wraps the text. x/y are relative to frame when supplied. For Zine typography first get_canvas, "
+        "then view_canvas(ids=[target frame(s)]) to inspect the treated page. Pass frame and role. Place related "
+        "boxes together using additional (same page or spread; frame defaults to first box's frame). Each box "
+        "has independent text/style/coordinates. Book fonts with full coverage have priority. Success selects "
+        "the first box and completes only this typography step.",
+        {**_TEXT_BOX, "additional": {"type": "array", "items": _schema(_TEXT_BOX, ["text"])}},
         ["text"]),
     "add_shape": _tool(
         "Add a vector shape: kind rect, ellipse, polygon (sides) or star (sides = points). fill and "

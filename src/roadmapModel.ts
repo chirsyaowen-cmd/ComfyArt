@@ -19,17 +19,35 @@ export function repeatsLastCompletion(plan: Roadmap, expected: number, changes: 
     (change.reason === undefined || change.reason === d.reason))
 }
 
+export function onRequest(step: Step) {
+  return step.type === 'typography' || step.type === 'embellishment'
+}
+
 export function nextStep(plan: Roadmap) {
-  const remaining = plan.steps.filter(s => s.status !== 'done')
+  const remaining = plan.steps.filter(s => s.status !== 'done' && (!onRequest(s) || s.status === 'in_progress'))
   if (remaining.every(s => s.status === 'deferred')) return undefined
   return remaining.find(step => {
     if (step.status !== 'deferred') return step.type !== 'review' || remaining.every(s => s === step || s.type === 'review')
     const paused = plan.decisions.find(d => d.stepId === step.id && ['defer', 'last'].includes(d.action))
-    const earlier = plan.steps.slice(0, plan.steps.indexOf(step))
+    const earlier = plan.steps.slice(0, plan.steps.indexOf(step)).filter(s => !onRequest(s) || s.status === 'in_progress' || s.status === 'done')
     return paused && earlier.every(s => s.status === 'done' || s.status === 'deferred') &&
       earlier.some(s => s.status === 'done' && plan.decisions.some(d =>
         d.stepId === s.id && d.action === 'done' && d.revision > paused.revision))
   })
+}
+
+// A review can offer optional work without making it a prerequisite for the next page.
+export function reviewStep(plan: Roadmap, frame: TLShapeId | undefined, artworkReady: boolean) {
+  const current = plan.steps.find(s => s.id === plan.currentStepId) ?? nextStep(plan)
+  if (!frame || !artworkReady) return current
+  if (current?.type === 'typography' && current.status === 'in_progress' && current.targetFrameIds.includes(frame)) return current
+  const scoped = plan.steps.filter(s => s.scope === 'frames' && s.targetFrameIds.includes(frame))
+  const page = scoped.find(s => ['cover', 'back_cover', 'spread'].includes(s.type))
+  if (!page || page.status === 'deferred') return current
+  const photo = scoped.find(s => s.type === 'photo_adjust')
+  if (photo && (photo.status === 'pending' || photo.status === 'in_progress')) return photo
+  const text = scoped.find(s => s.type === 'typography')
+  return text && (text.status === 'pending' || text.status === 'in_progress') ? text : current
 }
 
 function nextFocus(plan: Roadmap) {
@@ -118,7 +136,8 @@ function edit(frames: TLShapeId[], plan: Roadmap, change: Change, source: Source
       delete step.startedByCanvas
       step.status = 'deferred'
       const closing = step.type === 'review' ? undefined : closingStep(plan, step, action === 'last')
-      move(plan, step, change.before ?? closing?.id)
+      if (action !== 'defer' || step.type !== 'typography' || change.before)
+        move(plan, step, change.before ?? closing?.id)
       if (plan.currentStepId === id || !plan.currentStepId) plan.currentStepId = nextFocus(plan)
       break
     }

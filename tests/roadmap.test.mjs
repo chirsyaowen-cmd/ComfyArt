@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { nextStep, repeatsLastCompletion, reviseRoadmap } from '../src/roadmapModel.ts'
+import { nextStep, reviewStep, repeatsLastCompletion, reviseRoadmap } from '../src/roadmapModel.ts'
 
 const frames = ['shape:front', 'shape:left', 'shape:right']
 function book() {
@@ -73,5 +73,45 @@ test('a duplicate completion acknowledges the saved decision and only that decis
     assert.equal(repeatsLastCompletion(plan, prior.revision - 1, [done]), false)
     const resumed = change(plan, { action: 'start', id: 'cover' })
     assert.equal(repeatsLastCompletion(resumed, plan.revision, [done]), false)
+  }
+})
+
+test('image-only pages can reach review while typography and embellishments stay available', () => {
+  const plan = book()
+  plan.steps.splice(1, 0, ...['typography', 'embellishment'].map(type => ({
+    ...plan.steps[0], id: 'cover-' + type, type,
+  })))
+  const photosOnly = change(plan, ...['cover', 'spread', 'writing'].map(id => ({ action: 'done', id })))
+  assert.equal(photosOnly.currentStepId, 'review')
+  assert.equal(nextStep(photosOnly).id, 'review')
+  const requested = change(photosOnly, { action: 'start', id: 'cover-typography' })
+  assert.equal(requested.currentStepId, 'cover-typography')
+  const placed = change(requested, { action: 'done', id: 'cover-typography' })
+  assert.equal(placed.currentStepId, 'review')
+  assert.equal(placed.steps.find(s => s.type === 'embellishment').status, 'pending')
+})
+
+test('review offers typography on the visible spread after photo decisions, and respects image-only', () => {
+  const plan = book()
+  const cover = plan.steps[0]
+  plan.steps.splice(1, 0, ...['photo_adjust', 'typography', 'embellishment'].map(type => ({
+    ...cover, id: 'cover-' + type, type,
+  })))
+  plan.steps.push({ ...plan.steps.find(s => s.id === 'spread'), id: 'spread-typography', type: 'typography' })
+  assert.equal(reviewStep(plan, frames[0], false).id, 'cover')
+  assert.equal(reviewStep(plan, frames[0], true).type, 'photo_adjust')
+  const requested = change(plan, { id: 'cover-typography', action: 'start' })
+  assert.equal(reviewStep(requested, frames[0], true).type, 'typography')
+  for (const reason of ['保留原图', '已应用照片调整']) {
+    const ready = change(plan, { id: 'cover-photo_adjust', action: 'done', reason })
+    assert.equal(reviewStep(ready, frames[0], true).id, 'cover-typography')
+    for (const frame of frames.slice(1)) assert.equal(reviewStep(ready, frame, true).id, 'spread-typography')
+    const skipped = change(ready, { id: 'cover-typography', action: 'defer' })
+    assert.deepEqual(skipped.steps.map(s => s.id), ready.steps.map(s => s.id))
+    assert.equal(reviewStep(skipped, frames[0], true).id, 'cover')
+    const placedOnRequest = change(skipped, { id: 'cover-typography', action: 'done' })
+    assert.equal(reviewStep(placedOnRequest, frames[0], true).id, 'cover')
+    const postponed = change(ready, { id: 'cover', action: 'last' })
+    assert.notEqual(reviewStep(postponed, frames[0], true)?.id, 'cover-typography')
   }
 })

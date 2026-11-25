@@ -12,7 +12,7 @@ import { enterMode } from './ui/mode'
 import { adjustedOf, applyAdjust, sourceAsset } from './imageOps'
 import { adjustedCanvas, loadImage, NO_ADJUST } from './adjust'
 import { frameFacts } from './roadmapPhotos'
-import { coverPhoto, COVER_PHOTO_STEP, updateRoadmap, checkRoadmapTurn, roadmap } from './roadmap'
+import { coverPhoto, COVER_PHOTO_STEP, updateRoadmap, checkRoadmapTurn, matchingRoadmapTurn, roadmap } from './roadmap'
 import { LAYOUT_HANDLERS, shapeOf, type Args, type Handler } from './botLayout'
 import { placeInChatFrame } from './chatFrame'
 import { capRefs, createGenerator, generate } from './generate'
@@ -362,10 +362,18 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
           }
           const readOnly = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source', 'photo_adjust_target'].includes(msg.action)
           const active = readOnly ? undefined : guard()
+          if (active?.placedText.size) {
+            const ids = msg.action === 'update_shapes' ? msg.args.updates?.map((u: Args) => u.id)
+              : ['delete_shapes', 'focus'].includes(msg.action) ? msg.args.ids : []
+            if (ids?.some((id: TLShapeId) => active.placedText.has(id))) {
+              return { status: 'handed_off', applied: false, selection: editor.getSelectedShapeIds(),
+                handoff: 'The text is ready for manual editing. This follow-up was skipped. Report the completed placement.' }
+            }
+          }
           if (!readOnly && msg.action !== 'update_roadmap') editor.markHistoryStoppingPoint(`agent:${msg.action}`)
-          const result = handler(editor, msg.args ?? {}, onError, msg.chat ?? '', guard)
+          const result = handler(editor, msg.args ?? {}, onError, msg.chat ?? '', guard, matchingRoadmapTurn(editor, msg.roadmap_turn))
           if (active && msg.action === 'update_roadmap') active.revision = roadmap(editor).revision
-          if (active && msg.action === 'apply_photo_recipe') return Promise.resolve(result).then(value => { active.revision = roadmap(editor).revision; return value })
+          if (active && (msg.action === 'apply_photo_recipe' || msg.action === 'add_text')) return Promise.resolve(result).then(value => { active.revision = roadmap(editor).revision; return value })
           return result
         })
         .then((result) => reply({ ok: true, result }), (e) => reply({ ok: false, error: errorText(e) }))

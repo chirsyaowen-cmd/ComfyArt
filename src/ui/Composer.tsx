@@ -73,7 +73,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
   function reviewCanvas() {
     setMenu(null)
     const book = inspectZine(editor)
-    if (book && !book.occupied.length) {
+    if (book && (!book.occupied.length || roadmapGuide(editor)?.step.type === 'typography')) {
       setPhotoPromptChat(chatId)
       return
     }

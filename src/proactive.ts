@@ -148,8 +148,7 @@ export function startProactive(editor: Editor, onError: ErrorSink) {
     const signature = guide?.signature ?? ''
     const reviewEnabled = enabled('review')
     const busy = chatsAtom.get().some(c => c.busy)
-    if (busy) guideShown.set(null)
-    if (!reviewEnabled) { clearTimeout(timer); guideShown.set(null); last = ''; return }
+    if (busy || !reviewEnabled) { clearTimeout(timer); guideShown.set(null); last = ''; return }
     if (last === signature) return
     clearTimeout(timer)
     const removed = guide?.step.id === priorStep && guide.content < priorContent
@@ -157,7 +156,7 @@ export function startProactive(editor: Editor, onError: ErrorSink) {
     priorStep = guide?.step.id ?? ''
     last = signature
     guideShown.set(null)
-    if (!guide || busy || removed || (!guide.photos.length && !guide.content && guide.step.status !== 'deferred')) return
+    if (!guide || removed || (!guide.photos.length && !guide.content && guide.step.type !== 'typography' && guide.step.status !== 'deferred')) return
     const turn = currentRoadmapTurn(editor)
     const valid = () => quiet() && turn === currentRoadmapTurn(editor) && roadmapGuide(editor)?.signature === signature
     timer = window.setTimeout(() => {
