@@ -1016,7 +1016,7 @@
   "zineReview.usePhoto": "Use this photo",
   "zineReview.useNumbered": "Use nearby photo {0}",
   "zineReview.context": "This is a {0}-page zine. Its cover, spreads and back cover in reading order are {1}. Facing pages meet at the binding. Gaps between spreads are workspace spacing. Pages containing work: {2}. Page numbers and shape IDs: {3}. Review the work on those pages in spread context. Empty pages, numeric page names and off-page references are expected. Whitespace and landscape images need not be full bleed. Report evidenced reading problems only. Do not invent a brand, theme, bleed or print specification.",
-  "zineReview.manual": "Use get_canvas for structure and view_canvas for populated pages or spreads. Give concrete issues and suggestions by page number. Skip unaffected pages and omit the structure inventory and shape IDs. If there are no clear issues, say so in one sentence. Leave the canvas as it is.",
+  "zineReview.manual": "Use get_canvas for book structure, the project goal, the roadmap, and recorded decisions. Use view_canvas to inspect populated pages or spreads. Briefly describe what you see. Put any next step and choices in a review card and finish there. If the work is ready as it is, say so in one sentence. Leave the canvas as it is.",
   "proactive.reviewTitle": "Canvas check-up",
   "proactive.skillLearned": "ComfyArt learned a skill: {0}",
   "proactive.source": "Proactive AI",

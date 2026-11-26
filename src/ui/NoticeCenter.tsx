@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useValue, type Editor } from 'tldraw'
 
-import { roadmapGuide } from '../roadmapGuide'
 import { openChat } from '../bot'
 import { clearNotices, currentProject, markRead, noticesAtom, removeNotice, type Notice, type NoticeKind } from '../notices'
 import { openProject } from '../projects'
@@ -15,11 +14,10 @@ import { t, timeAgo } from '../i18n'
 const FILTERS: [NoticeKind | 'all', string][] = [['all', t('common.all')], ['task', t('noticeCenter.tasks')], ['suggestion', t('noticeCenter.suggestions')], ['comment', t('common.comment')], ['schedule', t('noticeCenter.scheduled')]]
 const KIND_ICONS: Record<NoticeKind, keyof typeof Icons> = { task: 'genImage', suggestion: 'agent', comment: 'comment', schedule: 'bell' }
 
-export function NoticeCenter({ editor }: { editor: Editor }) {
+export function NoticeCenter({ editor, onError }: { editor: Editor; onError: (message: string) => void }) {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState<NoticeKind | 'all'>('all')
-  const notices = useValue(noticesAtom)
-  const signature = useValue('notice roadmap', () => roadmapGuide(editor)?.signature, [editor])
+  const notices = useValue(noticesAtom).filter(n => n.action !== 'zine-photos')
   const unread = notices.filter((n) => !n.read).length
   const shown = notices.filter((n) => filter === 'all' || n.kind === filter)
 
@@ -60,7 +58,7 @@ export function NoticeCenter({ editor }: { editor: Editor }) {
               <div className="ca-menu__grow ca-notice__text">
                 <div className="ca-notice__title">{n.title}</div>
                 {n.body && <div className="ca-notice__body">{n.body}</div>}
-                {n.action === 'zine-photos' && n.guideSignature === signature && !!signature && n.project === currentProject() && <ZinePhotoPrompt key={signature} editor={editor} actionsOnly />}
+                {n.roadmapAdvice && n.body && n.project === currentProject() && <ZinePhotoPrompt editor={editor} onError={onError} noticeText={n.body} />}
                 <div className="ca-chat__hint">{timeAgo(n.time)}{n.project !== currentProject() ? t('noticeCenter.otherProject') : ''}</div>
               </div>
               {n.srcs?.[0] && (/\.(mp4|webm|mov)(&|$)/.test(n.srcs[0])

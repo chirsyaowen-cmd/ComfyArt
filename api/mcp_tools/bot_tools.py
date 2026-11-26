@@ -33,6 +33,17 @@ def publish_embellishments(result: dict) -> dict:
     return {**result, "embellishment_cards": len(offers)}
 
 
+async def offer_roadmap_advice(args: dict) -> dict:
+    chat_id, state = bot_turn_state()
+    if state is None:
+        raise ValueError("Open an active canvas review first")
+    if any(block.get("type") == "roadmap_advice" for block in state.blocks):
+        return {"offered": True}
+    result = await submit_command("offer_roadmap_advice", args, PROJECT.get(), chat=chat_id)
+    publish_blocks(chat_id, state, [{"type": "roadmap_advice", "review": result}])
+    return {"offered": True}
+
+
 async def recommend_embellishment(args: dict) -> dict:
     chat_id, state = bot_turn_state()
     if state is None:
@@ -205,6 +216,19 @@ ASK_USER_SCHEMA = {
 }
 
 TOOLS: dict[str, dict] = {
+    "offer_roadmap_advice": {
+        "description": "Show next-step options in this manual canvas review. Request starts the named roadmap step and sends its request. Keep_image_only records an explicit image-only choice on a typography step. Upload_photos opens the device photo chooser when the user clicks it. Dismiss just closes the card.",
+        "inputSchema": {"type": "object", "properties": {
+            "text": {"type": "string", "description": "One concrete recommendation grounded in the inspected work"},
+            "options": {"type": "array", "minItems": 1, "maxItems": 3, "items": {
+                "type": "object", "properties": {
+                    "kind": {"type": "string", "enum": ["request", "keep_image_only", "upload_photos", "dismiss"]},
+                    "label": {"type": "string"}, "stepId": {"type": "string", "description": "Exact roadmap ID for request and keep_image_only"},
+                    "request": {"type": "string", "description": "For request: full user instruction including target page and parameters"},
+                }, "required": ["kind", "label"], "additionalProperties": False}},
+        }, "required": ["text", "options"], "additionalProperties": False},
+        "handler": offer_roadmap_advice,
+    },
     "recommend_embellishment": {
         "description": "During read-only canvas inspection, offer one concrete idea for an inspected page if it would improve the design. The user can request a preview later.",
         "inputSchema": {"type": "object", "properties": {"frame": {"type": "string"}, "idea": {"type": "string"}},

@@ -8,6 +8,8 @@ import { onComfyEvent, onReconnect } from './ws'
 import { t } from './i18n'
 import type { EmbellishmentOffer } from './zineEmbellishments'
 
+import type { RoadmapAdvice } from './roadmapAdvice'
+
 export interface AskOption { id: string; label: string; description?: string }
 export interface BotBlock {
   type: string
@@ -23,6 +25,7 @@ export interface BotBlock {
   ask_id?: string
   prompt?: string
   options?: AskOption[]
+  review?: { advice: RoadmapAdvice; bookVersion: string }
   recommendation?: { frame: string; idea: string; version: string; project: string }
   offer?: EmbellishmentOffer & { project: string }
   min_selections?: number
@@ -86,6 +89,7 @@ export const TOOL_LABELS: Record<string, string> = {
   place_html: t('bot.placeWebPage'),
   create_slides: t('bot.createPpt'),
   add_text: t('bot.addText'),
+  offer_roadmap_advice: t('road.reviewSuggestion'),
   recommend_embellishment: t('embellishment.title'),
   preview_embellishments: t('embellishment.title'),
   suggest_embellishments: t('embellishment.title'),

@@ -3,6 +3,7 @@ import { t } from './i18n'
 import { activeZineIndex, getZinePages, zineSpreads } from './zine'
 import { adjustedOf } from './imageOps'
 import { uuid } from './id'
+import { CLIENT_ID } from './ws'
 
 import { COVER_PHOTO_STEP, readCoverTypography, repeatsLastCompletion, reviseRoadmap, treatedCoverTypography, type Step, type Roadmap, type Source, type Change } from './roadmapModel'
 import { textShapesOnPage } from './zineText'
@@ -143,6 +144,7 @@ export function undoRoadmap(editor: Editor) {
 
 // A new user request supersedes earlier work even before it changes the roadmap.
 export type RoadmapTurn = { token: string; revision: number; source: Source; frame: TLShapeId; inspected: boolean
+  reviewVersion?: string
   embellishmentDraft?: import('./zineEmbellishments').EmbellishmentOffer; purpose?: 'canvas_review' | 'embellishment' | 'schedule'
   viewedFrames: Map<TLShapeId, string>; placedText: Set<TLShapeId> }
 const turns = new WeakMap<Editor, RoadmapTurn>()
@@ -153,7 +155,7 @@ export function matchingRoadmapTurn(editor: Editor, token?: string) {
 export function beginRoadmapTurn(editor: Editor, source: Source, purpose?: RoadmapTurn['purpose']) {
   const pages = getZinePages(editor)
   if (!pages.length) return undefined
-  const turn: RoadmapTurn = { token: uuid(), revision: roadmap(editor).revision, source, purpose,
+  const turn: RoadmapTurn = { token: CLIENT_ID + ":" + uuid(), revision: roadmap(editor).revision, source, purpose,
     frame: pages[activeZineIndex(editor)], inspected: false, viewedFrames: new Map(), placedText: new Set() }
   turns.set(editor, turn)
   return turn.token
