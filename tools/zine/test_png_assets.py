@@ -144,7 +144,8 @@ class PngLayers(unittest.IsolatedAsyncioTestCase):
                 image = store[steps[0]["elementIds"][0]]
                 self.assertEqual(image["type"], "image")
                 self.assertEqual((image["props"]["w"], image["props"]["h"]), (50, 100))
-                self.assertEqual(image["props"]["url"], src)
+                self.assertEqual(image["props"]["url"], "")
+                self.assertEqual(image["meta"]["decoration"]["sourcePageUrl"], src)
                 self.assertEqual(image["meta"]["decoration"]["provider"], "PNGimg")
                 self.assertEqual("预览" in image["meta"]["name"], key == preview)
                 self.assertFalse(assets.imports)
