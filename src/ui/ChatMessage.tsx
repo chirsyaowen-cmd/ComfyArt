@@ -157,7 +157,8 @@ function StepGroup({ editor, steps }: { editor: Editor; steps: Pair[] }) {
 }
 
 export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }) {
-  const blocks = visibleReplyBlocks(m.blocks)
+  const blocks = visibleReplyBlocks(m.liveText && m.status === 'streaming'
+    ? [...m.blocks, { type: 'text', text: m.liveText }] : m.blocks)
   const results = new Map(blocks.filter((b) => b.type === 'tool_result' && b.id).map((b) => [b.id, b]))
   const resultOf = (b: BotBlock, i: number) => (b.id ? results.get(b.id) : blocks[i + 1]?.type === 'tool_result' ? blocks[i + 1] : undefined)
   const isPlan = (b: BotBlock) => b.type === 'tool_use' && toolName(b.name) === 'update_plan'

@@ -141,6 +141,9 @@ class TurnRunner:
         await asyncio.sleep(0.1)
 
         async def emit(ev: BotEvent) -> None:
+            if ev.t == "live_text":
+                self.broadcast("turn_live_text", {"chat_id": chat_id, "message_id": state.message_id, "text": ev.text})
+                return
             if ev.t == "session":
                 if not ev.id:
                     return

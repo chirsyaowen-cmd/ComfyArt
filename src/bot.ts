@@ -41,7 +41,7 @@ export interface BotBlock {
   detail?: Record<string, any>
 }
 export interface BotUsage { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cost_usd?: number }
-export interface BotMessage { id: string; chat_id: string; parent_id: string | null; role: 'user' | 'assistant' | 'system'; blocks: BotBlock[]; status: string; usage: BotUsage | null; created_at: number }
+export interface BotMessage { liveText?: string; id: string; chat_id: string; parent_id: string | null; role: 'user' | 'assistant' | 'system'; blocks: BotBlock[]; status: string; usage: BotUsage | null; created_at: number }
 export interface BotChat { id: string; user: string; project: string; title: string; provider: string; run_mode: 'auto' | 'ask'; pinned: boolean; archived: boolean; busy?: boolean; created_at: number; updated_at: number }
 export interface ModelOption { value: string; label: string; group: string }
 export interface ProviderInfo { id: string; label: string; available: boolean; version: string; detail: string; logged_in: boolean | null; stateful: boolean; attachments: boolean; branch: boolean; models: string[]; model_options?: ModelOption[] }
@@ -269,7 +269,9 @@ const reducers: Record<string, (e: any) => void> = {
     const rest = messagesAtom.get().filter((m) => m.id !== e.user_message.id)
     messagesAtom.set([...rest, e.user_message, e.assistant_message])
   },
+  turn_live_text: (e) => patchMessages(e.chat_id, e.message_id, (m) => ({ ...m, liveText: e.text })),
   turn_delta: (e) => patchMessages(e.chat_id, e.message_id, (m) => {
+    m = { ...m, liveText: undefined }
     const last = m.blocks.at(-1)
     return last?.type === 'text' ? { ...m, blocks: [...m.blocks.slice(0, -1), { ...last, text: (last.text ?? '') + e.text }] } : appendBlock(m, { type: 'text', text: e.text })
   }),
