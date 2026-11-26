@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Editor } from 'tldraw'
 
 import { answerAsk, outputsOf, toolLabel, toolName, type BotBlock, type BotMessage } from '../bot'
@@ -156,6 +156,32 @@ function StepGroup({ editor, steps }: { editor: Editor; steps: Pair[] }) {
   )
 }
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+
+function TypedReply({ text, live }: { text: string; live: boolean }) {
+  // A completed message opened from history should appear immediately.
+  const [visible, setVisible] = useState(() => live ? 0 : Infinity)
+  const ends = useMemo(() => Number.isFinite(visible)
+    ? Array.from(graphemes.segment(text), part => part.index + part.segment.length)
+    : [], [text, Number.isFinite(visible)])
+  const pending = visible < ends.length
+  useEffect(() => {
+    if (!pending) return
+    let frame: number
+    let last = performance.now()
+    const tick = (now: number) => {
+      if (now - last >= 25) {
+        setVisible(count => count + 1)
+        last = now
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [pending])
+  return <Markdown text={pending ? text.slice(0, ends[visible - 1] ?? 0) : text} />
+}
+
 export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }) {
   const blocks = visibleReplyBlocks(m.liveText && m.status === 'streaming'
     ? [...m.blocks, { type: 'text', text: m.liveText }] : m.blocks)
@@ -172,6 +198,7 @@ export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }
     else if (run.length) items.push(<Step key={run[0].i} editor={editor} use={run[0].use} result={run[0].result} thumbs={false} />)
     run = []
   }
+  let textIndex = 0
   let planShown = false
   blocks.forEach((b, i) => {
     if (isPlan(b)) {
@@ -182,7 +209,7 @@ export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }
     } else if (b.type === 'tool_use' && done) run.push({ use: b, result: resultOf(b, i), i })
     else if (b.type !== 'tool_result') {
       flush()
-      if (b.type === 'text') items.push(<Markdown key={i} text={b.text ?? ''} />)
+      if (b.type === 'text') items.push(<TypedReply key={`text-${textIndex++}`} text={b.text ?? ''} live={!done && i === blocks.length - 1} />)
       if (b.type === 'thinking' && b.text?.trim()) items.push(<Thought key={i} text={b.text} live={!done && i === blocks.length - 1} />)
       if (b.type === 'tool_use') items.push(<Step key={i} editor={editor} use={b} result={resultOf(b, i)} />)
       if (b.type === 'roadmap_advice' && b.review)

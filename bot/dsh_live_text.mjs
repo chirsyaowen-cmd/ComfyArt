@@ -12,7 +12,9 @@ export function apply(ctx) {
     if (frame.type === 'start') {
       drafts.set(id, { text: '', sent: 0 })
     } else if (frame.type === 'end') {
-      if (drafts.get(id)?.text) publish(id, '')
+      // A committed message replaces its draft in turn_delta. Keep the
+      // same text mounted so its reveal can finish after generation.
+      if (drafts.get(id)?.text && frame.outcome.eventType !== 'assistant/message') publish(id, '')
       drafts.delete(id)
     } else if (frame.chunk.type === 'text-delta') {
       const draft = drafts.get(id)
