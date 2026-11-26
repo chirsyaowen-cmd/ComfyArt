@@ -1,4 +1,5 @@
 import type { Editor } from 'tldraw'
+import { CHINESE_BRUSH, CHINESE_SANS, CHINESE_SERIF } from './fonts'
 import { linkedKit } from './library'
 import { TEXT } from './shapes/TextShape'
 import { getZinePages } from './zine'
@@ -10,9 +11,10 @@ const latin = {
 }
 export type TextRole = keyof typeof latin
 const chinese: Record<TextRole, string[]> = {
-  title: ['Songti SC', 'SimSun', 'Noto Serif CJK SC'], body: ['Songti SC', 'SimSun', 'Noto Serif CJK SC'],
-  date: ['PingFang SC', 'Microsoft YaHei'], caption: ['PingFang SC', 'Microsoft YaHei'],
-  note: ['Kaiti SC', 'KaiTi', 'STKaiti'],
+  title: [CHINESE_SERIF, CHINESE_SANS, 'Songti SC', 'SimSun', 'Noto Serif CJK SC'],
+  body: [CHINESE_SERIF, CHINESE_SANS, 'Songti SC', 'SimSun', 'Noto Serif CJK SC'],
+  date: [CHINESE_SANS, 'PingFang SC', 'Microsoft YaHei'], caption: [CHINESE_SANS, 'PingFang SC', 'Microsoft YaHei'],
+  note: [CHINESE_BRUSH, CHINESE_SANS, 'Kaiti SC', 'KaiTi', 'STKaiti'],
 }
 
 export function bookFonts(editor: Editor, role?: TextRole) {

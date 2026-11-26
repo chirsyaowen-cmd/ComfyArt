@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useEditor, useValue, type TLImageShape, type TLShapeId } from 'tldraw'
 
 import { thumbUrl } from '../comfy'
+import { fontLabel } from '../fonts'
 import { download } from '../psd'
 import { richEditorAtom, richVersionAtom } from '../richText'
 import { TEXT, type TextShape } from '../shapes/TextShape'
@@ -144,7 +145,7 @@ export function TextToolbar({ onError }: { onError: (msg: string) => void }) {
         onOpenChange={setFontOpen}
         trigger={({ open, toggle }) => (
           <button type="button" className="ca-bar__btn ca-pick" style={{ minWidth: 130 }} data-open={open || undefined} onClick={toggle}>
-            <span className="ca-menu__grow ca-pick__font" style={{ fontFamily: `"${font}"` }}>{font}</span><span className="ca-icon ca-pick__chev">{Icons.chevron}</span>
+            <span className="ca-menu__grow ca-pick__font" style={{ fontFamily: `"${font}"` }}>{fontLabel(font)}</span><span className="ca-icon ca-pick__chev">{Icons.chevron}</span>
           </button>
         )}
       >

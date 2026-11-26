@@ -16,6 +16,7 @@ import {
   type TLShape,
 } from 'tldraw'
 import { docFromText, hasMarks, plainOf, RichInput, RichView } from '../richText'
+import { canvasFontFamily } from '../fonts'
 import { t } from '../i18n'
 
 export const TEXT = 'ca-text'
@@ -48,7 +49,7 @@ const versions = createShapePropsMigrationIds(TEXT, { AddDecoration: 1, AddRich:
 
 export function textStyle(p: TextShape['props']): React.CSSProperties {
   return {
-    fontFamily: p.font,
+    fontFamily: canvasFontFamily(p.font),
     fontWeight: p.weight,
     fontSize: p.size,
     color: p.color,
@@ -71,12 +72,21 @@ function Text({ shape }: { shape: TextShape }) {
   useLayoutEffect(() => {
     const el = box.current
     if (!el) return
-    const w = p.autoSize ? Math.ceil(el.scrollWidth) : p.w
-    const h = Math.ceil(el.scrollHeight)
-    if (Math.abs(w - p.w) > 0.5 || Math.abs(h - p.h) > 0.5) {
-      editor.run(() => editor.updateShape<TextShape>({ id: shape.id, type: TEXT, props: { w, h } }), { history: 'ignore' })
+    const measure = () => {
+      const current = editor.getShape<TextShape>(shape.id)
+      if (!current) return
+      const { autoSize, w: oldWidth, h: oldHeight } = current.props
+      const w = autoSize ? Math.ceil(el.scrollWidth) : oldWidth
+      const h = Math.ceil(el.scrollHeight)
+      if (Math.abs(w - oldWidth) > 0.5 || Math.abs(h - oldHeight) > 0.5) {
+        editor.run(() => editor.updateShape<TextShape>({ id: shape.id, type: TEXT, props: { w, h } }), { history: 'ignore' })
+      }
     }
-  })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [editor, shape.id, p.w, p.h])
 
   const style: React.CSSProperties = {
     ...textStyle(p),
