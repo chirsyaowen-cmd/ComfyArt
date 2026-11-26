@@ -199,8 +199,12 @@
 .ca-slideshow__bar .ca-bar__btn { color: #fff; }
 .ca-slideshow__prev { transform: rotate(180deg); }
 .ca-memory__q { font-weight: 600; font-size: 15px; }
-.ca-chat__acts { display: none; gap: 2px; }
-.ca-chat__user:hover .ca-chat__acts, .ca-chat__bot:hover .ca-chat__acts { display: flex; }
+.ca-chat__acts { display: flex; gap: 2px; }
+.ca-chat__acts > button { display: inline-flex; }
+@media (hover: hover) {
+  .ca-chat__acts { opacity: 0; pointer-events: none; }
+  :is(.ca-chat__user, .ca-chat__bot):is(:hover, :focus-within) > .ca-chat__acts { opacity: 1; pointer-events: auto; }
+}
 .ca-chat__thinking { display: flex; align-items: center; gap: 8px; }
 .ca-comment__dot { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border: 2px solid #fff; border-radius: 50%; background: var(--ca-blue); box-shadow: 0 1px 4px rgba(0,0,0,.3); }
 .ca-stale { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1500; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--ca-float); box-shadow: var(--ca-shadow); font: 400 13px var(--ca-font); color: var(--ca-text); }
