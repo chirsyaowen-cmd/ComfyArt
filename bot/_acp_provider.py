@@ -202,7 +202,10 @@ class AcpProvider(AgentProvider):
         live: list = [None, "", False, False]
 
         async def on_notification(method: str, params: dict) -> None:
-            if method == "session/update":
+            if method == "_comfyart/live_text" and live[3] and params.get("sessionId") == live[1]:
+                if isinstance(params.get("text"), str):
+                    await emit(BotEvent(t="live_text", text=params["text"]))
+            elif method == "session/update":
                 await self._on_update(params.get("update") or {}, emit, names, live[3])
 
         transport = AcpTransport(launch.argv, cwd=launch.cwd, env=base_spawn_env(),
