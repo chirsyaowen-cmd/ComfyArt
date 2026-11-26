@@ -332,10 +332,7 @@ class Spread:
                     parent,
                     px,
                     py,
-                    {
-                        **image_props(w, h, aid, crop, flip, meta["name"]),
-                        **({"url": info["sourcePageUrl"]} if kind == "png" else {}),
-                    },
+                    image_props(w, h, aid, crop, flip, meta["name"]),
                     meta,
                     angle,
                     opacity,
