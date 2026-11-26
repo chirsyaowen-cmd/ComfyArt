@@ -92,6 +92,42 @@ async def test_repeated_reviews_use_the_requesting_tab(bot_client):
     assert (await response.json())["result"]["isError"]
 
 
+async def test_second_review_publishes_its_card_when_another_tab_opens_after_inspection(bot_client):
+    await _open(bot_client, "book", "origin")
+    chat = chat_store.create_chat(user="default", project="book", provider="deepseek-harness")
+    messages = []
+
+    for turn in ("first", "second"):
+        token = f"origin:{turn}"
+        endpoint = f"/comfyart/mcp?bot_chat={chat['id']}&roadmap_turn={token}"
+        msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
+        ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
+        advice = {"text": f"Suggestion for {turn}", "options": [{"kind": "dismiss", "label": "Close"}]}
+        review = {"advice": advice, "bookVersion": "unchanged"}
+        try:
+            for name, args, result in [
+                ("get_canvas", {}, {"book_frames": [{"id": "shape:cover"}]}),
+                ("view_canvas", {"ids": ["shape:cover"]}, {"png": "QUJD"}),
+                ("offer_roadmap_advice", advice, review),
+            ]:
+                if turn == "second" and name == "offer_roadmap_advice":
+                    await _open(bot_client, "book", "other")
+                call = asyncio.create_task(bot_client.post(endpoint, json=_rpc(
+                    "tools/call", {"name": name, "arguments": args})))
+                commands = await _answer_commands(bot_client, lambda c: {"ok": True, "result": result}
+                    if (c["_sid"], c["roadmap_turn"]) == ("origin", token)
+                    else {"ok": False, "error": "TASK_SUPERSEDED"})
+                response = (await (await call).json())["result"]
+                assert not response["isError"], (turn, name, commands[0]["_sid"], response["content"])
+            messages.append((msg["id"], review))
+        finally:
+            ACTIVE_TURNS.pop(chat["id"], None)
+
+    for message_id, expected in messages:
+        assert chat_store.get_message(chat["id"], message_id)["blocks"] == [
+            {"type": "roadmap_advice", "review": expected}]
+
+
 async def test_view_canvas_png_becomes_an_image_block(bot_client):
     await _open(bot_client)
     call = asyncio.create_task(bot_client.post("/comfyart/mcp", json=_rpc("tools/call", {"name": "view_canvas", "arguments": {}})))
