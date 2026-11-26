@@ -244,7 +244,8 @@ async def handle(args):
 
 TOOL = {
     "description": "Default workflow for making a complete editable Zine from reference spreads and project photos. "
-    "Use inputs to inspect available saved references; assign one per spread, cover first. Use start with the user's title and creative direction. "
+    "When choosing interior references, compare them as a set. Prefer shared visual style (paper, type, spacing or photographic treatment), allow varied compositions and different books, and honor explicit user choices. "
+        "Use inputs to inspect available saved references; assign one per spread, cover first. Use start with the user's title and creative direction. "
     "Native DeepSeek children extract layouts and treatments before the master binds photos and copy. "
     "Poll status until complete and give the user the new canvas link. Existing source project is preserved.",
     "inputSchema": {
