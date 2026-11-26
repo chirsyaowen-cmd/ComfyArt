@@ -58,20 +58,6 @@ export function nextStep(plan: Roadmap) {
   })
 }
 
-// A review can offer optional work without making it a prerequisite for the next page.
-export function reviewStep(plan: Roadmap, frame: TLShapeId | undefined, artworkReady: boolean) {
-  const current = plan.steps.find(s => s.id === plan.currentStepId) ?? nextStep(plan)
-  if (!frame || !artworkReady) return current
-  if (current?.type === 'typography' && current.status === 'in_progress' && current.targetFrameIds.includes(frame)) return current
-  const scoped = plan.steps.filter(s => s.scope === 'frames' && s.targetFrameIds.includes(frame))
-  const page = scoped.find(s => ['cover', 'back_cover', 'spread'].includes(s.type))
-  if (!page || page.status === 'deferred') return current
-  const photo = scoped.find(s => s.type === 'photo_adjust')
-  if (photo && (photo.status === 'pending' || photo.status === 'in_progress')) return photo
-  const text = scoped.find(s => s.type === 'typography')
-  return text && (text.status === 'pending' || text.status === 'in_progress') ? text : current
-}
-
 function nextFocus(plan: Roadmap) {
   const next = nextStep(plan)
   return next && next.status !== 'deferred' ? next.id : null

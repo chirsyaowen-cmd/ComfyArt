@@ -5,7 +5,6 @@ import { agentModeAtom, directSettingsAtom, DOC_ACCEPT, docsAtom, draftAtom, eac
 import { EachButton, EachRole, useEach } from './EachToggle'
 import { RefFrameButton } from './RefFrameButton'
 import { PHOTO_ACCEPT } from '../photoImport'
-import { guideShown, roadmapGuide } from '../roadmapGuide'
 import { activeZineIndex, getZinePages } from '../zine'
 import { RequestEmbellishments } from './ZineEmbellishmentCard'
 import { describeZine, inspectZine } from '../zineReview'
@@ -68,7 +67,6 @@ function DirectPills({ editor, video }: { editor: Editor; video: boolean }) {
 }
 
 export function Composer({ editor, busy, onError }: { editor: Editor; busy: boolean; onError: (msg: string) => void }) {
-  const autoGuide = useValue('automatic roadmap guide', () => guideShown.get() === roadmapGuide(editor)?.signature ? guideShown.get() : null, [editor])
   const activePage = useValue('embellishment target', () => getZinePages(editor)[activeZineIndex(editor)], [editor])
   const chatId = useValue(chatIdAtom)
   const [photoTarget, setPhotoTarget] = useState<TLShapeId | null>(null)
@@ -210,7 +208,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
       )}
       {showPhotoSources && photoTarget
         ? <EmptyBookPhotos editor={editor} frame={photoTarget} onError={onError} onRequest={() => setPhotoTarget(null)} />
-        : !busy && autoGuide && <ZinePhotoPrompt key={autoGuide} editor={editor} />}
+        : !busy && <ZinePhotoPrompt editor={editor} />}
       <div className="ca-composer__entry">
         {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
           <div className="ca-composer__chips">
