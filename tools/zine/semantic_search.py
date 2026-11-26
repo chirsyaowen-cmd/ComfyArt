@@ -14,7 +14,7 @@ from reference_candidates import choose_or_refine, prepare_references
 
 async def main(a):
     photos = json.loads(a.photos.read_text())
-    prompt = '观察图中的上传照片。为它们找真正相关的 Pinterest 纸本摄影书或杂志内页跨页。只根据可见场景、活动、镜头气氛判断，避免猜地点、身份和私人经历。输出 JSON {"theme":"简短中文书名","captions":{"照片ID":"简短客观描述"},"queries":["英文检索词","英文检索词"],"reason":"画面决定检索方向的理由"}。两条检索词应分别有明确的题材词及内页排版词，去掉文件名和个人信息。目标为带有可见未印刷纸张的真实双页设计，并且适合当前照片的比例与数量。'
+    prompt = '观察图中的上传照片。为它们找真正相关的 Pinterest 纸本摄影书或杂志内页跨页。只根据可见场景、活动、镜头气氛判断，避免猜地点、身份和私人经历。输出 JSON {"theme":"简短中文书名","captions":{"照片ID":"简短客观描述"},"queries":["英文检索词","英文检索词"],"reason":"画面决定检索方向的理由"}。两条检索词应分别有明确的题材词及内页排版词，两条查询围绕同一可行的内页设计方向展开，允许不同构图；不要求同一本书或封面。去掉文件名和个人信息。目标为带有可见未印刷纸张的真实双页设计，并且适合当前照片的比例与数量。'
 
     def valid(d):
         if set(d["captions"]) != {p["id"] for p in photos} or not all(
