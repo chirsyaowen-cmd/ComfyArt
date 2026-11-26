@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useEditor, useValue, type TLImageShape } from 'tldraw'
 
 import { adjustedCanvas, autoAdjust, loadImage, NO_ADJUST, type Adjust } from '../adjust'
@@ -104,6 +104,18 @@ export function AdjustPanel({ onError }: { onError: (msg: string) => void }) {
   }
   useEscape(active, close)
 
+  const saveOnCanvasPointerDown = useEffectEvent((event: PointerEvent) => {
+    if (event.button !== 0 || !(event.target instanceof Element) || !event.target.closest('.tl-canvas')) return
+    if (modeAtom.get() === mode && !busy && dirty) void apply(true)
+  })
+  useEffect(() => {
+    if (mode !== 'photoAdjust' && !(editing && tab === photoTab)) return
+    const container = editor.getContainer()
+    // Capture the draft before the canvas changes the selected image.
+    container.addEventListener('pointerdown', saveOnCanvasPointerDown, true)
+    return () => container.removeEventListener('pointerdown', saveOnCanvasPointerDown, true)
+  }, [editor, editing, mode, tab, photoTab])
+
   useEffect(() => {
     if (active && !shape) exitMode()
   }, [active, shape])
@@ -115,12 +127,14 @@ export function AdjustPanel({ onError }: { onError: (msg: string) => void }) {
   const effects = effectsOf(shape)
   const setEffects = (patch: Partial<Effects>) => editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', meta: { ...shape.meta, effects: { ...effects, ...patch } as any } })
 
-  async function apply() {
-    if (!img || !shape) return
+  async function apply(closeImmediately = false) {
+    if (!shape || !src) return
     setBusy(true)
+    if (closeImmediately) exitMode()
     try {
-      await applyAdjust(editor, shape, KEYS.some((k) => adjust[k]) ? adjust : null, () => adjustedCanvas(img, adjust), recipe)
-      exitMode()
+      const sourceImage = img ?? await loadImage(src)
+      await applyAdjust(editor, shape, KEYS.some((k) => adjust[k]) ? adjust : null, () => adjustedCanvas(sourceImage, adjust), recipe)
+      if (!closeImmediately && modeAtom.get() === mode) exitMode()
     } catch (e) {
       onError(errorText(e))
     } finally {
