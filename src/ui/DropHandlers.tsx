@@ -13,14 +13,16 @@ import { isPdf, placePdf } from '../pdf'
 
 const GAP = 20
 
-export function importFiles(editor: Editor, accept: string) {
+export function importFiles(editor: Editor, accept: string, onSelected?: () => void) {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = accept === 'image/*' ? PHOTO_ACCEPT : accept
   input.multiple = true
   input.onchange = () => {
     const files = Array.from(input.files ?? [])
-    if (files.length) void editor.putExternalContent({ type: 'files', files, point: fileInsertionPoint(editor) })
+    if (!files.length) return
+    void editor.putExternalContent({ type: 'files', files, point: fileInsertionPoint(editor) })
+    onSelected?.()
   }
   input.click()
 }

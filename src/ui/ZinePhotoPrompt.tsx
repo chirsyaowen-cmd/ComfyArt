@@ -25,14 +25,11 @@ export function EmptyBookPhotos({ editor, frame, onError, onRequest }: {
     const page = getZinePages(editor).indexOf(frame) + 1
     void sendToAgent(editor, t('zineReview.helpPhoto', page), [], null).then(onRequest).catch(e => onError(errorText(e)))
   }
+  if (!photos.length) return null
   return <div className="ca-zine-photo">
-    <div>{t('zineReview.blankBook')}</div>
     <div className="ca-zine-photo__actions">
-      <button type="button" onClick={() => importFiles(editor, 'image/*')}>{t('zineReview.devicePhotos')}</button>
-      {!!photos.length && <>
-        <button type="button" aria-expanded={picker} onClick={() => setPicker(!picker)}>{t('zineReview.projectPhotos')}</button>
-        <button type="button" disabled={working} onClick={help}>{t('road.help')}</button>
-      </>}
+      <button type="button" aria-expanded={picker} onClick={() => setPicker(!picker)}>{t('zineReview.projectPhotos')}</button>
+      <button type="button" disabled={working} onClick={help}>{t('road.help')}</button>
     </div>
     {picker && <div className="ca-assets__grid">{photos.map(photo =>
       <button type="button" key={photo.key} title={photo.name} className="ca-side__cell" onClick={() =>
@@ -72,6 +69,10 @@ function ReviewOptions({ editor, advice, onError, valid, close, showText, allowB
 
   const choose = async (option: AdviceOption) => {
     if (sending || (busy() && !allowBusy) || !valid()) return
+    if (option.kind === 'upload_photos') {
+      importFiles(editor, 'image/*', close)
+      return
+    }
     setSending(true)
     try {
       const plan = roadmap(editor)

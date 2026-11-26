@@ -74,7 +74,11 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
   const showPhotoSources = useValue('empty book photo sources', () =>
     !!photoTarget && photoTarget === activePage && inspectZine(editor)?.occupied.length === 0,
     [editor, activePage, photoTarget])
-  useEffect(() => { setPhotoTarget(null) }, [activePage, chatId])
+  const previousChat = useRef(chatId)
+  useEffect(() => {
+    if (previousChat.current && previousChat.current !== chatId) setPhotoTarget(null)
+    previousChat.current = chatId
+  }, [chatId])
   useEffect(() => { if (!showPhotoSources) setPhotoTarget(null) }, [showPhotoSources])
   function reviewCanvas() {
     setMenu(null)
@@ -208,9 +212,8 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           ))}
         </div>
       )}
-      {showPhotoSources && photoTarget
-        ? <EmptyBookPhotos editor={editor} frame={photoTarget} onError={onError} onRequest={() => setPhotoTarget(null)} />
-        : !busy && <ZinePhotoPrompt editor={editor} onError={onError} />}
+      {showPhotoSources && photoTarget && <EmptyBookPhotos editor={editor} frame={photoTarget} onError={onError} onRequest={() => setPhotoTarget(null)} />}
+      {!busy && <ZinePhotoPrompt editor={editor} onError={onError} />}
       <div className="ca-composer__entry">
         {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
           <div className="ca-composer__chips">

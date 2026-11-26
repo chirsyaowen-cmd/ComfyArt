@@ -3,6 +3,7 @@ import type { Change, Step } from './roadmapModel'
 export type AdviceOption =
   | { label: string; kind: 'request'; stepId: string; request: string }
   | { label: string; kind: 'keep_image_only'; stepId: string }
+  | { label: string; kind: 'upload_photos' }
   | { label: string; kind: 'dismiss' }
 
 export interface RoadmapAdvice {
@@ -28,7 +29,7 @@ export function parseRoadmapAdvice(value: unknown, steps: Step[]): RoadmapAdvice
       throw new Error('Invalid canvas review option')
     }
     const label = option.label.trim()
-    if (option.kind === 'dismiss') return { label, kind: 'dismiss' }
+    if (option.kind === 'dismiss' || option.kind === 'upload_photos') return { label, kind: option.kind }
     if (!('stepId' in option) || typeof option.stepId !== 'string') {
       throw new Error('Canvas review option needs a roadmap step')
     }
@@ -46,7 +47,7 @@ export function parseRoadmapAdvice(value: unknown, steps: Step[]): RoadmapAdvice
 }
 
 export function roadmapChangeForAdvice(option: AdviceOption, steps: Step[]): Change | null {
-  if (option.kind === 'dismiss') return null
+  if (option.kind === 'dismiss' || option.kind === 'upload_photos') return null
   const step = steps.find(step => step.id === option.stepId)
   if (!step) throw new Error('Canvas review option refers to an unknown roadmap step')
   if (option.kind === 'keep_image_only') {
@@ -54,3 +55,5 @@ export function roadmapChangeForAdvice(option: AdviceOption, steps: Step[]): Cha
   }
   return { id: step.id, action: step.status === 'deferred' ? 'resume' : 'start' }
 }
+
+export const PHOTO_REVIEW_INSTRUCTION = 'When the canvas or target page is blank, consider whether importing personal photos would serve the user’s creative goal. If so, offer {"kind":"upload_photos","label":"从设备选照片"} (English: "Choose photos from device"). This opens a file chooser directly and needs no request or stepId. You may omit it, for example for a text-only project.'

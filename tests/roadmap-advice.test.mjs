@@ -56,3 +56,11 @@ test('mismatched steps and unrecognized actions are rejected', () => {
   assert.throws(() => parseRoadmapAdvice(withOption({ ...suggestion.options[0], stepId: 'missing' }), plan.steps))
   assert.throws(() => parseRoadmapAdvice(withOption(suggestion.options[1]), [{ ...step, type: 'spread' }]))
 })
+
+test('only the reviewer can offer the device photo chooser, without starting a step', () => {
+  const upload = { label: '从设备选照片', kind: 'upload_photos' }
+  const advice = parseRoadmapAdvice({ suggestion: { text: '可以挑选旅行照片。', options: [upload] } }, plan.steps)
+  assert.deepEqual(advice.options, [upload])
+  assert.equal(roadmapChangeForAdvice(advice.options[0], plan.steps), null)
+  assert.ok(!parseRoadmapAdvice({ suggestion }, plan.steps).options.some(o => o.kind === 'upload_photos'))
+})
