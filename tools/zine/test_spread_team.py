@@ -38,7 +38,7 @@ class SpreadTeamTest(unittest.IsolatedAsyncioTestCase):
                         for task in tasks:
                             child = "child-" + task.key
 
-                            async def event(kind, **fields):
+                            async def event(kind, child=child, **fields):
                                 await on_event(
                                     root, {"event": kind, "child": child, **fields}
                                 )

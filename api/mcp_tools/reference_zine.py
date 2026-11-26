@@ -2,15 +2,15 @@
 
 import asyncio
 import json
+import re
 import sys
 import tempfile
-import re
 from pathlib import Path
 from urllib.parse import urlencode
 
 from ... import runtime
 from .. import project_store
-from .._common import view_path, read_json, write_json
+from .._common import read_json, view_path, write_json
 from ._context import PROJECT
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "tools/zine"
@@ -233,7 +233,7 @@ async def handle(args):
             result = await generate(
                 folder, project, args["title"], args.get("brief", "")
             )
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             result = {"status": "failed", "error": str(exc)}
         record(result)
         _jobs.pop((project, folder.name), None)

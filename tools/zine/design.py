@@ -4,8 +4,8 @@ import argparse
 import asyncio
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 from pathlib import Path
 
 from frame_geometry import checked_frames, read_project, spread_geometry
@@ -255,6 +255,7 @@ async def generate_book(args):
         )
         if args.photos:
             from argparse import Namespace
+
             from bind_photos import main as bind_book
 
             await bind_book(

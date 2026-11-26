@@ -1,10 +1,10 @@
 """Short isolated vision requests through the same installed Harness as layout extraction."""
 
-from contextlib import asynccontextmanager
 import json
 import os
 import shutil
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from local_runtime import audit, configure

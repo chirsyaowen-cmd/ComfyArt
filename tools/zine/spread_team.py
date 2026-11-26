@@ -85,13 +85,13 @@ async def run_team(release, tasks, trace, finish, *, binding):
                 timeout=900,
             )
 
-            async def wait_children():
-                while spawned - before - ended:
+            async def wait_children(previous_children):
+                while spawned - previous_children - ended:
                     if transport.returncode is not None:
                         raise RuntimeError("DeepSeek Harness stopped during layout")
                     await asyncio.sleep(0.2)
 
-            await asyncio.wait_for(wait_children(), timeout=900)
+            await asyncio.wait_for(wait_children(before), timeout=900)
             missing = [key for key in ids if key not in accepted]
             if missing or len(spawned - before) != len(batch):
                 raise RuntimeError(
