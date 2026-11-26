@@ -73,7 +73,7 @@ Claude Code、Codex、Gemini CLI、Qwen Code、Cursor、VS Code、Claude Desktop
 
 ## 工作流和模型
 
-从照片语义搜参考内页、自动读取纸色，并按实际书页尺寸生成可编辑小志，见[本地 Zine 工作流](tools/zine/README.md)。
+在项目聊天里要求按参考跨页制作整本小志时，DeepSeek 会让子会话各自拆解版式与照片处理，再由主编统一配图文，返回新画布。命令行与参考图准备见[本地 Zine 工作流](tools/zine/README.md)。
 
 画布上的每个操作都通过 ComfyUI 的 `/prompt` 运行 `workflows/` 里的某个 API 工作流。除特别注明外都只用核心节点。
 

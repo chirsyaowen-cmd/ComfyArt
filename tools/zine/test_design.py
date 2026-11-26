@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from design import extract
+from design import prepare_layout
 from frame_geometry import spread_geometry
 from PIL import Image
 
@@ -75,9 +75,9 @@ class GenerateSpreadTests(unittest.IsolatedAsyncioTestCase):
                     "paper_sample.sample_paper",
                     return_value={"status": "measured", "paper": "#ECEBE9"},
                 ),
-                patch("design.request", generate),
             ):
-                actual = await extract([(group, target)], conf)
+                task = await prepare_layout([(group, target)], conf)
+                actual = await generate(None, task.blocks, task.save, None, None)
                 self.assertEqual(actual["spreads"][0]["paper"], "#ECEBE9")
                 self.assertEqual(
                     actual["spreads"][0]["layers"][0]["points"], [[320, 0], [320, 510]]

@@ -1,4 +1,4 @@
-from . import photo_adjust, vectorcraft
+from . import photo_adjust, reference_zine, vectorcraft
 
 from .. import chat_store, memory
 from . import bot_tools, canvas, image_search, media
@@ -16,6 +16,7 @@ async def _server_info(_args: dict) -> dict:
 
 
 TOOLS: dict[str, dict] = {
+    "make_reference_zine": reference_zine.TOOL,
     "server_info": {
         "description": "ComfyArt status: the open project, this chat and its runtime.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},

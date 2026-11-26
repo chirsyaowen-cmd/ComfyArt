@@ -4,12 +4,13 @@ import argparse
 import asyncio
 import hashlib
 import json
+from dataclasses import dataclass
+from typing import Callable
 from pathlib import Path
 
 from frame_geometry import checked_frames, read_project, spread_geometry
-from harness_json import request
 from layout_schema import SCHEMA_FILE, check_design, validate_schema
-from local_runtime import ROOT, write_json
+from local_runtime import ROOT, audit, write_json
 
 HERE = Path(__file__).resolve().parent
 
@@ -59,7 +60,14 @@ def packets(manifest, binding, frames):
         yield [(catalog[key], targets[key]) for key in keys]
 
 
-async def extract(packet, conf):
+@dataclass
+class LayoutTask:
+    key: str
+    blocks: list
+    save: Callable[[dict], None]
+
+
+async def prepare_layout(packet, conf):
     from paper_sample import sample_paper
 
     targets = [target for _, target in packet]
@@ -73,6 +81,8 @@ async def extract(packet, conf):
     measurements = await asyncio.gather(*(locate(g, t) for g, t in fresh))
     measured = {}
     for (_, target), evidence in zip(fresh, measurements):
+        if evidence["status"] == "unobservable" and target["id"] == "spread-01":
+            continue
         if evidence["status"] != "measured":
             raise ValueError(f"{target['id']}: 此参考没有可靠的纸色记录")
         measured[target["id"]] = evidence["paper"]
@@ -95,9 +105,6 @@ async def extract(packet, conf):
             measured[targets[0]["id"]] = old["spreads"][0]["paper"]
         prompt += "\n复用以下槽位ID和类型，使同一图文能对比新旧留白。" + json.dumps(
             old["slots"], ensure_ascii=False
-        )
-        prompt += "\n原有照片槽位绑定和文字：" + json.dumps(
-            conf.content.get(targets[0]["id"], {}), ensure_ascii=False
         )
     prompt += "\n纸色数据：" + json.dumps(measured)
     if len(packet) > 1:
@@ -141,19 +148,14 @@ async def extract(packet, conf):
                 spread["paper"] = measured[spread["id"]]
         valid(data)
 
-    async with conf.gate:
-        data = await request(
-            conf.release,
-            blocks,
-            finalize,
-            conf.records / "trace.jsonl",
-            targets[0]["id"] + ".layout",
-        )
-    write_json(cache, {"inputDigest": digest, "design": data})
-    return data
+    def save(data):
+        finalize(data)
+        write_json(cache, {"inputDigest": digest, "design": data})
+
+    return LayoutTask(targets[0]["id"], blocks, save)
 
 
-async def main():
+def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--records", type=Path, required=True)
@@ -175,8 +177,28 @@ async def main():
         type=Path,
         help="Reuse the existing v2 cover design when extracting new interiors",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--photos",
+        type=Path,
+        help="Bind these photos in the same master session after all layouts are sealed",
+    )
+    parser.add_argument("--bindings-output", type=Path)
+    parser.add_argument("--title")
+    parser.add_argument(
+        "--brief", default="", help="Additional user-specified creative direction"
+    )
+    parser.add_argument("--use-all-photos", action="store_true")
+    return parser
+
+
+async def generate_book(args):
+    if bool(args.photos) != bool(args.bindings_output) or (
+        args.photos and not args.title
+    ):
+        raise ValueError("Supply --photos, --bindings-output and --title together")
     args.prompt = (HERE / "spec-contract.txt").read_text()
+    if args.brief:
+        args.prompt += "\n用户给出的创作要求：" + args.brief
     args.schema_digest = hashlib.sha256(SCHEMA_FILE.read_bytes()).hexdigest()
     args.gate = asyncio.Semaphore(4)
     manifest = json.loads(args.manifest.read_text())
@@ -193,17 +215,10 @@ async def main():
         },
     )
     args.previous = {}
-    args.content = {}
     source = metadata.get("zine_spec", {})
     if args.preserve_content:
         validate_schema(source)
         args.previous = {s["id"]: d for d in source["designs"] for s in d["spreads"]}
-        bindings = metadata["zineBindings"]
-        args.content = {
-            k: {slot["id"]: bindings[k][slot["id"]] for slot in d["slots"]}
-            for k, d in args.previous.items()
-            if k in bindings
-        }
     if args.reuse_cover:
         cover_source = json.loads(args.reuse_cover.read_text())
         validate_schema(cover_source)
@@ -216,22 +231,55 @@ async def main():
         if len(covers) != 1 or len(covers[0]["spreads"]) != 1:
             raise ValueError("Expected a separate cover design")
         args.previous[work[0][0][1]["id"]] = covers[0]
-    results = await asyncio.gather(
-        *(extract(p, args) for p in work), return_exceptions=True
+    from spread_team import run_team
+
+    prepared = await asyncio.gather(*(prepare_layout(p, args) for p in work))
+    trace = args.records / "trace.jsonl"
+
+    async def finalize(designs, bind):
+        results = [designs[x.key] if isinstance(x, LayoutTask) else x for x in prepared]
+        book = {
+            "schemaVersion": 2,
+            "size": spread_geometry(frames[-1], frames[0])["size"],
+            "frames": frames,
+            "designs": results,
+        }
+        checked_frames(book)
+        validate_schema(book)
+        write_json(args.output, book)
+        audit(
+            trace,
+            "spec.sealed",
+            spreads=len(frames) // 2,
+            digest=hashlib.sha256(args.output.read_bytes()).hexdigest(),
+        )
+        if args.photos:
+            from argparse import Namespace
+            from bind_photos import main as bind_book
+
+            await bind_book(
+                Namespace(
+                    spec=args.output,
+                    photos=args.photos,
+                    title=args.title,
+                    brief=args.brief,
+                    output=args.bindings_output,
+                    release=args.release,
+                    trace=trace,
+                    use_all_photos=args.use_all_photos,
+                ),
+                bind,
+            )
+        return book
+
+    return await run_team(
+        args.release,
+        [x for x in prepared if isinstance(x, LayoutTask)],
+        trace,
+        finalize,
+        binding=bool(args.photos),
     )
-    for result in results:
-        if isinstance(result, BaseException):
-            raise result
-    book = {
-        "schemaVersion": 2,
-        "size": spread_geometry(frames[-1], frames[0])["size"],
-        "frames": frames,
-        "designs": results,
-    }
-    checked_frames(book)
-    validate_schema(book)
-    write_json(args.output, book)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(generate_book(arguments().parse_args()))

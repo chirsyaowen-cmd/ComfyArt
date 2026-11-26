@@ -2,6 +2,10 @@
 
 These local CLI tools turn reference spreads into reusable layouts and place the user's photos and text on a new editable ComfyArt canvas.
 
+## Default in ComfyArt
+
+Ask the project chat to make a complete zine from the reference spreads and uploaded photos. The agent uses `make_reference_zine` with one project reference per spread in reading order (back/front cover first). It reads saved frame sizes and measures exposed paper. Each native DeepSeek child receives its own reference and writes reusable layout, editable treatments and text slots. After every layout passes validation the same parent session receives the photo sheets and binds the whole book. The chat returns a new editable project. The source book stays available. The project data directory holds per-job specs, bindings, and traces under `zine-runs/`.
+
 ## Setup
 
 Use the Python environment for the running ComfyArt server. From the repository root, run `python -m pip install -r tools/zine/requirements.txt`. Use the same `COMFYART_DATA`, `DSH_HOME`, and optional `COMFYART_TLDRAW` settings as the server. Model calls use the installed DeepSeek Harness, the `comfyart-acp` profile, and the configured official Flash API route. Set `COMFYART_DSH` if the executable is outside PATH. Graded photos use the server's PhotoCraft executable via `PHOTOCRAFT_CLI` or PATH.
@@ -15,9 +19,8 @@ python tools/zine/prepare_photos.py --output "$ZINE_RUN" photo1.heic photo2.jpg
 python tools/zine/semantic_search.py --url http://127.0.0.1:8190 --project "$FRAME_PROJECT" \
   --photos "$ZINE_RUN/照片清单.json" --output "$ZINE_RUN" --trace "$ZINE_RUN/trace.jsonl"
 python tools/zine/design.py "$ZINE_RUN/素材清单.json" --frame-project "$FRAME_PROJECT" \
-  --records "$ZINE_RUN/设计记录" --output "$ZINE_RUN/zine_spec.json"
-python tools/zine/bind_photos.py --spec "$ZINE_RUN/zine_spec.json" --photos "$ZINE_RUN/照片清单.json" \
-  --title '作品名' --use-all-photos --output "$ZINE_RUN/图文绑定.json" --trace "$ZINE_RUN/trace.jsonl"
+  --records "$ZINE_RUN/设计记录" --output "$ZINE_RUN/zine_spec.json" \
+  --photos "$ZINE_RUN/照片清单.json" --title '作品名' --use-all-photos --bindings-output "$ZINE_RUN/图文绑定.json"
 python tools/zine/project.py "$ZINE_RUN" --url http://127.0.0.1:8190 \
   --references "$ZINE_RUN/来源.json" --database "$COMFYART_DATA/data.db" --id "$NEW_PROJECT" --title '作品名' \
   --photos "$ZINE_RUN/照片清单.json" --bindings "$ZINE_RUN/图文绑定.json" --trace "$ZINE_RUN/trace.jsonl"
