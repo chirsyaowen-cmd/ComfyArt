@@ -5,7 +5,7 @@ import { thumbUrl, viewUrl } from './comfy'
 import { roadmap, roadmapSource, updateRoadmap, type RoadmapTurn } from './roadmap'
 import { frameFacts, placeProjectPhoto, projectPhotos } from './roadmapPhotos'
 import { activeZineIndex, focusZinePage, getZinePages } from './zine'
-import { embellishmentPageStatus, makeEmbellishmentOffer } from './zineEmbellishments'
+import { canRequestEmbellishments, embellishmentVersion, embellishmentPageStatus, embellishmentOfferStatus, previewEmbellishments } from './zineEmbellishments'
 import { BUNDLED_FONTS, fontLabel } from './fonts'
 import { bookFonts, chooseZineFont } from './zineFonts'
 import { placeInChatFrame } from './chatFrame'
@@ -217,16 +217,33 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       updateRoadmap(editor, plan.revision, [{ id: step.id, action: 'done' }], roadmapSource(editor))
     })
     for (const shape of shapes) turn?.placedText.add(shape.id)
-    const embellishments = turn ? [...versions.keys()].flatMap(id => makeEmbellishmentOffer(editor, id) ?? []) : []
-    return { id: shapes[0].id, embellishments, handoff: 'First layout complete. Reply now. The user has the text toolbar for further edits.', boxes: shapes.map(s => ({ id: s.id, frame: s.parentId, font: s.props.font })),
+    return { id: shapes[0].id, handoff: 'First layout complete. Reply now. The user has the text toolbar for further edits.', boxes: shapes.map(s => ({ id: s.id, frame: s.parentId, font: s.props.font })),
       completed_step: step.id, revision: roadmap(editor).revision }
   },
-  suggest_embellishments: (editor, args, _onError, _chat, _check, turn) => {
+  recommend_embellishment: (editor, args, _error, _chat, _check, turn) => {
+    const frame = getZinePages(editor).find(id => id === args.frame)
+    if (turn?.purpose !== 'canvas_review' || !frame || turn.viewedFrames.get(frame) !== frameFacts(editor, frame).frame_version)
+      throw new Error('Inspect this page during a canvas review first.')
+    if (!canRequestEmbellishments(editor, frame) || embellishmentPageStatus(editor, frame) === 'skipped')
+      throw new Error('There is no pending embellishment decision for this page.')
+    if (typeof args.idea !== 'string' || !args.idea.trim()) throw new Error('Describe the proposed change and why it helps.')
+    return { recommendation: { frame, idea: args.idea.trim(), version: embellishmentVersion(editor, frame) } }
+  },
+  preview_embellishments: async (editor, args, _onError, _chat, checkTask, turn) => {
     const frame = turn?.frame
-    if (!frame || frame !== args.frame || turn.viewedFrames.get(frame) !== frameFacts(editor, frame).frame_version)
+    if (!turn || turn.placedText.size || !frame || frame !== args.frame || turn.viewedFrames.get(frame) !== frameFacts(editor, frame).frame_version)
       throw new Error('Inspect active_book_frame with get_canvas and view_canvas before suggesting embellishments.')
-    const offer = makeEmbellishmentOffer(editor, frame)
-    return { embellishments: offer ? [offer] : [] }
+    turn.purpose = 'embellishment'
+    const draft = await previewEmbellishments(editor, frame, args.reason, args.marks)
+    checkTask()
+    turn.embellishmentDraft = draft
+    return { preview_id: draft.id, jpeg: draft.preview.split(',')[1] }
+  },
+  suggest_embellishments: (editor, args, _onError, _chat, _check, turn) => {
+    const draft = turn?.embellishmentDraft
+    if (!draft || draft.id !== args.preview_id || embellishmentOfferStatus(editor, draft) !== 'open')
+      throw new Error('Inspect the current page and preview the proposed layout again.')
+    return { embellishments: [draft] }
   },
   add_shape: (editor, args) => {
     const kinds = ['rect', 'ellipse', 'polygon', 'star']

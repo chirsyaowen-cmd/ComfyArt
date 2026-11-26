@@ -1,18 +1,14 @@
-import { createShapeId, getHashForString, getIndexBetween, type Editor, type TLFrameShape, type TLShapeId } from 'tldraw'
+import { createShapeId, getHashForString, type Editor, type TLFrameShape } from 'tldraw'
 
-import { roadmap } from './roadmap'
-import { artboardStyle } from './shapes/ArtboardShape'
-import { TEXT } from './shapes/TextShape'
-import { VECTOR, type VectorShape } from './shapes/VectorShape'
+import { exportImage } from './shapes/ArtboardShape'
+import { uuid } from './id'
+import { VECTOR, polygonPoints, type VectorShape } from './shapes/VectorShape'
 import { getZinePages } from './zine'
-import { textShapesOnPage } from './zineText'
 import { t } from './i18n'
 
-type Kind = 'color-block' | 'star'
-type Area = { x: number; y: number; w: number; h: number }
-type Placement = Area & { id: Kind; fill: string; below?: TLShapeId }
-export type EmbellishmentOffer = { frame: string; version: string; options: Kind[] }
-type Decision = { version: string; choice: 'applied' | 'skipped' }
+type Mark = { kind: 'rect' | 'ellipse' | 'star'; x: number; y: number; w: number; h: number; rotation: number; fill: string }
+export type EmbellishmentOffer = { id: string; frame: string; version: string; preview: string; reason: string; marks: Mark[] }
+type Decision = { version: string; proposal?: string; choice: 'applied' | 'skipped' }
 
 function pageFrame(editor: Editor, id: string) {
   const frameId = getZinePages(editor).find(page => page === id)
@@ -28,7 +24,7 @@ function decision(frame: TLFrameShape): Decision | undefined {
   const value = frame.meta.zineEmbellishment
   if (typeof value !== 'object' || !value || !('version' in value) || !('choice' in value)) return
   if (typeof value.version === 'string' && (value.choice === 'applied' || value.choice === 'skipped')) {
-    return { version: value.version, choice: value.choice }
+    return { version: value.version, choice: value.choice, proposal: typeof value.proposal === 'string' ? value.proposal : undefined }
   }
 }
 
@@ -37,126 +33,83 @@ export function embellishmentPageStatus(editor: Editor, id: string) {
   return frame && decision(frame)?.choice
 }
 
-function readyPage(editor: Editor, id: string) {
-  const frame = pageFrame(editor, id)
-  if (!frame) return
-  const steps = roadmap(editor).steps.filter(step => step.targetFrameIds.includes(frame.id))
-  if (steps.some(step => step.type === 'photo_adjust' && (step.status === 'pending' || step.status === 'in_progress'))) return
-  const stage = steps.find(step => step.type === 'embellishment')
-  const copy = textShapesOnPage(editor, frame.id)
-  if (stage && copy.length) return { frame, stage, copy }
-}
-
-const overlaps = (a: Area, b: Area) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
-const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
-
-function pageBounds(editor: Editor, frame: TLFrameShape, id: TLShapeId): Area | undefined {
-  const bounds = editor.getShapePageBounds(id)
-  if (!bounds) return
-  const corners = bounds.corners.map(point => editor.getPointInShapeSpace(frame, point))
-  const xs = corners.map(point => point.x)
-  const ys = corners.map(point => point.y)
-  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
-}
-
-function rgb(color: string) {
-  const match = /^#([\da-f]{6})$/i.exec(color)
-  if (!match) return
-  return [0, 2, 4].map(i => Number.parseInt(match[1].slice(i, i + 2), 16))
-}
-
-function palette(paper: string, ink: string) {
-  const paperRgb = rgb(paper)
-  const text = rgb(ink) ?? [20, 20, 20]
-  const colorful = [paperRgb, text].find(channels => channels && Math.max(...channels) - Math.min(...channels) > 18)
-  const hue = colorful ?? [100, 133, 170]
-  const base = 0.2126 * text[0] + 0.7152 * text[1] + 0.0722 * text[2] > 150 ? 25 : 255
-  return { block: `#${hue.map(c => Math.round(c * 0.25 + base * 0.75).toString(16).padStart(2, '0')).join('')}`,
-    star: `#${hue.map(c => Math.round(c * 0.76).toString(16).padStart(2, '0')).join('')}` }
-}
-
-function placements(editor: Editor, page: NonNullable<ReturnType<typeof readyPage>>): Placement[] {
-  const { frame, copy } = page
-  const title = copy.find(shape => shape.meta.textRole === 'title') ?? copy[0]
-  const textBounds = pageBounds(editor, frame, title.id)
-  const { w, h } = frame.props
-  if (!textBounds || w < 24 || h < 24) return []
-  const margin = Math.min(w, h) * 0.045
-  const colors = palette(artboardStyle(frame).fill ?? '', title.type === TEXT ? title.props.color : '#202020')
-  const blockW = clamp(textBounds.w + margin / 2, w * 0.1, w * 0.32)
-  const blockH = clamp(textBounds.h * 0.6, h * 0.018, h * 0.085)
-  let below = title.id
-  for (const ancestor of editor.getShapeAncestors(title)) {
-    if (ancestor.parentId === frame.id) { below = ancestor.id; break }
-  }
-  const block: Placement = { id: 'color-block', fill: colors.block, below, w: blockW, h: blockH,
-    x: clamp(textBounds.x - margin / 4, margin, w - margin - blockW),
-    y: clamp(textBounds.y + textBounds.h - blockH * 0.8, margin, h - margin - blockH) }
-  const size = Math.min(w, h) * 0.045
-  const occupied = pageShapes(editor, frame).flatMap(shape => {
-    if (shape.id === frame.id || shape.type === 'group' || shape.type === 'comment') return []
-    const bounds = pageBounds(editor, frame, shape.id)
-    // Full-bleed artwork is the backdrop. Smaller images and text reserve their own space.
-    if (!bounds || (shape.type !== TEXT && shape.type !== 'text' && bounds.w >= w * 0.92 && bounds.h >= h * 0.92)) return []
-    return [bounds]
-  })
-  const star: Placement = { id: 'star', fill: colors.star, w: size, h: size, x: 0, y: 0 }
-  const candidates = [0, 1, 2, 3, 4].flatMap(row => [0, 1, 2, 3, 4].map(column => ({ ...star,
-    x: margin + (w - 2 * margin - size) * (4 - column) / 4,
-    y: margin + (h - 2 * margin - size) * (4 - row) / 4,
-  })))
-  const space = candidates.find(place => ![block, ...occupied].some(area => overlaps(place, area)))
-  return space ? [block, space] : [block]
+export function canRequestEmbellishments(editor: Editor, id: string) {
+  return !!pageFrame(editor, id) && !editor.getIsReadonly()
 }
 
 function versionOf(editor: Editor, frame: TLFrameShape) {
-  const shapes = pageShapes(editor, frame).map(shape => {
-    if (shape.type !== TEXT) return shape
-    // The text component measures these dimensions after the lettering is placed.
-    return { ...shape, props: { ...shape.props, h: 0, w: shape.props.autoSize ? 0 : shape.props.w } }
-  })
-  return getHashForString(JSON.stringify(shapes))
+  return getHashForString(JSON.stringify(pageShapes(editor, frame).sort((a, b) => a.id.localeCompare(b.id))))
 }
 
-export function makeEmbellishmentOffer(editor: Editor, id: string, reopen = false): EmbellishmentOffer | undefined {
-  const page = readyPage(editor, id)
-  if (!page) return
-  const previous = decision(page.frame)
-  if (previous?.choice === 'applied' || (!reopen && (previous || ['deferred', 'done'].includes(page.stage.status)))) return
-  const options = placements(editor, page).map(option => option.id)
-  if (options.length) return { frame: id, version: versionOf(editor, page.frame), options }
+export function embellishmentVersion(editor: Editor, id: string) {
+  const frame = pageFrame(editor, id)
+  return frame && versionOf(editor, frame)
+}
+
+function isMark(input: unknown): input is Mark {
+  if (!input || typeof input !== 'object') return false
+  const m = input as Record<string, unknown>
+  return ['rect', 'ellipse', 'star'].some(kind => kind === m.kind)
+    && [m.x, m.y, m.w, m.h, m.rotation].every(Number.isFinite)
+    && typeof m.w === 'number' && m.w > 0 && typeof m.h === 'number' && m.h > 0
+    && typeof m.fill === 'string' && /^#[0-9a-f]{6}$/i.test(m.fill)
+}
+
+export async function previewEmbellishments(editor: Editor, id: string, reason: unknown, marks: unknown) {
+  const frame = pageFrame(editor, id)
+  if (!frame || !canRequestEmbellishments(editor, id)) throw new Error(t('embellishment.unavailable'))
+  if (typeof reason !== 'string' || !reason.trim() || !Array.isArray(marks) || !marks.length || !marks.every(isMark))
+    throw new Error('Supply a rationale and shapes with valid geometry and hex colors.')
+  const version = versionOf(editor, frame)
+  const { w, h } = frame.props
+  const { blob } = await exportImage(editor, [frame.id], { format: 'png', padding: 0, background: true, scale: Math.min(1, 960 / Math.max(w, h)), pixelRatio: 1 })
+  const bitmap = await createImageBitmap(blob)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(bitmap, 0, 0)
+  bitmap.close()
+  ctx.scale(canvas.width / w, canvas.height / h)
+  for (const m of marks) {
+    ctx.save()
+    ctx.translate(m.x, m.y)
+    ctx.rotate(m.rotation * Math.PI / 180)
+    ctx.fillStyle = m.fill
+    ctx.beginPath()
+    if (m.kind === 'rect') ctx.rect(0, 0, m.w, m.h)
+    else if (m.kind === 'ellipse') ctx.ellipse(m.w / 2, m.h / 2, m.w / 2, m.h / 2, 0, 0, 2 * Math.PI)
+    else polygonPoints('star', m.w, m.h, 5).forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))
+    ctx.fill()
+    ctx.restore()
+  }
+  const offer = { id: uuid(), frame: id, version, reason, marks, preview: canvas.toDataURL('image/jpeg', 0.85) }
+  if (embellishmentOfferStatus(editor, offer) !== 'open') throw new Error(t('embellishment.stale'))
+  return offer
 }
 
 export function embellishmentOfferStatus(editor: Editor, offer: EmbellishmentOffer) {
   const frame = pageFrame(editor, offer.frame)
   if (!frame) return 'stale'
   const previous = decision(frame)
-  if (previous?.version === offer.version || previous?.choice === 'applied') return previous.choice
-  return versionOf(editor, frame) === offer.version && readyPage(editor, offer.frame) ? 'open' : 'stale'
+  if (previous && (previous.proposal ? previous.proposal === offer.id : previous.version === offer.version)) return previous.choice
+  if (!offer.preview) return 'stale'
+  return versionOf(editor, frame) === offer.version ? 'open' : 'stale'
 }
 
-export function decideEmbellishments(editor: Editor, offer: EmbellishmentOffer, selection: Kind[] | 'skip') {
+export function decideEmbellishments(editor: Editor, offer: EmbellishmentOffer, selection: 'apply' | 'skip') {
   if (editor.getIsReadonly() || editor.isDisposed || embellishmentOfferStatus(editor, offer) !== 'open') throw new Error(t('embellishment.stale'))
-  const page = readyPage(editor, offer.frame)
-  if (!page) throw new Error(t('embellishment.stale'))
-  const { frame } = page
-  const siblings = editor.getSortedChildIdsForParent(frame.id).flatMap(id => editor.getShape(id) ?? [])
-  const selected = selection === 'skip' ? [] : placements(editor, page).filter(place => selection.includes(place.id) && offer.options.includes(place.id))
-  if (selection !== 'skip' && (!selected.length || selected.length !== selection.length)) throw new Error(t('embellishment.stale'))
-  const shapes = selected.map(({ below, id, x, y, w, h, fill }) => {
-    const index = siblings.findIndex(shape => shape.id === below)
-    return { id: createShapeId(), type: VECTOR, parentId: frame.id, x, y,
-      index: index < 0 ? getIndexBetween(siblings.at(-1)?.index ?? null, null)
-        : getIndexBetween(siblings[index - 1]?.index ?? null, siblings[index].index),
-      props: { kind: id === 'star' ? 'star' : 'rect', w, h, fill, stroke: '', sides: 5 },
-    } as const
-  })
+  const frame = pageFrame(editor, offer.frame)!
+  const shapes = (selection === 'apply' ? offer.marks : []).map(({ kind, x, y, w, h, rotation, fill }) => ({
+    id: createShapeId(), type: VECTOR, parentId: frame.id, x, y, rotation: rotation * Math.PI / 180,
+    props: { kind, w, h, fill, stroke: '', sides: 5 },
+  } as const))
   if (shapes.length && !editor.canCreateShapes(shapes)) throw new Error(t('embellishment.cannotAdd'))
   editor.markHistoryStoppingPoint('zine embellishments')
   editor.run(() => {
     if (shapes.length) editor.createShapes<VectorShape>(shapes)
     editor.updateShape({ id: frame.id, type: 'frame', meta: { ...frame.meta,
-      zineEmbellishment: { version: offer.version, choice: selection === 'skip' ? 'skipped' : 'applied' },
+      zineEmbellishment: { version: offer.version, proposal: offer.id, choice: selection === 'skip' ? 'skipped' : 'applied' },
     } })
   })
   editor.markHistoryStoppingPoint('zine embellishments added')

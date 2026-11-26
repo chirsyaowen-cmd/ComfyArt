@@ -60,7 +60,7 @@ export function NoticeCenter({ editor }: { editor: Editor }) {
               <div className="ca-menu__grow ca-notice__text">
                 <div className="ca-notice__title">{n.title}</div>
                 {n.body && <div className="ca-notice__body">{n.body}</div>}
-                {n.action === 'zine-photos' && (!n.guideSignature || n.guideSignature === signature) && n.project === currentProject() && <ZinePhotoPrompt editor={editor} actionsOnly />}
+                {n.action === 'zine-photos' && n.guideSignature === signature && !!signature && n.project === currentProject() && <ZinePhotoPrompt key={signature} editor={editor} actionsOnly />}
                 <div className="ca-chat__hint">{timeAgo(n.time)}{n.project !== currentProject() ? t('noticeCenter.otherProject') : ''}</div>
               </div>
               {n.srcs?.[0] && (/\.(mp4|webm|mov)(&|$)/.test(n.srcs[0])

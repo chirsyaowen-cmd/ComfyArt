@@ -76,8 +76,10 @@ export async function uploadRefs(editor: Editor, files: File[]) {
   }
 }
 
-export async function sendToAgent(editor: Editor, text: string, refs: RefShape[], skill: Skill | null, kits: LibraryItem[] = [], docs: ChatDoc[] = [], context = '', source?: 'schedule') {
-  const roadmapTurn = beginRoadmapTurn(editor, source ?? 'chat')
+export async function sendToAgent(editor: Editor, text: string, refs: RefShape[], skill: Skill | null, kits: LibraryItem[] = [], docs: ChatDoc[] = [], context = '', purpose?: 'schedule' | 'canvas_review' | 'embellishment') {
+  const source = purpose === 'schedule' ? purpose : undefined
+  const roadmapTurn = beginRoadmapTurn(editor, source ?? 'chat', purpose)
+  if (purpose === 'canvas_review') context += '\nThis is a read-only design review. Inspect the actual book pages (get_canvas then view_canvas for each populated frame, max_px=512). Consider the user’s decisions and the current composition. If a specific embellishment would help, call recommend_embellishment with that page and a concrete visual idea in the user’s language. A page can be finished as it is. Never start a preview during inspection.'
   if (roadmapTurn) context += '\n[Project Roadmap revision ' + roadmap(editor).revision +
     '. Start this turn with get_canvas. It returns current project photos, book frames, progress derived from the live canvas, and recorded user decisions. Follow only this request. ' +
     'During reviews, honor an explicit keep_image_only choice until the user asks to add text. ' +
@@ -87,8 +89,10 @@ export async function sendToAgent(editor: Editor, text: string, refs: RefShape[]
     'Preserve supplied copy exactly; when asked to write, draft from this page. Choose a readable font, size, color, frame-local x/y, width and alignment around the subject and negative space. ' +
     'Call add_text directly with frame and role. Put all requested boxes in one call using additional, e.g. a title plus a separate date. ' +
     'Use a date supplied in the request or project; if none is specified use today (' + new Date().toLocaleDateString('sv-SE') + ') for the edition date. ' +
-    'After add_text succeeds, reply in the user’s language. The first box is selected for manual editing. If embellishment_cards is returned, briefly point to the optional choices already in chat. ' +
-    'For an explicit Zine embellishment review, get_canvas, view_canvas(ids=[active_book_frame]) and call suggest_embellishments once. If a card was posted, say it is ready in one short sentence and leave the choices to the card. Skip optional stages on image-only pages. ' +
+    'After add_text succeeds, end this turn and hand the selected text back for editing. ' +
+    'Only when the user explicitly requests embellishments, inspect get_canvas and view_canvas(ids=[active_book_frame], max_px=512). ' +
+    'Choose your own frame-local positions, dimensions, colors and rotation based on the subject, text and empty space. If the page reads better as it is, say so. ' +
+    'Use preview_embellishments with your marks and a brief rationale in the user’s language. Inspect the returned full-page image, revise if needed, then call suggest_embellishments with the chosen preview_id. The user applies the preview. Do not edit the canvas in an embellishment review. ' +
     'Compare actual thumbnails with view_canvas(photo_key) for visual choices. If pixels are unavailable, be clear about that. Use place_photo only when the user asks to place a photo, using the chosen frame and current frame_version.]'
   const linked = linkedKit(editor.getDocumentSettings().meta.brandKit)
   if (linked && !kits.some((k) => k.id === linked.id)) kits = [...kits, linked]

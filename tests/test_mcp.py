@@ -85,24 +85,69 @@ async def test_view_canvas_png_becomes_an_image_block(bot_client):
     assert "png" not in content[0]["text"]
 
 
-async def test_zine_text_posts_decoration_choices_without_waiting(bot_client):
+async def test_placing_copy_cannot_publish_a_design_suggestion(bot_client):
     await _open(bot_client)
     chat = chat_store.create_chat(user="default", project="p", provider="deepseek-harness")
     msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
     ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
-    offer = {"frame": "shape:cover", "version": "layout-version", "options": ["color-block", "star"]}
-    call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc(
-        "tools/call", {"name": "add_text", "arguments": {"text": "海风来信", "frame": offer["frame"]}})))
     try:
-        await _answer_commands(bot_client, lambda _: {"ok": True, "result": {"id": "shape:title", "embellishments": [offer]}})
-        result = (await (await asyncio.wait_for(call, timeout=2)).json())["result"]
-        assert not result["isError"]
-        assert json.loads(result["content"][0]["text"]) == {
-            "id": "shape:title", "embellishment_cards": 1, "choices": [["color-block", "star"]],
-        }
+        call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc(
+            "tools/call", {"name": "add_text", "arguments": {"text": "青枫手记", "frame": "shape:cover"}})))
+        # Older editors attached these automatic choices to a successful title placement.
+        old_result = {"id": "shape:title", "embellishments": [
+            {"frame": "shape:cover", "version": "layout", "options": ["color-block", "star"]}]}
+        await _answer_commands(bot_client, lambda _: {"ok": True, "result": old_result})
+        assert not (await (await call).json())["result"]["isError"]
+        assert chat_store.get_message(chat["id"], msg["id"])["blocks"] == []
+        assert not any(e == "comfyart-bot" and d.get("event") == "turn_embellishments" for e, d in SENT)
+    finally:
+        ACTIVE_TURNS.pop(chat["id"], None)
+
+
+async def test_zine_title_then_reviewed_decoration_preview(bot_client):
+    await _open(bot_client)
+    chat = chat_store.create_chat(user="default", project="p", provider="deepseek-harness")
+    msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
+    ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
+    offer = {"frame": "shape:cover", "version": "current", "preview": "data:image/jpeg;base64,QUJD",
+             "reason": "Echo the stem", "marks": [{"kind": "rect", "x": 31, "y": 215, "w": 43, "h": 2,
+                                                     "rotation": 28, "fill": "#80623A"}]}
+    async def invoke(name, args, result):
+        call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc(
+            "tools/call", {"name": name, "arguments": args})))
+        await _answer_commands(bot_client, lambda _: {"ok": True, "result": result})
+        response = (await (await asyncio.wait_for(call, timeout=2)).json())["result"]
+        assert not response["isError"]
+        return response["content"]
+
+    try:
+        await invoke("add_text", {"text": "海风来信", "frame": offer["frame"]}, {"id": "shape:title"})
+        image = await invoke("preview_embellishments", {k: offer[k] for k in ("frame", "reason", "marks")},
+                             {"preview_id": "draft", "jpeg": "QUJD"})
+        assert image[1] == {"type": "image", "data": "QUJD", "mimeType": "image/jpeg"}
+        assert chat_store.get_message(chat["id"], msg["id"])["blocks"] == []
+        content = await invoke("suggest_embellishments", {"preview_id": "draft"}, {"embellishments": [offer]})
+        assert json.loads(content[0]["text"]) == {"embellishment_cards": 1}
         block = {"type": "embellishment", "offer": {**offer, "project": "p"}}
         assert chat_store.get_message(chat["id"], msg["id"])["blocks"] == [block]
         assert [data["blocks"] for event, data in SENT if event == "comfyart-bot" and data["event"] == "turn_embellishments"] == [[block]]
+    finally:
+        ACTIVE_TURNS.pop(chat["id"], None)
+
+
+async def test_review_recommendation_is_bound_to_the_reviewed_page(bot_client):
+    await _open(bot_client)
+    chat = chat_store.create_chat(user="default", project="p", provider="deepseek-harness")
+    msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
+    ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
+    recommendation = {"frame": "shape:cover", "idea": "沿叶柄加一条暖色细线", "version": "seen-layout"}
+    try:
+        call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc(
+            "tools/call", {"name": "recommend_embellishment", "arguments": {k: recommendation[k] for k in ("frame", "idea")}})))
+        await _answer_commands(bot_client, lambda _: {"ok": True, "result": {"recommendation": recommendation}})
+        assert not (await (await call).json())["result"]["isError"]
+        assert chat_store.get_message(chat["id"], msg["id"])["blocks"] == [
+            {"type": "embellishment_recommendation", "recommendation": {**recommendation, "project": "p"}}]
     finally:
         ACTIVE_TURNS.pop(chat["id"], None)
 

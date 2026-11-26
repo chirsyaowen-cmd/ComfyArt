@@ -1,6 +1,6 @@
 from ..mcp_commands import submit_command
 from ._context import BOT_CHAT_ID, PROJECT
-from .bot_tools import maybe_ask_run_approval, publish_embellishments
+from .bot_tools import maybe_ask_run_approval
 
 WAIT_MAX_S = 170
 SLOW_S = 90.0
@@ -30,7 +30,9 @@ def _relay(action: str, *, timeout: float = 20.0, approval: str = ""):
         image = result.pop("png", None)
         if image:
             result["_images"] = [{"data": image, "mime": "image/png"}]
-        return publish_embellishments(result) if action == "add_text" else result
+        if jpeg := result.pop("jpeg", None):
+            result["_images"] = [{"data": jpeg, "mime": "image/jpeg"}]
+        return result
     return handler
 
 
@@ -49,6 +51,16 @@ _TEXT_BOX = {"text": {"type": "string"}, "x": _POINT, "y": _POINT, "width": _POI
              "align": {"enum": ["left", "center", "right"]}, "frame": _PLACE["frame"]}
 
 SPECS: dict[str, dict] = {
+    "preview_embellishments": _tool(
+        "Render your proposed marks on a full-page proof for visual review. Inspect the returned image. "
+        "Revise by calling again or publish its preview_id using suggest_embellishments. "
+        "For explicit decoration requests only. First inspect get_canvas and view_canvas for the target frame. "
+        "x/y are frame-local top-left coordinates, w/h in page units, rotation clockwise degrees about x/y. "
+        "Marks are painted above the page in array order. For a line use a narrow rect.",
+        {"frame": _ID, "reason": {"type": "string"}, "marks": {"type": "array", "minItems": 1, "items": _schema({
+            "kind": {"enum": ["rect", "ellipse", "star"]}, "fill": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+            **{k: _POINT for k in ("x", "y", "w", "h", "rotation")}}, ["kind", "fill", "x", "y", "w", "h", "rotation"])}},
+        ["frame", "reason", "marks"]),
     "update_roadmap": _tool(
         "Apply ordered changes together to this Zine's project roadmap. Read get_canvas first. "
         "Stable step id; create/edit accept type, title, targetFrameIds (real frames), scope "
