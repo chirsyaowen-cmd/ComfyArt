@@ -4,9 +4,10 @@ import { activeZineIndex, getZinePages, zineSpreads } from './zine'
 import { adjustedOf } from './imageOps'
 import { uuid } from './id'
 
-import { repeatsLastCompletion, reviseRoadmap, type Step, type Roadmap, type Source, type Change } from './roadmapModel'
+import { COVER_PHOTO_STEP, readCoverTypography, repeatsLastCompletion, reviseRoadmap, treatedCoverTypography, type Step, type Roadmap, type Source, type Change } from './roadmapModel'
+import { textShapesOnPage } from './zineText'
 
-export const COVER_PHOTO_STEP = 'cover-photo-adjust'
+export { COVER_PHOTO_STEP } from './roadmapModel'
 
 export function coverPhoto(editor: Editor) {
   const page = getZinePages(editor)[0]
@@ -72,9 +73,15 @@ function defaultRoadmap(editor: Editor): Roadmap {
   return { goal: '', currentStepId: steps[0]?.id ?? null, steps, decisions: [], revision: 0 }
 }
 
-export function roadmap(editor: Editor): Roadmap {
+function savedRoadmap(editor: Editor): Roadmap {
   const saved = editor.getDocumentSettings().meta.roadmap
   return saved ? saved as Roadmap : defaultRoadmap(editor)
+}
+
+export function roadmap(editor: Editor): Roadmap {
+  const plan = savedRoadmap(editor)
+  const cover = treatedCoverTypography(plan)?.targetFrameIds[0]
+  return cover ? readCoverTypography(plan, textShapesOnPage(editor, cover).length > 0) : plan
 }
 
 const previous = new WeakMap<Editor, { saved: Roadmap; revision: number }>()
@@ -89,7 +96,7 @@ export function trackRoadmap(editor: Editor) {
   if (!getZinePages(editor).length) return () => {}
   if (!editor.getDocumentSettings().meta.roadmap) save(editor, defaultRoadmap(editor))
   return react('infer only the start of page design', () => {
-    const plan = roadmap(editor)
+    const plan = savedRoadmap(editor)
     const updated = syncPageStages(editor, syncCoverPhoto(editor, plan))
     const steps = updated.steps.map(step => {
       if (step.status !== 'pending' && !step.startedByCanvas) return step
@@ -110,16 +117,20 @@ export function trackRoadmap(editor: Editor) {
   })
 }
 export function updateRoadmap(editor: Editor, expected: number, changes: Change[], source: Source) {
-  const original = roadmap(editor)
-  if (repeatsLastCompletion(original, expected, changes)) return original
+  const original = savedRoadmap(editor)
+  if (repeatsLastCompletion(original, expected, changes)) return roadmap(editor)
   assertRevision(editor, expected)
   const frames = getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame')
   if (!frames.length) throw new Error('Expected a Zine project')
-  const plan = reviseRoadmap(original, frames, changes, source)
-  if (plan === original) return plan
+  const cover = treatedCoverTypography(original)
+  const commands = cover?.status === 'deferred' && treatedCoverTypography(roadmap(editor))?.status === 'pending'
+    ? changes.map(change => change.id === cover.id && change.action === 'start' ? { ...change, action: 'resume' } : change)
+    : changes
+  const plan = reviseRoadmap(original, frames, commands, source)
+  if (plan === original) return roadmap(editor)
   previous.set(editor, { saved: original, revision: plan.revision })
   save(editor, plan)
-  return plan
+  return roadmap(editor)
 }
 export function canUndoRoadmap(editor: Editor) { return previous.get(editor)?.revision === roadmap(editor).revision }
 export function undoRoadmap(editor: Editor) {

@@ -93,7 +93,10 @@ function textProps(args: Args): Partial<TextShape['props']> {
 }
 
 export const LAYOUT_HANDLERS: Record<string, Handler> = {
-  update_roadmap: (editor, args, _onError, chat) => updateRoadmap(editor, args.expected_revision, args.changes, chat ? roadmapSource(editor) : 'chat'),
+  update_roadmap: (editor, args, _onError, chat, _check, turn) => {
+    if (turn && !turn.inspected) throw new Error('Read get_canvas before updating the roadmap.')
+    return updateRoadmap(editor, args.expected_revision, args.changes, chat ? roadmapSource(editor) : 'chat')
+  },
   place_photo: (editor, args, _onError, _chat, checkTask) => placeProjectPhoto(editor, {
     frame: args.frame, frame_version: args.frame_version, expected_revision: args.expected_revision, fit: args.fit, photo_key: args.photo_key,
   }, checkTask),

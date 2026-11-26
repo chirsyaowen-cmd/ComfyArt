@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useValue, type Editor, type TLShapeId } from 'tldraw'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
-import { applies } from '../roadmapModel'
+import { KEEP_IMAGE_ONLY, applies, treatedCoverTypography } from '../roadmapModel'
 import { canUndoRoadmap, roadmap, undoRoadmap, updateRoadmap } from '../roadmap'
 import { roadmapGuide, roadmapOpen } from '../roadmapGuide'
 import { activeZineIndex, getZinePages } from '../zine'
@@ -36,10 +36,11 @@ export function RoadmapDialog({ editor }: { editor: Editor }) {
   const undo = useValue('undo roadmap', () => canUndoRoadmap(editor), [editor])
   const [filter, setFilter] = useState(false)
   const [error, setError] = useState('')
+  const coverTypography = treatedCoverTypography(plan)?.id
   const frame = useValue('roadmap page filter', () => getZinePages(editor)[activeZineIndex(editor)], [editor])
   const pages = useValue('roadmap page order', () => getZinePages(editor), [editor])
   const change = (action: string, id: string, before?: string) => {
-    try { updateRoadmap(editor, plan.revision, [{ action, id, before }], 'button'); setError('') }
+    try { updateRoadmap(editor, plan.revision, [{ action, id, before, reason: action === KEEP_IMAGE_ONLY ? t('road.imageOnly') : undefined }], 'button'); setError('') }
     catch (e) { setError(errorText(e)) }
   }
   return <Modal title={t('road.title')} className="ca-roadmap" onClose={() => roadmapOpen.set(false)}>
@@ -63,8 +64,12 @@ export function RoadmapDialog({ editor }: { editor: Editor }) {
             ? <button onClick={() => change('resume', s.id)}>{t('road.resume')}</button>
             : <>
               {(s.status !== 'in_progress' || plan.currentStepId !== s.id) && <button onClick={() => change('start', s.id)}>{t('road.start')}</button>}
-              {s.status !== 'done' && <button onClick={() => change('defer', s.id)}>{t('road.skip')}</button>}
-              {s.status !== 'done' && <button onClick={() => change('done', s.id)}>{t('road.finish')}</button>}
+              {s.status !== 'done' && (s.id === coverTypography
+                ? <button onClick={() => change(KEEP_IMAGE_ONLY, s.id)}>{t('road.imageOnly')}</button>
+                : <>
+                  <button onClick={() => change('defer', s.id)}>{t('road.skip')}</button>
+                  <button onClick={() => change('done', s.id)}>{t('road.finish')}</button>
+                </>)}
             </>}
           {i > 0 && <button aria-label={t('road.up') + ' ' + s.title} onClick={() => change('move', s.id, plan.steps[i - 1].id)}>{t('road.up')}</button>}
         </div>

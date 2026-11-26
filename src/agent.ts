@@ -79,7 +79,8 @@ export async function uploadRefs(editor: Editor, files: File[]) {
 export async function sendToAgent(editor: Editor, text: string, refs: RefShape[], skill: Skill | null, kits: LibraryItem[] = [], docs: ChatDoc[] = [], context = '', source?: 'schedule') {
   const roadmapTurn = beginRoadmapTurn(editor, source ?? 'chat')
   if (roadmapTurn) context += '\n[Project Roadmap revision ' + roadmap(editor).revision +
-    '. Read get_canvas for current project photos, book frames, progress and decisions. Follow only this request. ' +
+    '. Start this turn with get_canvas. It returns current project photos, book frames, progress derived from the live canvas, and recorded user decisions. Follow only this request. ' +
+    'During reviews, honor an explicit keep_image_only choice until the user asks to add text. ' +
     'For a change of direction call update_roadmap first. Use action last for “封面最后做” (last creative step before review), defer for “跳过”, then start the requested step. ' +
     'Page typography is on request, after photo treatment and before optional embellishments. For a title, caption, diary or date: ' +
     'Use get_canvas first. For “这页” / “this page”, active_book_frame is the confirmed target at send time, even when blank or a previous turn used another page. Go directly to view_canvas(ids=[target frame(s)]). ' +

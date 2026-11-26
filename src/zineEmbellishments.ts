@@ -1,10 +1,11 @@
-import { createShapeId, getHashForString, getIndexBetween, renderPlaintextFromRichText, type Editor, type TLFrameShape, type TLShapeId } from 'tldraw'
+import { createShapeId, getHashForString, getIndexBetween, type Editor, type TLFrameShape, type TLShapeId } from 'tldraw'
 
 import { roadmap } from './roadmap'
 import { artboardStyle } from './shapes/ArtboardShape'
 import { TEXT } from './shapes/TextShape'
 import { VECTOR, type VectorShape } from './shapes/VectorShape'
 import { getZinePages } from './zine'
+import { textShapesOnPage } from './zineText'
 import { t } from './i18n'
 
 type Kind = 'color-block' | 'star'
@@ -21,11 +22,6 @@ function pageFrame(editor: Editor, id: string) {
 
 function pageShapes(editor: Editor, frame: TLFrameShape) {
   return [...editor.getShapeAndDescendantIds([frame.id])].flatMap(id => editor.getShape(id) ?? [])
-}
-
-function copyOnPage(editor: Editor, frame: TLFrameShape) {
-  return pageShapes(editor, frame).filter(shape =>
-    shape.type === TEXT ? shape.props.text.trim() : shape.type === 'text' && renderPlaintextFromRichText(editor, shape.props.richText).trim())
 }
 
 function decision(frame: TLFrameShape): Decision | undefined {
@@ -47,7 +43,7 @@ function readyPage(editor: Editor, id: string) {
   const steps = roadmap(editor).steps.filter(step => step.targetFrameIds.includes(frame.id))
   if (steps.some(step => step.type === 'photo_adjust' && (step.status === 'pending' || step.status === 'in_progress'))) return
   const stage = steps.find(step => step.type === 'embellishment')
-  const copy = copyOnPage(editor, frame)
+  const copy = textShapesOnPage(editor, frame.id)
   if (stage && copy.length) return { frame, stage, copy }
 }
 
