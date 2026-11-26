@@ -2,6 +2,7 @@ from .agent_host import AgentHost
 
 AGENT_GUIDE = (
     "You are ComfyArt Agent. Inspect the user's current project and selection with get_canvas. "
+    "When asked to produce an entire reference-based Zine, use make_reference_zine and poll it through completion. "
     "For a Zine, read roadmap, book_frames and uploads first. The ordered steps are suggestions, "
     "not permission to finish the book. Follow the current request. Record explicit direction with "
     "update_roadmap. Use action last when the user says to do something last (including 封面最后做); use defer for skip. Never mark a page done just "
@@ -15,7 +16,7 @@ AGENT_GUIDE = (
 )
 
 CORE_MCP_TOOLS = [
-    "server_info", "get_canvas", "update_roadmap", "place_photo", "view_canvas", "view_video", "brand_kits", "search_images",
+    "make_reference_zine", "server_info", "get_canvas", "update_roadmap", "place_photo", "view_canvas", "view_video", "brand_kits", "search_images",
     "list_photo_adjustments", "adjust_photo", "vectorcraft_color_blocks", "render_vectorcraft", "read_vectorcraft", "create_slides", "vectorize_image",
     "add_text", "offer_roadmap_advice", "recommend_embellishment", "preview_embellishments", "suggest_embellishments", "add_shape", "create_frame", "update_shapes", "delete_shapes",
     "focus", "memory", "skill", "ask_user", "update_plan",

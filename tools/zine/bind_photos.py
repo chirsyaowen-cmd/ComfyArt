@@ -60,7 +60,7 @@ def validate(spec, photos, bindings):
                 raise ValueError(f"Unknown photo in {design}/{k}: {value}")
 
 
-async def main(args):
+async def main(args, generate=request):
     spec = json.loads(args.spec.read_text())
     photos = json.loads(args.photos.read_text())
     slots = []
@@ -74,7 +74,11 @@ async def main(args):
             {
                 **slot,
                 "placements": [
-                    {k: l[k] for k in ("box", "size", "fit") if k in l}
+                    {
+                        k: l[k]
+                        for k in ("box", "size", "fit", "clip", "anchor", "treatment")
+                        if k in l
+                    }
                     for l in layers
                     if l.get("slot") == slot["id"]
                 ],
@@ -96,6 +100,8 @@ async def main(args):
         + "\n设计："
         + json.dumps(slots, ensure_ascii=False)
     )
+    if getattr(args, "brief", ""):
+        prompt += "\n用户给出的创作要求：" + args.brief
     expected_photos = {p["id"] for p in photos}
     photo_slots = [
         (d["spreads"][0]["id"], slot["id"])
@@ -116,7 +122,7 @@ async def main(args):
                     "Photo IDs still unused: " + ", ".join(sorted(missing))
                 )
 
-    data = await request(
+    data = await generate(
         args.release,
         sheets(photos) + [{"type": "text", "text": prompt}],
         validate_result,

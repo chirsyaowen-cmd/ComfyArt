@@ -4,12 +4,14 @@ import json
 import os
 import shutil
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from local_runtime import audit, configure
 
 
-async def request(release, blocks, validate, trace, stage):
+@asynccontextmanager
+async def session(release, *, team=False, on_event=None):
     configure(release)
     from ComfyArt.bot._acp import AcpTransport
     from ComfyArt.bot.deepseek_harness_runtime import (
@@ -33,14 +35,44 @@ async def request(release, blocks, validate, trace, stage):
         folder = Path(tmp)
         shutil.copytree(profile_dir("comfyart-acp"), folder / "profiles/comfyart-acp")
         overlay = folder / "turn.yml"
-        overlay.write_text(
-            json.dumps(
-                overlay_entries("comfyart", ("deepseek-official", "deepseek-flash"))
+        entries = overlay_entries("comfyart", ("deepseek-official", "deepseek-flash"))
+        if team:
+            enabled = {"subagent", "subagent-spawn-in-process", "tool-subagent"}
+            entries = [e for e in entries if e.get("id") not in enabled]
+            entries.extend(
+                [
+                    {
+                        "id": "tool-subagent",
+                        "config": {
+                            "provider": "spawn",
+                            "toolName": "subagent",
+                            "maxDepth": 1,
+                            "agentOptions": {
+                                "provider": "deepseek-official",
+                                "model": "deepseek-flash",
+                                "reasoningEffort": "low",
+                            },
+                        },
+                    },
+                    {
+                        "insert": [
+                            {
+                                "id": "comfyart-spreads",
+                                "name": Path(__file__)
+                                .with_name("spread_io.mjs")
+                                .as_uri(),
+                            }
+                        ]
+                    },
+                ]
             )
-        )
+        overlay.write_text(json.dumps(entries))
         chunks = []
 
-        async def receive(_, params):
+        async def receive(method, params):
+            if method == "_comfyart/spread" and on_event:
+                await on_event(folder, params)
+                return
             u = params.get("update", {})
             if (
                 u.get("sessionUpdate") == "agent_message_chunk"
@@ -98,40 +130,50 @@ async def request(release, blocks, validate, trace, stage):
                     != v
                 ):
                     raise ValueError("Unexpected DSH configuration")
-            for i in range(3):
-                chunks.clear()
-                audit(trace, stage + ".request", session=sid, attempt=i + 1)
-                await t.request(
-                    "session/prompt", {"sessionId": sid, "prompt": blocks}, timeout=420
-                )
-                try:
-                    data = json.loads(
-                        "".join(chunks)
-                        .strip()
-                        .removeprefix("```json")
-                        .removeprefix("```")
-                        .removesuffix("```")
-                        .strip()
-                    )
-                    validate(data)
-                    audit(trace, stage + ".validated", session=sid, attempt=i + 1)
-                    return data
-                except (ValueError, TypeError, KeyError, IndexError) as exc:
-                    audit(trace, stage + ".retry", error=str(exc)[:220])
-                    if i == 2:
-                        raise
-                    blocks = [
-                        {
-                            "type": "text",
-                            "text": f"校验未通过：{exc}。请对照原图，重新给出完整 JSON。",
-                        }
-                    ]
-        except Exception as exc:
-            audit(trace, stage + ".failed", error=str(exc)[:350])
-            raise
+            yield t, sid, chunks, folder
         finally:
             await t.close(1)
             if t.proc.returncode is None:
                 t.proc.kill()
                 await t.proc.wait()
             await t.dispose()
+
+
+async def json_turn(t, sid, chunks, blocks, validate, trace, stage):
+    for i in range(3):
+        chunks.clear()
+        audit(trace, stage + ".request", session=sid, attempt=i + 1)
+        await t.request(
+            "session/prompt", {"sessionId": sid, "prompt": blocks}, timeout=420
+        )
+        try:
+            data = json.loads(
+                "".join(chunks)
+                .strip()
+                .removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+            validate(data)
+            audit(trace, stage + ".validated", session=sid, attempt=i + 1)
+            return data
+        except (ValueError, TypeError, KeyError, IndexError) as exc:
+            audit(trace, stage + ".retry", error=str(exc)[:220])
+            if i == 2:
+                raise
+            blocks = [
+                {
+                    "type": "text",
+                    "text": f"校验未通过：{exc}。请对照原图，重新给出完整 JSON。",
+                }
+            ]
+
+
+async def request(release, blocks, validate, trace, stage):
+    try:
+        async with session(release) as (t, sid, chunks, _):
+            return await json_turn(t, sid, chunks, blocks, validate, trace, stage)
+    except Exception as exc:
+        audit(trace, stage + ".failed", error=str(exc)[:350])
+        raise

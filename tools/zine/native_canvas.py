@@ -588,6 +588,16 @@ async def import_book(
                 spread_id = spread_ids[row["id"]]
                 if spread_id not in real_spreads:
                     raise ValueError("Unknown reference spread " + spread_id)
+                if "savedReference" in row:
+                    ref = row["savedReference"]
+                    if ref not in meta["references"]:
+                        meta["references"].append(ref)
+                    meta["zineReferenceSources"][spread_id] = {
+                        "referenceKey": row["imageUrl"],
+                        "sourcePageUrl": row["pin"],
+                        "paperBoundsPx": row.get("referenceBox"),
+                    }
+                    continue
                 path = Path(row["reference"])
                 with Image.open(path) as im:
                     mime = Image.MIME[im.format]
