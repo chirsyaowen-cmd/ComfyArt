@@ -232,9 +232,14 @@ class Spread:
         else:
             box = l["box"]
             m = compose(m, rotate_box(box, l.get("rotation", 0)))
-            if kind == "photo":
-                photo_id = self.bindings[l["slot"]]
-                src = await self.assets.source(photo_id)
+            if kind in ("photo", "png"):
+                if kind == "png":
+                    src = await self.assets.decoration(l["asset"])
+                    # Determine occupied pixels before splitting a wide placement at the fold.
+                    box, _ = image_geometry(box, src["size"], "contain", "midMid", None)
+                else:
+                    photo_id = self.bindings[l["slot"]]
+                    src = await self.assets.source(photo_id)
                 if not intersects(
                     [
                         point(m, box[0] + i * box[2], box[1] + j * box[3])
@@ -254,7 +259,11 @@ class Spread:
                         return
                     clip = [left, b, right - left, h]
                 box, crop = image_geometry(
-                    box, src["size"], l["fit"], l.get("anchor", "midMid"), clip
+                    box,
+                    src["size"],
+                    l.get("fit", "contain"),
+                    l.get("anchor", "midMid"),
+                    clip,
                 )
             x, y, w, h = box
             pts = [
@@ -279,9 +288,23 @@ class Spread:
             px = (px - origin) * self.scale
             py *= self.scale
             opacity = l.get("opacity", 1)
-            if kind == "photo":
-                aid, extra = await self.assets.treated(photo_id, l.get("treatment", {}))
-                meta.update(extra, photoKey=src["library"]["key"], sourceSlot=l["slot"])
+            if kind in ("photo", "png"):
+                if kind == "png":
+                    aid = src["aid"]
+                    info = src["info"]
+                    label = (
+                        info.get("provider", "Vecteezy") + " 预览"
+                        if info["origin"] == "search-preview"
+                        else info.get("provider", "Vecteezy") + " 上传原件"
+                    )
+                    meta.update(decoration=info, name=l["name"] + " · " + label)
+                else:
+                    aid, extra = await self.assets.treated(
+                        photo_id, l.get("treatment", {})
+                    )
+                    meta.update(
+                        extra, photoKey=src["library"]["key"], sourceSlot=l["slot"]
+                    )
                 radius = l.get("radius", 0) * self.scale
                 if radius:
                     mask = self.add(
@@ -309,7 +332,10 @@ class Spread:
                     parent,
                     px,
                     py,
-                    image_props(w, h, aid, crop, flip, l["name"]),
+                    {
+                        **image_props(w, h, aid, crop, flip, meta["name"]),
+                        **({"url": info["sourcePageUrl"]} if kind == "png" else {}),
+                    },
                     meta,
                     angle,
                     opacity,
@@ -506,6 +532,7 @@ async def import_book(
             if current.status != 404:
                 raise ValueError(f"New project expected; GET returned {current.status}")
         assets = CanvasAssets(client, store, photos, trace)
+        assets.png_dir = spec_path.parent / "zine-png"
         for d in spec["designs"]:
             values = bindings[d["spreads"][0]["id"]]
             for s in d["spreads"]:
@@ -618,6 +645,16 @@ async def import_book(
                     "sourcePageUrl": row["pin"],
                     "paperBoundsPx": row.get("referenceBox"),
                 }
+        if assets.decorations:
+            meta["zineDecorations"] = {
+                key: value["info"] for key, value in assets.decorations.items()
+            }
+            if any(
+                value["info"]["origin"] == "search-preview"
+                for value in assets.decorations.values()
+            ):
+                title += " · 素材预览稿"
+                store[page]["name"] = title
         store["document:document"] = {
             "typeName": "document",
             "id": "document:document",

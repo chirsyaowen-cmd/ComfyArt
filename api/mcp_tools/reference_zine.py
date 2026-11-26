@@ -78,6 +78,27 @@ def prepare(folder, args, pages, refs, library, meta):
         {"cover": groups[0]["id"], "spreads": [g["id"] for g in groups[1:]]},
     )
     save("来源.json", groups)
+    originals = []
+    for item in args.get("pngOriginals", []):
+        photo = photos.get(item["photoKey"])
+        if not photo:
+            raise ValueError("Choose a ready uploaded PNG from this project")
+        originals.append(
+            {
+                "file": view_path(
+                    "/api/view?" + urlencode(photo["ref"]), original=True
+                ),
+                "sourcePageUrl": item["sourcePageUrl"],
+                "name": photo.get("name") or "PNG",
+            }
+        )
+    if originals:
+        save("png-originals.json", originals)
+        if "photos" not in args:
+            original_keys = {item["photoKey"] for item in args["pngOriginals"]}
+            selected = [k for k in selected if k not in original_keys]
+            if not selected:
+                raise ValueError("Supply book photographs as well as decorations")
     catalog = []
     for i, key in enumerate(dict.fromkeys(selected)):
         p = photos[key]
@@ -159,7 +180,16 @@ async def generate(folder, project, title, brief):
         "--trace",
         records / "trace.jsonl",
     )
+    snapshot = project_store.get_snapshot("default", dest)
+    decorations = json.loads(snapshot)["document"]["store"]["document:document"][
+        "meta"
+    ].get("zineDecorations", {})
     return {
+        "decorationPreviews": [
+            {"provider": v["provider"], "sourcePageUrl": v["sourcePageUrl"]}
+            for v in decorations.values()
+            if v["origin"] == "search-preview"
+        ],
         "status": "complete",
         "project": dest,
         "url": url + "/comfyart/?project=" + dest,
@@ -245,7 +275,8 @@ async def handle(args):
 TOOL = {
     "description": "Default workflow for making a complete editable Zine from reference spreads and project photos. "
     "When choosing interior references, compare them as a set. Prefer shared visual style (paper, type, spacing or photographic treatment), allow varied compositions and different books, and honor explicit user choices. "
-        "Use inputs to inspect available saved references; assign one per spread, cover first. Use start with the user's title and creative direction. "
+    "Use inputs to inspect available saved references; assign one per spread, cover first. Use start with the user's title and creative direction. "
+    "Children can search Brave for transparent decorations from Vecteezy, Pngtree and PNGimg. Indexed assets are visibly marked as previews; pngOriginals matches uploaded originals to their resource pages. "
     "Native DeepSeek children extract layouts and treatments before the master binds photos and copy. "
     "Poll status until complete and give the user the new canvas link. Existing source project is preserved.",
     "inputSchema": {
@@ -259,6 +290,18 @@ TOOL = {
             "brief": {
                 "type": "string",
                 "description": "User-specified design and editorial requirements",
+            },
+            "pngOriginals": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "photoKey": {"type": "string"},
+                        "sourcePageUrl": {"type": "string"},
+                    },
+                    "required": ["photoKey", "sourcePageUrl"],
+                    "additionalProperties": False,
+                },
             },
             "references": {"type": "array", "items": {"type": "string"}},
             "photos": {"type": "array", "items": {"type": "string"}},

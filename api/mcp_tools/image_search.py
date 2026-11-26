@@ -91,9 +91,7 @@ def _web_url(value):
     return None
 
 
-async def search_images(args: dict) -> dict:
-    query = args.get("query")
-    count = args.get("count", 6)
+async def image_results(query: str, count: int) -> list[dict]:
     if not isinstance(query, str) or not query.strip():
         raise ValueError("Provide a non-empty image search query.")
     if type(count) is not int or not 1 <= count <= MAX_COUNT:
@@ -137,6 +135,11 @@ async def search_images(args: dict) -> dict:
                        "imageUrl": original, "sourcePageUrl": source})
         if len(images) == count:
             break
+    return images
+
+
+async def search_images(args: dict) -> dict:
+    images = await image_results(args.get("query"), args.get("count", 6))
     if not images:
         return {"images": [], "added": 0}
     timeout = aiohttp.ClientTimeout(total=10)

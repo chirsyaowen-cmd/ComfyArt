@@ -140,7 +140,15 @@ async def prepare_layout(packet, conf):
         saved = json.loads(cache.read_text())
         if saved.get("inputDigest") == digest:
             valid(saved["design"])
-            return saved["design"]
+            from png_assets import decoration_keys
+
+            keys = decoration_keys(saved["design"])
+            if not keys or all(
+                (conf.output.parent / "zine-png" / (k + ext)).is_file()
+                for k in keys
+                for ext in (".png", ".json")
+            ):
+                return saved["design"]
 
     def finalize(data):
         for spread in data["spreads"]:
@@ -199,7 +207,28 @@ async def generate_book(args):
     args.prompt = (HERE / "spec-contract.txt").read_text()
     if args.brief:
         args.prompt += "\n用户给出的创作要求：" + args.brief
-    args.schema_digest = hashlib.sha256(SCHEMA_FILE.read_bytes()).hexdigest()
+    import os
+
+    from local_runtime import configure
+    from png_assets import prepare_originals
+
+    configure(args.release)
+    png_dir = args.output.parent / "zine-png"
+    originals = args.output.parent / "png-originals.json"
+    if originals.exists():
+        prepare_originals(png_dir, json.loads(originals.read_text()))
+    png_enabled = bool(os.environ.get("BRAVE_SEARCH_API_KEY") or originals.exists())
+    if png_enabled:
+        args.prompt += (
+            "\n需要复现独立的插画贴纸、邮票、胶带或装饰印章时，可以调用 search_png，指定 provider 为 Vecteezy、Pngtree 或 PNGimg，"
+            "用装饰风格与图形的英文关键词检索，观察候选图并选择。没有合适的图就保留原样。"
+            "选中后用独立基本图层 {id,name,kind:'png',asset:返回的完整资源键,box:[x,y,w,h],rotation,opacity}；"
+            "数组顺序控制遮挡。PNG 等比内接框，预览保留原貌。不要把这些图当作用户照片或整页背景。"
+        )
+    args.schema_digest = hashlib.sha256(
+        SCHEMA_FILE.read_bytes()
+        + ((png_dir / "originals.json").read_bytes() if originals.exists() else b"")
+    ).hexdigest()
     args.gate = asyncio.Semaphore(4)
     manifest = json.loads(args.manifest.read_text())
     binding = json.loads((args.manifest.parent / "装订顺序.json").read_text())
@@ -279,6 +308,7 @@ async def generate_book(args):
         trace,
         finalize,
         binding=bool(args.photos),
+        png_dir=png_dir if png_enabled else None,
     )
 
 

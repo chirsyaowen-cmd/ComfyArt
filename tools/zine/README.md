@@ -33,3 +33,11 @@ The design agent chooses the slot roles, composition, component instances, treat
 Each generation reads the saved project frames in book order. New specs store actual page IDs and dimensions. Each spread is laid out in native page units, with the spine at the left page's width. The importer retains the legacy virtual coordinate mapping for v2 files without frame metadata. Use `--preserve-content` when reflowing a zine that already has slot bindings. Successful designs are cached by input digest so a failed generation can be resumed.
 
 Running `python tools/zine/project.py "$ZINE_RUN"` creates an offline HTML layout reader with replaceable slots and layered SVG export. The native import instead creates editable photo, vector, text and group records, and links roadmap steps to their canvas elements. Split instances can be edited independently on the canvas. Mirrored text boxes retain readable native glyphs. Source photos, references, bindings, traces and finished projects belong in the local output directory.
+
+### Transparent decoration layers
+
+Spread designers can use `search_png` with the server’s existing `BRAVE_SEARCH_API_KEY` to look for Vecteezy, Pngtree or PNGimg decorations. They see a numbered contact sheet and may choose none. A selected `png` layer stores an immutable project asset key, box, rotation and opacity. Sources, original bytes and alpha are retained in the adjacent `zine-png/` folder; keep it with a saved spec. The native canvas and offline reader draw the PNG independently of the user's photos.
+
+Public indexed PNGs are design previews. A draft that uses one carries the title suffix 素材预览稿 and per-layer source metadata. Search does not acquire publication rights. To use your downloaded original at generation time, upload the transparent PNG and pass its project photo key and provider resource page in `pngOriginals`. Source-page links remain with the image layers for any required credit.
+
+PNGimg lists CC BY-NC 4.0 for its collection (https://pngimg.com/license/). Keep the source and check applicable credits and uses before publishing.

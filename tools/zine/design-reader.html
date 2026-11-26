@@ -68,6 +68,11 @@ function draw(){
     if(l.kind==='use'){svg('use',{href:'#'+componentIds.get(l.component),transform:'matrix('+l.matrix.join(' ')+')'},g);return}
     if(l.clip)g=clip(g,l.clip);
     if(l.rotation){const [x,y,w,h]=l.box;g=svg('g',{transform:'rotate('+[l.rotation,x+w/2,y+h/2].join(' ')+')'},g)}
+    if(l.kind==='png'){
+      const asset=spec.decorationImages[l.asset];
+      if(asset.origin==='search-preview')title.textContent=l.name+' · '+asset.provider+' 预览';
+      svg('image',{...box(l.box),href:asset.src,preserveAspectRatio:'xMidYMid meet'},g);return
+    }
     if(l.kind==='photo'){
       const [x,y,w,h]=l.box,v=values.get(key(index,l.slot));g=clip(g,l.box,l.radius);
       if(v){
