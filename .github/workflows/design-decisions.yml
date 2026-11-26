@@ -1,0 +1,21 @@
+name: Design decision regressions
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  design-decisions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ComfyArt
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        working-directory: ComfyArt
+        run: python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Check agent and canvas tool behavior
+        working-directory: ComfyArt
+        run: python -m pytest -q tests/test_mcp.py

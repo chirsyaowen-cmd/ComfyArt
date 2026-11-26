@@ -85,6 +85,25 @@ async def test_view_canvas_png_becomes_an_image_block(bot_client):
     assert "png" not in content[0]["text"]
 
 
+async def test_placing_copy_cannot_publish_a_design_suggestion(bot_client):
+    await _open(bot_client)
+    chat = chat_store.create_chat(user="default", project="p", provider="deepseek-harness")
+    msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
+    ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
+    try:
+        call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc(
+            "tools/call", {"name": "add_text", "arguments": {"text": "青枫手记", "frame": "shape:cover"}})))
+        # Older editors attached these automatic choices to a successful title placement.
+        old_result = {"id": "shape:title", "embellishments": [
+            {"frame": "shape:cover", "version": "layout", "options": ["color-block", "star"]}]}
+        await _answer_commands(bot_client, lambda _: {"ok": True, "result": old_result})
+        assert not (await (await call).json())["result"]["isError"]
+        assert chat_store.get_message(chat["id"], msg["id"])["blocks"] == []
+        assert not any(e == "comfyart-bot" and d.get("event") == "turn_embellishments" for e, d in SENT)
+    finally:
+        ACTIVE_TURNS.pop(chat["id"], None)
+
+
 async def test_zine_title_then_reviewed_decoration_preview(bot_client):
     await _open(bot_client)
     chat = chat_store.create_chat(user="default", project="p", provider="deepseek-harness")
