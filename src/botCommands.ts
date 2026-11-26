@@ -361,7 +361,7 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
             return msg.roadmap_turn ? checkRoadmapTurn(editor, msg.roadmap_turn) : undefined
           }
           const inspect = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source', 'photo_adjust_target'].includes(msg.action)
-          const recommend = msg.action === 'recommend_embellishment'
+          const recommend = msg.action === 'recommend_embellishment' || msg.action === 'offer_roadmap_advice'
           const preview = msg.action === 'preview_embellishments' || msg.action === 'suggest_embellishments'
           const writesCanvas = !inspect && !recommend && !preview
           const active = inspect ? undefined : guard()

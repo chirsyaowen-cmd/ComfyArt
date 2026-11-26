@@ -11,7 +11,7 @@ import { loadSkills, saveSkill, slug } from './skills'
 import { onComfyEvent } from './ws'
 import { currentRoadmapTurn } from './roadmap'
 import { parseRoadmapAdvice } from './roadmapAdvice'
-import { guideShown, roadmapReviewContext } from './roadmapGuide'
+import { guideShown, manuallyReviewed, roadmapReviewContext } from './roadmapGuide'
 import { describeZine } from './zineReview'
 import { lang, t } from './i18n'
 
@@ -145,7 +145,7 @@ export function startProactive(editor: Editor, onError: ErrorSink) {
   const quiet = () => alive && enabled('review') && !chatsAtom.get().some(c => c.busy)
   const stopGuide = react('review the current Zine canvas and roadmap', () => {
     const context = roadmapReviewContext(editor)
-    const next = quiet() ? context?.signature ?? '' : ''
+    const next = quiet() && context && !manuallyReviewed(context.bookVersion) ? context.signature : ''
     if (next === scheduled) return
     scheduled = next
     const run = ++generation
@@ -155,7 +155,7 @@ export function startProactive(editor: Editor, onError: ErrorSink) {
     const project = currentProject()
     const turn = currentRoadmapTurn(editor)
     const valid = () => run === generation && quiet() && turn === currentRoadmapTurn(editor) && currentProject() === project
-      && roadmapReviewContext(editor)?.signature === signature
+      && !manuallyReviewed(context.bookVersion) && roadmapReviewContext(editor)?.signature === signature
     timer = window.setTimeout(() => {
       void (async () => {
         if (!valid() || !await withState(state => valid() && take(state, 'review')) || !valid()) return

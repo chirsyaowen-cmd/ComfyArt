@@ -7,6 +7,7 @@ import { RefFrameButton } from './RefFrameButton'
 import { PHOTO_ACCEPT } from '../photoImport'
 import { activeZineIndex, getZinePages } from '../zine'
 import { RequestEmbellishments } from './ZineEmbellishmentCard'
+import { markManualReview, roadmapReviewContext } from '../roadmapGuide'
 import { describeZine, inspectZine } from '../zineReview'
 import { EmptyBookPhotos, ZinePhotoPrompt } from './ZinePhotoPrompt'
 import { botEnabledAtom, chatIdAtom, messagesAtom } from '../bot'
@@ -77,10 +78,11 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
   useEffect(() => { if (!showPhotoSources) setPhotoTarget(null) }, [showPhotoSources])
   function reviewCanvas() {
     setMenu(null)
-    const book = inspectZine(editor)
+    const context = roadmapReviewContext(editor)
+    const book = context?.book
+    if (context) markManualReview(context.bookVersion)
     if (book && !book.occupied.length && activePage) {
       setPhotoTarget(activePage)
-      return
     }
     void sendToAgent(editor, book ? t('zineReview.manual') : REVIEW_PROMPT, [], null, [], [],
       book ? describeZine(book) : '', book ? 'canvas_review' : undefined).catch(fail)

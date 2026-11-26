@@ -2,14 +2,15 @@ import { useState } from 'react'
 import { useValue, type Editor, type TLShapeId } from 'tldraw'
 
 import { placeAsset } from '../assets'
-import { busy } from '../bot'
+import { busy, type BotBlock } from '../bot'
 import { sendToAgent } from '../agent'
 import { thumbUrl, viewUrl } from '../comfy'
 import { t } from '../i18n'
 import { errorText, type ErrorSink } from '../jobs'
 import { roadmap, updateRoadmap } from '../roadmap'
 import { roadmapChangeForAdvice, type AdviceOption } from '../roadmapAdvice'
-import { currentRoadmapAdvice, guideShown, roadmapOpen } from '../roadmapGuide'
+import { currentRoadmapAdvice, guideShown, roadmapOpen, roadmapReviewContext } from '../roadmapGuide'
+import { readLocal, writeLocal } from '../localPrefs'
 import { projectPhotos } from '../roadmapPhotos'
 import { getZinePages } from '../zine'
 import { importFiles } from './DropHandlers'
@@ -43,19 +44,41 @@ export function EmptyBookPhotos({ editor, frame, onError, onRequest }: {
 
 export function ZinePhotoPrompt({ editor, onError, noticeText }: { editor: Editor; onError: ErrorSink; noticeText?: string }) {
   const guide = useValue('current roadmap advice', () => currentRoadmapAdvice(editor), [editor])
+  if (!guide || (noticeText !== undefined && noticeText !== guide.advice.text)) return null
+  return <ReviewOptions editor={editor} advice={guide.advice} onError={onError} showText={noticeText === undefined}
+    valid={() => guide === currentRoadmapAdvice(editor)} close={() => {
+      if (guideShown.get() === guide) guideShown.set(null)
+    }} />
+}
+
+export function ManualReviewOptions({ editor, review, messageId, streaming, onError }: {
+  editor: Editor; review: NonNullable<BotBlock['review']>; messageId: string; streaming: boolean; onError: ErrorSink
+}) {
+  const key = 'comfyart.reviewChoice.' + messageId
+  const [closed, setClosed] = useState(() => !!readLocal(key))
+  const valid = () => roadmapReviewContext(editor)?.bookVersion === review.bookVersion
+  const current = useValue('review still current', valid, [editor, review])
+  if (closed || !current) return <div>{review.advice.text}</div>
+  return <ReviewOptions editor={editor} advice={review.advice} onError={onError} showText allowBusy={streaming}
+    valid={valid} close={() => { writeLocal(key, '1'); setClosed(true) }} />
+}
+
+function ReviewOptions({ editor, advice, onError, valid, close, showText, allowBusy = false }: {
+  editor: Editor; advice: NonNullable<BotBlock['review']>['advice']; onError: ErrorSink
+  valid: () => boolean; close: () => void; showText: boolean; allowBusy?: boolean
+}) {
   const working = useValue('agent running', busy, [])
   const [sending, setSending] = useState(false)
-  if (!guide || (noticeText !== undefined && noticeText !== guide.advice.text)) return null
 
   const choose = async (option: AdviceOption) => {
-    if (sending || busy() || guide !== currentRoadmapAdvice(editor)) return
+    if (sending || (busy() && !allowBusy) || !valid()) return
     setSending(true)
     try {
       const plan = roadmap(editor)
       const change = roadmapChangeForAdvice(option, plan.steps)
       if (change) updateRoadmap(editor, plan.revision, [change], 'button')
       if (option.kind === 'request') await sendToAgent(editor, option.request, [], null)
-      if (guideShown.get() === guide) guideShown.set(null)
+      close()
     } catch (e) {
       onError(errorText(e))
     } finally {
@@ -64,13 +87,13 @@ export function ZinePhotoPrompt({ editor, onError, noticeText }: { editor: Edito
   }
 
   return <div className="ca-zine-photo" onClick={e => e.stopPropagation()}>
-    {noticeText === undefined && <div>{guide.advice.text}</div>}
+    {showText && <div>{advice.text}</div>}
     <div className="ca-zine-photo__actions">
-      {guide.advice.options.map((option, index) =>
-        <button type="button" key={index} disabled={sending || working}
+      {advice.options.map((option, index) =>
+        <button type="button" key={index} disabled={sending || (working && !allowBusy)}
           title={option.kind === 'request' ? option.request : undefined}
           onClick={() => void choose(option)}>{option.label}</button>)}
-      {noticeText === undefined && <button type="button" onClick={() => roadmapOpen.set(true)}>{t('road.title')}</button>}
+      {showText && <button type="button" onClick={() => roadmapOpen.set(true)}>{t('road.title')}</button>}
     </div>
   </div>
 }

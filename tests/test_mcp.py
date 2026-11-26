@@ -135,6 +135,30 @@ async def test_zine_title_then_reviewed_decoration_preview(bot_client):
         ACTIVE_TURNS.pop(chat["id"], None)
 
 
+async def test_manual_review_posts_clickable_advice_in_the_same_message_once(bot_client):
+    await _open(bot_client)
+    chat = chat_store.create_chat(user="default", project="p", provider="deepseek-harness")
+    msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
+    ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
+    advice = {"text": "Keep this page quiet?", "options": [
+        {"kind": "keep_image_only", "label": "Keep page 1 image-only", "stepId": "cover-typography"},
+        {"kind": "dismiss", "label": "Close"}]}
+    review = {"advice": advice, "bookVersion": "reviewed"}
+    endpoint = f"/comfyart/mcp?bot_chat={chat['id']}"
+    command = _rpc("tools/call", {"name": "offer_roadmap_advice", "arguments": advice})
+    try:
+        call = asyncio.create_task(bot_client.post(endpoint, json=command))
+        await _answer_commands(bot_client, lambda _: {"ok": True, "result": review})
+        first = await (await call).json()
+        assert not first["result"]["isError"]
+        again = await (await bot_client.post(endpoint, json=command)).json()
+        assert not again["result"]["isError"]
+        assert chat_store.get_message(chat["id"], msg["id"])["blocks"] == [
+            {"type": "roadmap_advice", "review": review}]
+    finally:
+        ACTIVE_TURNS.pop(chat["id"], None)
+
+
 async def test_review_recommendation_is_bound_to_the_reviewed_page(bot_client):
     await _open(bot_client)
     chat = chat_store.create_chat(user="default", project="p", provider="deepseek-harness")

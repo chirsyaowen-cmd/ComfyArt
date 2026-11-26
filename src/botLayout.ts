@@ -3,6 +3,8 @@ import { createShapeId, type Editor, type TLFrameShape, type TLShape, type TLSha
 import { loadImage } from './adjust'
 import { thumbUrl, viewUrl } from './comfy'
 import { roadmap, roadmapSource, updateRoadmap, type RoadmapTurn } from './roadmap'
+import { markManualReview, roadmapReviewContext } from './roadmapGuide'
+import { parseRoadmapAdvice } from './roadmapAdvice'
 import { frameFacts, placeProjectPhoto, projectPhotos } from './roadmapPhotos'
 import { activeZineIndex, focusZinePage, getZinePages } from './zine'
 import { canRequestEmbellishments, embellishmentVersion, embellishmentPageStatus, embellishmentOfferStatus, previewEmbellishments } from './zineEmbellishments'
@@ -141,7 +143,12 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
     const bounds = shapes.map((s) => editor.getShapePageBounds(s)!).reduce((a, b) => a.union(b))
     const maxPx = Math.min(2048, Number(args.max_px) || VIEW_MAX_PX)
     const viewed = turn?.inspected ? getZinePages(editor).filter(id => ids.includes(id)).map(id => frameFacts(editor, id)) : []
+    const reviewed = turn?.purpose === 'canvas_review' ? roadmapReviewContext(editor) : null
     const { blob, width, height } = await exportImage(editor, ids, { format: 'png', background: true, scale: Math.min(1, maxPx / Math.max(bounds.w, bounds.h)) })
+    if (reviewed && viewed.length && turn && roadmapReviewContext(editor)?.bookVersion === reviewed.bookVersion) {
+      turn.reviewVersion = reviewed.bookVersion
+      markManualReview(reviewed.bookVersion)
+    }
     for (const frame of viewed) turn?.viewedFrames.set(frame.id, frame.frame_version)
     return { width, height, bounds: { x: Math.round(bounds.x), y: Math.round(bounds.y), width: Math.round(bounds.w), height: Math.round(bounds.h) }, png: await blobBase64(blob) }
   },
@@ -219,6 +226,17 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
     for (const shape of shapes) turn?.placedText.add(shape.id)
     return { id: shapes[0].id, handoff: 'First layout complete. Reply now. The user has the text toolbar for further edits.', boxes: shapes.map(s => ({ id: s.id, frame: s.parentId, font: s.props.font })),
       completed_step: step.id, revision: roadmap(editor).revision }
+  },
+  offer_roadmap_advice: (editor, args, _error, _chat, _check, turn) => {
+    const context = roadmapReviewContext(editor)
+    if (turn?.purpose !== 'canvas_review' || !context)
+      throw new Error('Roadmap options require a manual canvas review.')
+    if (turn.reviewVersion !== context.bookVersion)
+      throw new Error('The canvas changed. Inspect the current pages with view_canvas again.')
+    if (![...turn.viewedFrames].some(([id, version]) => frameFacts(editor, id).frame_version === version))
+      throw new Error('Inspect a book page with get_canvas and view_canvas before offering advice.')
+    const advice = parseRoadmapAdvice({ suggestion: args }, context.plan.steps)
+    return { advice, bookVersion: context.bookVersion }
   },
   recommend_embellishment: (editor, args, _error, _chat, _check, turn) => {
     const frame = getZinePages(editor).find(id => id === args.frame)
