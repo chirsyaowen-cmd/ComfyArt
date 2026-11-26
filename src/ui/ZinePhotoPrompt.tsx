@@ -6,7 +6,9 @@ import { busy } from '../bot'
 import { sendToAgent } from '../agent'
 import { thumbUrl, viewUrl } from '../comfy'
 import { t } from '../i18n'
-import { errorText } from '../jobs'
+import { errorText, type ErrorSink } from '../jobs'
+import { roadmap, updateRoadmap } from '../roadmap'
+import { roadmapChangeForAdvice, type AdviceOption } from '../roadmapAdvice'
 import { currentRoadmapAdvice, guideShown, roadmapOpen } from '../roadmapGuide'
 import { projectPhotos } from '../roadmapPhotos'
 import { getZinePages } from '../zine'
@@ -39,26 +41,23 @@ export function EmptyBookPhotos({ editor, frame, onError, onRequest }: {
   </div>
 }
 
-export function ZinePhotoPrompt({ editor, noticeText }: { editor: Editor; noticeText?: string }) {
+export function ZinePhotoPrompt({ editor, onError, noticeText }: { editor: Editor; onError: ErrorSink; noticeText?: string }) {
   const guide = useValue('current roadmap advice', () => currentRoadmapAdvice(editor), [editor])
   const working = useValue('agent running', busy, [])
   const [sending, setSending] = useState(false)
-  const [error, setError] = useState('')
   if (!guide || (noticeText !== undefined && noticeText !== guide.advice.text)) return null
 
-  const choose = async (option: (typeof guide.advice.options)[number]) => {
+  const choose = async (option: AdviceOption) => {
     if (sending || busy() || guide !== currentRoadmapAdvice(editor)) return
-    if (option.kind === 'dismiss') {
-      guideShown.set(null)
-      return
-    }
-    setError('')
     setSending(true)
     try {
-      await sendToAgent(editor, option.request, [], null)
+      const plan = roadmap(editor)
+      const change = roadmapChangeForAdvice(option, plan.steps)
+      if (change) updateRoadmap(editor, plan.revision, [change], 'button')
+      if (option.kind === 'request') await sendToAgent(editor, option.request, [], null)
       if (guideShown.get() === guide) guideShown.set(null)
     } catch (e) {
-      setError(errorText(e))
+      onError(errorText(e))
     } finally {
       setSending(false)
     }
@@ -73,6 +72,5 @@ export function ZinePhotoPrompt({ editor, noticeText }: { editor: Editor; notice
           onClick={() => void choose(option)}>{option.label}</button>)}
       {noticeText === undefined && <button type="button" onClick={() => roadmapOpen.set(true)}>{t('road.title')}</button>}
     </div>
-    {error && <div role="alert">{error}</div>}
   </div>
 }

@@ -248,7 +248,7 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
             editor={editor}
             left={
               <ProjectHeader editor={editor} projectId={id}>
-                <NoticeCenter editor={editor} />
+                <NoticeCenter editor={editor} onError={setError} />
               </ProjectHeader>
             }
           />

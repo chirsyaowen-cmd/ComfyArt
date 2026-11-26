@@ -208,7 +208,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
       )}
       {showPhotoSources && photoTarget
         ? <EmptyBookPhotos editor={editor} frame={photoTarget} onError={onError} onRequest={() => setPhotoTarget(null)} />
-        : !busy && <ZinePhotoPrompt editor={editor} />}
+        : !busy && <ZinePhotoPrompt editor={editor} onError={onError} />}
       <div className="ca-composer__entry">
         {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
           <div className="ca-composer__chips">

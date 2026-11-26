@@ -1,5 +1,8 @@
+import type { Change, Step } from './roadmapModel'
+
 export type AdviceOption =
-  | { label: string; kind: 'request'; request: string }
+  | { label: string; kind: 'request'; stepId: string; request: string }
+  | { label: string; kind: 'keep_image_only'; stepId: string }
   | { label: string; kind: 'dismiss' }
 
 export interface RoadmapAdvice {
@@ -7,7 +10,7 @@ export interface RoadmapAdvice {
   options: AdviceOption[]
 }
 
-export function parseRoadmapAdvice(value: unknown): RoadmapAdvice | null {
+export function parseRoadmapAdvice(value: unknown, steps: Step[]): RoadmapAdvice | null {
   if (!value || typeof value !== 'object' || !('suggestion' in value)) {
     throw new Error('Invalid canvas review response')
   }
@@ -26,10 +29,28 @@ export function parseRoadmapAdvice(value: unknown): RoadmapAdvice | null {
     }
     const label = option.label.trim()
     if (option.kind === 'dismiss') return { label, kind: 'dismiss' }
+    if (!('stepId' in option) || typeof option.stepId !== 'string') {
+      throw new Error('Canvas review option needs a roadmap step')
+    }
+    const step = steps.find(step => step.id === option.stepId)
+    if (!step) throw new Error('Canvas review option refers to an unknown roadmap step')
+    if (option.kind === 'keep_image_only' && step.type === 'typography' && step.scope === 'frames') {
+      return { label, kind: 'keep_image_only', stepId: step.id }
+    }
     if (option.kind === 'request' && 'request' in option && typeof option.request === 'string' && option.request.trim()) {
-      return { label, kind: 'request', request: option.request.trim() }
+      return { label, kind: 'request', stepId: step.id, request: option.request.trim() }
     }
     throw new Error('Invalid canvas review option')
   })
   return { text: suggestion.text.trim(), options }
+}
+
+export function roadmapChangeForAdvice(option: AdviceOption, steps: Step[]): Change | null {
+  if (option.kind === 'dismiss') return null
+  const step = steps.find(step => step.id === option.stepId)
+  if (!step) throw new Error('Canvas review option refers to an unknown roadmap step')
+  if (option.kind === 'keep_image_only') {
+    return { id: step.id, action: option.kind, reason: option.label }
+  }
+  return { id: step.id, action: step.status === 'deferred' ? 'resume' : 'start' }
 }
