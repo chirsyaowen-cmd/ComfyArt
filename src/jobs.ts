@@ -1,4 +1,4 @@
-import { AssetRecordType, atom, createShapeId, isShapeId, type Editor, type TLParentId, type JsonValue, type TLAssetId, type TLImageAsset, type TLShape, type TLShapeId, type TLVideoAsset } from 'tldraw'
+import { AssetRecordType, atom, createShapeId, isShapeId, type Editor, type TLParentId, type JsonValue, type TLAssetId, type TLImageAsset, type TLShape, type TLShapeCrop, type TLShapeId, type TLVideoAsset } from 'tldraw'
 
 import { cancelPrompt, mediaMeta, promptHistory, queuePrompt, refKind, viewUrl, waitForImages, type ImageRef } from './comfy'
 import { GENERATOR, type GeneratorShape } from './shapes/GeneratorShape'
@@ -66,7 +66,7 @@ export async function toMedia(ref: ImageRef, kind: MediaKind): Promise<Media> {
   return { ref, src, w, h, kind }
 }
 
-export function placeMedia(editor: Editor, m: Media, name: string, x: number, y: number, w: number, parentId?: TLShape['parentId']): TLShapeId {
+export function placeMedia(editor: Editor, m: Media, name: string, x: number, y: number, w: number, parentId?: TLShape['parentId'], cropped?: { h: number; crop: TLShapeCrop }): TLShapeId {
   const assetId = AssetRecordType.createId()
   editor.createAssets([{
     id: assetId,
@@ -76,7 +76,7 @@ export function placeMedia(editor: Editor, m: Media, name: string, x: number, y:
     meta: {},
   } as any])
   const id = createShapeId()
-  editor.createShape({ id, type: m.kind, x, y, ...(parentId ? { parentId } : {}), props: { assetId, w, h: w * m.h / m.w } } as any)
+  editor.createShape({ id, type: m.kind, x, y, ...(parentId ? { parentId } : {}), props: { assetId, w, h: w * m.h / m.w, ...cropped } } as any)
   return id
 }
 

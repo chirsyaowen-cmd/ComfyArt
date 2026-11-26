@@ -1,4 +1,4 @@
-import { frameFitScale } from '../assets'
+import { frameCoverCrop, frameFitScale } from '../assets'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { atom, useEditor, useValue, type Editor, type TLImageShape } from 'tldraw'
 
@@ -153,10 +153,18 @@ export function ImageToolbar({ onError }: { onError: (msg: string) => void }) {
   }
   const toggle = (m: string) => (o: boolean) => { setMenu(o ? m : null); setCustomize(false); setInMore(null) }
   const mode$ = (m: Mode) => () => enterMode(m)
-  const frame = editor.getShape(shape.parentId as any)
+  const frame = editor.getShape(shape.parentId)
   const fitFrame = (cover: boolean) => {
     if (frame?.type !== 'frame') return
-    const { w: fw, h: fh } = frame.props as { w: number; h: number }
+    const { w: fw, h: fh } = frame.props
+    editor.markHistoryStoppingPoint('fit image to frame')
+    if (cover && !shape.props.crop?.isCircle) {
+      editor.updateShape<TLImageShape>({
+        id: shape.id, type: 'image', x: 0, y: 0, rotation: 0,
+        props: { w: fw, h: fh, crop: frameCoverCrop(shape.props, frame.props) },
+      })
+      return
+    }
     const k = frameFitScale(shape.props.w, shape.props.h, fw, fh, cover)
     const [w, h] = [shape.props.w * k, shape.props.h * k]
     editor.updateShape<TLImageShape>({ id: shape.id, type: 'image', x: (fw - w) / 2, y: (fh - h) / 2, rotation: 0, props: { w, h } })
