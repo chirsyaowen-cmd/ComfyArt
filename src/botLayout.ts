@@ -5,6 +5,7 @@ import { thumbUrl, viewUrl } from './comfy'
 import { roadmap, roadmapSource, updateRoadmap, type RoadmapTurn } from './roadmap'
 import { frameFacts, placeProjectPhoto, projectPhotos } from './roadmapPhotos'
 import { activeZineIndex, focusZinePage, getZinePages } from './zine'
+import { BUNDLED_FONTS, fontLabel } from './fonts'
 import { bookFonts, chooseZineFont } from './zineFonts'
 import { placeInChatFrame } from './chatFrame'
 import { placeHtml } from './embeds'
@@ -106,6 +107,7 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       project: editor.getDocumentSettings().name || undefined,
       pages: editor.getPages().map((p) => ({ id: p.id, name: p.name, current: p.id === editor.getCurrentPageId() })),
       page: page.id,
+      bundled_fonts: BUNDLED_FONTS.map(family => ({ family, name: fontLabel(family) })),
       ...(getZinePages(editor).length ? { roadmap: roadmap(editor),
         active_book_frame: turn?.frame ?? getZinePages(editor)[activeZineIndex(editor)], book_fonts: bookFonts(editor),
         book_frames: getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame').map(id => frameFacts(editor, id)),

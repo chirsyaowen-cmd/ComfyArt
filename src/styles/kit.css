@@ -45,12 +45,13 @@
 .ca-kit__fontname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .ca-fonts { width: 320px; gap: 8px; }
-.ca-fonts .ca-panel__chips { flex-wrap: nowrap; }
 .ca-fonts__search { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-radius: 8px; background: var(--ca-field); }
 .ca-fonts__search .ca-icon { width: 16px; height: 16px; color: var(--ca-muted); }
 .ca-fonts__search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: inherit; font: inherit; }
 .ca-fonts__list { display: flex; flex-direction: column; max-height: 320px; overflow-y: auto; }
 .ca-fonts__item { height: 38px; font-size: 17px; }
+.ca-fonts__name { font-size: 14px; }
+.ca-fonts__sample { margin-inline-end: 4px; white-space: nowrap; }
 .ca-pick__font { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
 
 .ca-kit__foot { position: absolute; right: 24px; bottom: 20px; }

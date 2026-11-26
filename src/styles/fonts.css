@@ -1,0 +1,41 @@
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('../assets/fonts/noto-sans-sc.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('../assets/fonts/noto-serif-sc.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Ma Shan Zheng';
+  src: url('../assets/fonts/ma-shan-zheng.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Noto Sans SC Preview';
+  src: url('../assets/fonts/noto-sans-sc-preview.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Noto Serif SC Preview';
+  src: url('../assets/fonts/noto-serif-sc-preview.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Ma Shan Zheng Preview';
+  src: url('../assets/fonts/ma-shan-zheng-preview.woff2') format('woff2');
+  font-display: swap;
+}

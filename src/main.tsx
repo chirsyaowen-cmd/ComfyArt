@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 
 import { initLocale } from './i18n'
 import './styles/base.css'
+import './styles/fonts.css'
 import './styles/canvas.css'
 import './styles/shell.css'
 import './styles/overlays.css'
