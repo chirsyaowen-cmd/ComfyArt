@@ -23,6 +23,13 @@ def _open_pages() -> dict[str, str]:
 
 def _target(project: str) -> tuple[str, str]:
     pages = _open_pages()
+    # New roadmap turns carry their originating websocket client ID. A second
+    # tab may register the same project while the agent is inspecting it.
+    origin, separator, _ = ROADMAP_TURN.get().partition(":")
+    if separator:
+        if not project or pages.get(origin) != project:
+            raise ValueError("The tab that started this request was closed or refreshed. Start a new request in the current tab.")
+        return origin, project
     if project:
         clients = [c for c, p in pages.items() if p == project]
         if not clients:

@@ -364,6 +364,8 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
           const recommend = msg.action === 'recommend_embellishment' || msg.action === 'offer_roadmap_advice'
           const preview = msg.action === 'preview_embellishments' || msg.action === 'suggest_embellishments'
           const writesCanvas = !inspect && !recommend && !preview
+          if (inspect && msg.roadmap_turn && !matchingRoadmapTurn(editor, msg.roadmap_turn))
+            throw new Error('TASK_SUPERSEDED: a newer request or editor session took over')
           const active = inspect ? undefined : guard()
           if (active?.purpose === 'canvas_review' && !recommend)
             throw new Error('Canvas inspection is read-only. Describe the finding or recommend an embellishment.')

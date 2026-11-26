@@ -76,6 +76,22 @@ async def test_canvas_tool_is_relayed_to_the_project_page(bot_client):
     assert '"page": "page:1"' in data["result"]["content"][0]["text"]
 
 
+async def test_repeated_reviews_use_the_requesting_tab(bot_client):
+    await _open(bot_client, "book", "origin")
+    chat = chat_store.create_chat(user="default", project="book", provider="deepseek-harness")
+    for token in ("origin:first", "origin:second"):
+        await _open(bot_client, "book", "other")
+        path = f"/comfyart/mcp?bot_chat={chat['id']}&roadmap_turn={token}"
+        for name in ("get_canvas", "view_canvas"):
+            call = asyncio.create_task(bot_client.post(path, json=_rpc("tools/call", {"name": name, "arguments": {}})))
+            commands = await _answer_commands(bot_client, lambda _: {"ok": True, "result": {"shapes": []}})
+            assert not (await (await call).json())["result"]["isError"]
+            assert (commands[0]["_sid"], commands[0]["roadmap_turn"]) == ("origin", token)
+    runtime.sockets.pop("origin")
+    response = await bot_client.post(path, json=_rpc("tools/call", {"name": "get_canvas", "arguments": {}}))
+    assert (await response.json())["result"]["isError"]
+
+
 async def test_view_canvas_png_becomes_an_image_block(bot_client):
     await _open(bot_client)
     call = asyncio.create_task(bot_client.post("/comfyart/mcp", json=_rpc("tools/call", {"name": "view_canvas", "arguments": {}})))
