@@ -33,6 +33,8 @@
   "photo.remove": "Remove",
   "road.typography": "{0} · Typography",
   "road.embellishment": "{0} · Optional embellishments",
+  "embellishment.try": "Try embellishment",
+  "embellishment.tryIdea": "Preview this idea: {0}",
   "embellishment.title": "Embellishment suggestions",
   "embellishment.review": "Suggest a few embellishments for this page.",
   "embellishment.prompt": "Add a few embellishments to {0}?",

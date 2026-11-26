@@ -11,7 +11,7 @@ import { Thumb } from './TaskDetails'
 import { CopyButton } from './CopyButton'
 import { t } from '../i18n'
 import { currentProject } from '../notices'
-import { ZineEmbellishmentCard } from './ZineEmbellishmentCard'
+import { RequestEmbellishments, ZineEmbellishmentCard } from './ZineEmbellishmentCard'
 
 const GEN_TOOLS = new Set(['generate_image', 'generate_video', 'edit_image', 'animate_image', 'upscale_image', 'remove_background', 'expand_image', 'split_layers', 'change_angle', 'replace_text', 'edit_region', 'erase_region', 'move_object', 'style_transfer', 'extend_video', 'upscale_video', 'remove_video_background', 'generate_music', 'generate_sound_effect', 'text_to_speech', 'image_to_3d', 'edit_elements', 'create_mockup', 'create_slides'])
 
@@ -184,6 +184,11 @@ export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }
     }
   })
   flush()
+  if (m.status === 'done') for (const b of m.blocks) {
+    const rec = b.recommendation
+    if (b.type === 'embellishment_recommendation' && rec?.project === currentProject())
+      items.push(<RequestEmbellishments key={rec.frame + rec.version + rec.idea} editor={editor} frame={rec.frame} recommendation={rec} />)
+  }
   if (outputs.length) items.push(<div key="results" className="ca-chat__thumbs ca-chat__results">{outputs.map((s) => <Thumb key={s} editor={editor} src={s} />)}</div>)
   return <>{items}</>
 }

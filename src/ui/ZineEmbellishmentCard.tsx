@@ -5,28 +5,29 @@ import { busy } from '../bot'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
 import { focusZinePage, getZinePages } from '../zine'
-import { canRequestEmbellishments, decideEmbellishments, embellishmentOfferStatus, type EmbellishmentOffer } from '../zineEmbellishments'
+import { canRequestEmbellishments, embellishmentVersion, decideEmbellishments, embellishmentOfferStatus, type EmbellishmentOffer } from '../zineEmbellishments'
 
-export function RequestEmbellishments({ editor, frame, refresh, onSent }: { editor: Editor; frame: string; refresh?: boolean; onSent?: () => void }) {
+export function RequestEmbellishments({ editor, frame, refresh, recommendation, onSent }: { editor: Editor; frame: string; refresh?: boolean; recommendation?: { idea: string; version: string }; onSent?: () => void }) {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const available = useValue('can request embellishments', () => canRequestEmbellishments(editor, frame), [editor, frame])
+  const available = useValue('can request embellishments', () => canRequestEmbellishments(editor, frame) && (!recommendation || recommendation.version === embellishmentVersion(editor, frame)), [editor, frame, recommendation])
   const working = useValue('agent running', busy, [])
   if (!available) return null
   async function request() {
     const page = getZinePages(editor).findIndex(id => id === frame)
     if (page < 0 || busy()) return
+    if (recommendation && recommendation.version !== embellishmentVersion(editor, frame)) return
     setSending(true)
     setError('')
     try {
       focusZinePage(editor, page)
-      await sendToAgent(editor, t('embellishment.review'), [], null)
+      await sendToAgent(editor, recommendation ? t('embellishment.tryIdea', recommendation.idea) : t('embellishment.review'), [], null, [], [], '', 'embellishment')
       onSent?.()
     } catch (e) { setError(errorText(e)) }
     finally { setSending(false) }
   }
-  return <><button type="button" disabled={sending || working} onClick={request}>
-    {t(refresh ? 'embellishment.refresh' : 'embellishment.open')}
+  return <>{recommendation && <p>{recommendation.idea}</p>}<button type="button" disabled={sending || working} onClick={request}>
+    {t(recommendation ? 'embellishment.try' : refresh ? 'embellishment.refresh' : 'embellishment.open')}
   </button>{error && <span role="alert">{error}</span>}</>
 }
 

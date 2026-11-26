@@ -17,7 +17,7 @@ AGENT_GUIDE = (
 CORE_MCP_TOOLS = [
     "server_info", "get_canvas", "update_roadmap", "place_photo", "view_canvas", "view_video", "brand_kits", "search_images",
     "list_photo_adjustments", "adjust_photo", "vectorcraft_color_blocks", "render_vectorcraft", "read_vectorcraft", "create_slides", "vectorize_image",
-    "add_text", "preview_embellishments", "suggest_embellishments", "add_shape", "create_frame", "update_shapes", "delete_shapes",
+    "add_text", "recommend_embellishment", "preview_embellishments", "suggest_embellishments", "add_shape", "create_frame", "update_shapes", "delete_shapes",
     "focus", "memory", "skill", "ask_user", "update_plan",
 ]
 

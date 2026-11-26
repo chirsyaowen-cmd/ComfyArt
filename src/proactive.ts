@@ -156,6 +156,7 @@ export function startProactive(editor: Editor, onError: ErrorSink) {
     priorStep = guide?.step.id ?? ''
     last = signature
     guideShown.set(null)
+    if (guide?.content && ['cover', 'back_cover', 'spread'].includes(guide.step.type) && guide.step.status !== 'deferred') return
     if (!guide || removed || (!guide.photos.length && !guide.content && guide.step.type !== 'typography' && guide.step.status !== 'deferred')) return
     const turn = currentRoadmapTurn(editor)
     const valid = () => quiet() && turn === currentRoadmapTurn(editor) && roadmapGuide(editor)?.signature === signature

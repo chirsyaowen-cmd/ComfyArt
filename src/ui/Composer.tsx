@@ -6,12 +6,11 @@ import { EachButton, EachRole, useEach } from './EachToggle'
 import { RefFrameButton } from './RefFrameButton'
 import { PHOTO_ACCEPT } from '../photoImport'
 import { guideShown, roadmapGuide } from '../roadmapGuide'
-import { coverPhoto, COVER_PHOTO_STEP, roadmap } from '../roadmap'
 import { activeZineIndex, getZinePages } from '../zine'
 import { RequestEmbellishments } from './ZineEmbellishmentCard'
 import { describeZine, inspectZine } from '../zineReview'
 import { ZinePhotoPrompt } from './ZinePhotoPrompt'
-import { botEnabledAtom, chatIdAtom, messagesAtom } from '../bot'
+import { botEnabledAtom, messagesAtom } from '../bot'
 import { imageUrl } from '../comfy'
 import { VIDEO_RATIOS } from '../genOptions'
 import { errorText } from '../jobs'
@@ -69,30 +68,13 @@ function DirectPills({ editor, video }: { editor: Editor; video: boolean }) {
 }
 
 export function Composer({ editor, busy, onError }: { editor: Editor; busy: boolean; onError: (msg: string) => void }) {
-  const chatId = useValue(chatIdAtom)
-  const autoGuide = useValue('automatic roadmap guide', () => !!guideShown.get() && guideShown.get() === roadmapGuide(editor)?.signature, [editor])
-  const [photoPromptChat, setPhotoPromptChat] = useState<string | null | undefined>(undefined)
+  const autoGuide = useValue('automatic roadmap guide', () => guideShown.get() === roadmapGuide(editor)?.signature ? guideShown.get() : null, [editor])
   const activePage = useValue('embellishment target', () => getZinePages(editor)[activeZineIndex(editor)], [editor])
   function reviewCanvas() {
     setMenu(null)
     const book = inspectZine(editor)
-    if (book && (!book.occupied.length || roadmapGuide(editor)?.step.type === 'typography')) {
-      setPhotoPromptChat(chatId)
-      return
-    }
-    setPhotoPromptChat(undefined)
-    const photo = book && coverPhoto(editor)
-    const step = photo && roadmap(editor).steps.find(s => s.id === COVER_PHOTO_STEP)
-    if (photo && step && (step.status === 'pending' || step.status === 'in_progress')) {
-      const context = describeZine(book!) + '\nThe attached cover photo is ' + photo.id +
-        '. Inspect the attachment or use view_canvas with ids containing that shape ID. Read get_canvas.book_frames for the cover frame_version. ' +
-        'Use adjust_photo once with a concrete plain-language suggestion and ordered parameters suited to the image and user intent. ' +
-        'The suggestion should be one short, friendly question about how the picture will look. After applying, give a single sentence pointing to the controls. It asks for confirmation and records the cover-photo decision in the roadmap itself. Treat its completed_step_id as final. Follow the project goal and the actual light and dark areas. For a two-ink look, desaturate then map shadows and highlights to colors you choose. ' +
-        'For other images choose appropriate colors or contrast alone. If pixels are unavailable, tell the user.'
-      void sendToAgent(editor, t('photo.review'), [photo], null, [], [], context).catch(fail)
-      return
-    }
-    void sendToAgent(editor, book ? t('zineReview.manual') : REVIEW_PROMPT, [], null, [], [], book ? describeZine(book) : '').catch(fail)
+    void sendToAgent(editor, book ? t('zineReview.manual') : REVIEW_PROMPT, [], null, [], [],
+      book ? describeZine(book) : '', book ? 'canvas_review' : undefined).catch(fail)
   }
   const started = useValue('chat started', () => messagesAtom.get().length > 0, [])
   const draft = useValue(draftAtom)
@@ -215,7 +197,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           ))}
         </div>
       )}
-      {(photoPromptChat === chatId || autoGuide) && <ZinePhotoPrompt editor={editor} />}
+      {!busy && autoGuide && <ZinePhotoPrompt key={autoGuide} editor={editor} />}
       <div className="ca-composer__entry">
         {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
           <div className="ca-composer__chips">
@@ -281,7 +263,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
               </button>
               <div className="ca-menu__sep" />
               {activePage && <RequestEmbellishments editor={editor} frame={activePage} onSent={() => setMenu(null)} />}
-              <button type="button" className="ca-menu__item" onClick={reviewCanvas}>
+              <button type="button" className="ca-menu__item" disabled={busy} onClick={reviewCanvas}>
                 <span className="ca-icon">{Icons.search}</span><span className="ca-menu__grow">{t('composer.canvasReview')}</span>
               </button>
               <button type="button" className="ca-menu__item" onClick={() => { setMenu(null); schedulesOpenAtom.set(draft.trim() ? { prompt: draft.trim() } : {}) }}>

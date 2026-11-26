@@ -360,10 +360,14 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
               throw new Error('TASK_SUPERSEDED: start a fresh request from the Zine editor')
             return msg.roadmap_turn ? checkRoadmapTurn(editor, msg.roadmap_turn) : undefined
           }
-          const readOnly = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source', 'photo_adjust_target', 'preview_embellishments', 'suggest_embellishments'].includes(msg.action)
-          const previewTool = msg.action === 'preview_embellishments' || msg.action === 'suggest_embellishments'
-          const active = !readOnly || previewTool ? guard() : undefined
-          if (active?.reviewingEmbellishments && !readOnly)
+          const inspect = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source', 'photo_adjust_target'].includes(msg.action)
+          const recommend = msg.action === 'recommend_embellishment'
+          const preview = msg.action === 'preview_embellishments' || msg.action === 'suggest_embellishments'
+          const writesCanvas = !inspect && !recommend && !preview
+          const active = inspect ? undefined : guard()
+          if (active?.purpose === 'canvas_review' && !recommend)
+            throw new Error('Canvas inspection is read-only. Describe the finding or recommend an embellishment.')
+          if (active?.purpose === 'embellishment' && writesCanvas)
             throw new Error('This is a preview. Use preview_embellishments and submit the selected preview for the user to apply.')
           if (active?.placedText.size) {
             const ids = msg.action === 'update_shapes' ? msg.args.updates?.map((u: Args) => u.id)
@@ -373,7 +377,7 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
                 handoff: 'The text is ready for manual editing. This follow-up was skipped. Report the completed placement.' }
             }
           }
-          if (!readOnly && msg.action !== 'update_roadmap') editor.markHistoryStoppingPoint(`agent:${msg.action}`)
+          if (writesCanvas && msg.action !== 'update_roadmap') editor.markHistoryStoppingPoint(`agent:${msg.action}`)
           const result = handler(editor, msg.args ?? {}, onError, msg.chat ?? '', guard, matchingRoadmapTurn(editor, msg.roadmap_turn))
           if (active && msg.action === 'update_roadmap') active.revision = roadmap(editor).revision
           if (active && (msg.action === 'apply_photo_recipe' || msg.action === 'add_text')) return Promise.resolve(result).then(value => { active.revision = roadmap(editor).revision; return value })

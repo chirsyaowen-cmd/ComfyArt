@@ -14,6 +14,14 @@ def bot_turn_state():
     return chat_id, ACTIVE_TURNS.get(chat_id)
 
 
+def publish_blocks(chat_id, state, blocks):
+    blocks = [block for block in blocks if block not in state.blocks]
+    if blocks:
+        state.blocks.extend(blocks)
+        chat_store.update_message(chat_id, state.message_id, blocks=state.blocks)
+        broadcast("turn_embellishments", {"chat_id": chat_id, "message_id": state.message_id, "blocks": blocks})
+
+
 def publish_embellishments(result: dict) -> dict:
     offers = result.pop("embellishments", [])
     chat_id, state = bot_turn_state()
@@ -21,12 +29,18 @@ def publish_embellishments(result: dict) -> dict:
         return result
     blocks = [{"type": "embellishment", "offer": {**offer, "project": PROJECT.get()}}
               for offer in offers]
-    blocks = [block for block in blocks if block not in state.blocks]
-    if blocks:
-        state.blocks.extend(blocks)
-        chat_store.update_message(chat_id, state.message_id, blocks=state.blocks)
-        broadcast("turn_embellishments", {"chat_id": chat_id, "message_id": state.message_id, "blocks": blocks})
+    publish_blocks(chat_id, state, blocks)
     return {**result, "embellishment_cards": len(offers)}
+
+
+async def recommend_embellishment(args: dict) -> dict:
+    chat_id, state = bot_turn_state()
+    if state is None:
+        raise ValueError("Open an active canvas review first")
+    result = await submit_command("recommend_embellishment", args, PROJECT.get(), chat=chat_id)
+    block = {"type": "embellishment_recommendation", "recommendation": {**result["recommendation"], "project": PROJECT.get()}}
+    publish_blocks(chat_id, state, [block])
+    return {"recommended": True}
 
 
 async def suggest_embellishments(args: dict) -> dict:
@@ -191,6 +205,12 @@ ASK_USER_SCHEMA = {
 }
 
 TOOLS: dict[str, dict] = {
+    "recommend_embellishment": {
+        "description": "During read-only canvas inspection, offer one concrete idea for an inspected page if it would improve the design. The user can request a preview later.",
+        "inputSchema": {"type": "object", "properties": {"frame": {"type": "string"}, "idea": {"type": "string"}},
+                        "required": ["frame", "idea"], "additionalProperties": False},
+        "handler": recommend_embellishment,
+    },
     "suggest_embellishments": {
         "description": "Post the inspected preview in chat for the user to apply or skip.",
         "inputSchema": {"type": "object", "properties": {"preview_id": {"type": "string"}},

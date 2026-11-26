@@ -39,6 +39,8 @@
   "road.addCaption": "写一条图注",
   "road.imageOnly": "保留纯图片",
   "road.requestEmbellishment": "想加点缀时，告诉我想放什么。",
+  "embellishment.try": "试排点缀",
+  "embellishment.tryIdea": "请试排这个点缀建议：{0}",
   "embellishment.title": "点缀建议",
   "embellishment.review": "看看这页可以加什么点缀。",
   "embellishment.prompt": "要给{0}加一点点缀吗？",

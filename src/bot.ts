@@ -23,6 +23,7 @@ export interface BotBlock {
   ask_id?: string
   prompt?: string
   options?: AskOption[]
+  recommendation?: { frame: string; idea: string; version: string; project: string }
   offer?: EmbellishmentOffer & { project: string }
   min_selections?: number
   max_selections?: number
@@ -85,6 +86,7 @@ export const TOOL_LABELS: Record<string, string> = {
   place_html: t('bot.placeWebPage'),
   create_slides: t('bot.createPpt'),
   add_text: t('bot.addText'),
+  recommend_embellishment: t('embellishment.title'),
   preview_embellishments: t('embellishment.title'),
   suggest_embellishments: t('embellishment.title'),
   add_shape: t('bot.addShape'),

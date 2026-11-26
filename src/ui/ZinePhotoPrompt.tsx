@@ -16,6 +16,7 @@ export function ZinePhotoPrompt({ editor, actionsOnly = false }: { editor: Edito
   const guide = useValue('current roadmap guidance', () => roadmapGuide(editor), [editor])
   const [sendingText, setSendingText] = useState(false)
   const [picker, setPicker] = useState(false)
+  const [choosingPhoto, setChoosingPhoto] = useState(false)
   const [page, setPage] = useState('')
   const [error, setError] = useState('')
   if (!guide) return <button className="ca-panel__chip" onClick={() => roadmapOpen.set(true)}>{t('road.title')}</button>
@@ -56,7 +57,8 @@ export function ZinePhotoPrompt({ editor, actionsOnly = false }: { editor: Edito
         }}>{t('road.imageOnly')}</button>
       </>}
       {pick && !photos.length && <button onClick={() => importFiles(editor, 'image/*')}>{t('zineReview.upload')}</button>}
-      {pick && !!photos.length && <>
+      {pick && !!photos.length && !choosingPhoto && <button onClick={() => setChoosingPhoto(true)}>{t('road.place')}</button>}
+      {pick && !!photos.length && choosingPhoto && <>
         <button onClick={() => setPicker(!picker)}>{t('road.pick')}</button>
         <button onClick={() => void sendToAgent(editor, t('road.helpPick', step.title), [], null).catch(e => setError(errorText(e)))}>{t('road.help')}</button>
       </>}

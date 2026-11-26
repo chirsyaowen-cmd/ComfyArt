@@ -1,11 +1,9 @@
 import { createShapeId, getHashForString, type Editor, type TLFrameShape } from 'tldraw'
 
-import { roadmap } from './roadmap'
 import { exportImage } from './shapes/ArtboardShape'
 import { uuid } from './id'
 import { VECTOR, polygonPoints, type VectorShape } from './shapes/VectorShape'
 import { getZinePages } from './zine'
-import { textShapesOnPage } from './zineText'
 import { t } from './i18n'
 
 type Mark = { kind: 'rect' | 'ellipse' | 'star'; x: number; y: number; w: number; h: number; rotation: number; fill: string }
@@ -35,23 +33,17 @@ export function embellishmentPageStatus(editor: Editor, id: string) {
   return frame && decision(frame)?.choice
 }
 
-function readyPage(editor: Editor, id: string) {
-  const frame = pageFrame(editor, id)
-  if (!frame) return
-  const steps = roadmap(editor).steps.filter(step => step.targetFrameIds.includes(frame.id))
-  if (steps.some(step => step.type === 'photo_adjust' && (step.status === 'pending' || step.status === 'in_progress'))) return
-  const stage = steps.find(step => step.type === 'embellishment')
-  const copy = textShapesOnPage(editor, frame.id)
-  if (stage && copy.length) return { frame, stage, copy }
-}
-
 export function canRequestEmbellishments(editor: Editor, id: string) {
-  const page = readyPage(editor, id)
-  return !!page && decision(page.frame)?.choice !== 'applied'
+  return !!pageFrame(editor, id) && !editor.getIsReadonly()
 }
 
 function versionOf(editor: Editor, frame: TLFrameShape) {
   return getHashForString(JSON.stringify(pageShapes(editor, frame).sort((a, b) => a.id.localeCompare(b.id))))
+}
+
+export function embellishmentVersion(editor: Editor, id: string) {
+  const frame = pageFrame(editor, id)
+  return frame && versionOf(editor, frame)
 }
 
 function isMark(input: unknown): input is Mark {
@@ -101,8 +93,8 @@ export function embellishmentOfferStatus(editor: Editor, offer: EmbellishmentOff
   if (!frame) return 'stale'
   const previous = decision(frame)
   if (previous && (previous.proposal ? previous.proposal === offer.id : previous.version === offer.version)) return previous.choice
-  if (!offer.preview || previous?.choice === 'applied') return 'stale'
-  return versionOf(editor, frame) === offer.version && readyPage(editor, offer.frame) ? 'open' : 'stale'
+  if (!offer.preview) return 'stale'
+  return versionOf(editor, frame) === offer.version ? 'open' : 'stale'
 }
 
 export function decideEmbellishments(editor: Editor, offer: EmbellishmentOffer, selection: 'apply' | 'skip') {

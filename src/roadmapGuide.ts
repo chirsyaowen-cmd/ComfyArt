@@ -39,5 +39,5 @@ export function roadmapGuide(editor: Editor) {
     : t('road.suggest', step.title)
   const textFrame = targets.includes(frame) ? frame : targets[0]
   return { step, targets, textFrame, content, photos, text, revision: plan.revision,
-    signature: JSON.stringify([plan.revision, step.id, step.type === 'typography' ? textFrame : null, photos.map(p => p.key), !!content]) }
+    signature: JSON.stringify([plan.revision, step.id, frame, textFrame, photos.map(p => p.key), !!content]) }
 }

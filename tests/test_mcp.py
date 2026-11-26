@@ -116,6 +116,23 @@ async def test_zine_title_then_reviewed_decoration_preview(bot_client):
         ACTIVE_TURNS.pop(chat["id"], None)
 
 
+async def test_review_recommendation_is_bound_to_the_reviewed_page(bot_client):
+    await _open(bot_client)
+    chat = chat_store.create_chat(user="default", project="p", provider="deepseek-harness")
+    msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
+    ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
+    recommendation = {"frame": "shape:cover", "idea": "沿叶柄加一条暖色细线", "version": "seen-layout"}
+    try:
+        call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc(
+            "tools/call", {"name": "recommend_embellishment", "arguments": {k: recommendation[k] for k in ("frame", "idea")}})))
+        await _answer_commands(bot_client, lambda _: {"ok": True, "result": {"recommendation": recommendation}})
+        assert not (await (await call).json())["result"]["isError"]
+        assert chat_store.get_message(chat["id"], msg["id"])["blocks"] == [
+            {"type": "embellishment_recommendation", "recommendation": {**recommendation, "project": "p"}}]
+    finally:
+        ACTIVE_TURNS.pop(chat["id"], None)
+
+
 async def test_comfyui_models_are_not_available(bot_client):
     response = await bot_client.post("/comfyart/mcp", json=_rpc("tools/list"))
     names = {row["name"] for row in (await response.json())["result"]["tools"]}
