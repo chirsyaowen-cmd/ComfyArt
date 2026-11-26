@@ -43,8 +43,8 @@ async function update(fn: (list: Notice[]) => Notice[]) {
 
 channel.onmessage = () => void loadNotices()
 
-export function notify(n: Omit<Notice, 'id' | 'time' | 'project'> & { project?: string }) {
-  const notice: Notice = { id: uuid().slice(0, 8), time: Date.now(), project: currentProject(), ...n }
+export function notify(n: Omit<Notice, 'id' | 'time' | 'project'> & { project?: string }, id = uuid().slice(0, 8)) {
+  const notice: Notice = { id, time: Date.now(), project: currentProject(), ...n }
   if (document.hidden && pushEnabled() && Notification.permission === 'granted') {
     new Notification(notice.title, { body: notice.body, icon: notice.srcs?.[0] })
   }

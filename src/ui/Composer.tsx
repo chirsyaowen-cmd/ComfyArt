@@ -8,9 +8,8 @@ import { PHOTO_ACCEPT } from '../photoImport'
 import { activeZineIndex, getZinePages } from '../zine'
 import { RequestEmbellishments } from './ZineEmbellishmentCard'
 import { markManualReview, roadmapReviewContext } from '../roadmapGuide'
-import { describeZine, inspectZine } from '../zineReview'
-import { EmptyBookPhotos, ZinePhotoPrompt } from './ZinePhotoPrompt'
-import { botEnabledAtom, chatIdAtom, messagesAtom } from '../bot'
+import { describeZine } from '../zineReview'
+import { botEnabledAtom, messagesAtom } from '../bot'
 import { imageUrl } from '../comfy'
 import { VIDEO_RATIOS } from '../genOptions'
 import { errorText } from '../jobs'
@@ -69,25 +68,11 @@ function DirectPills({ editor, video }: { editor: Editor; video: boolean }) {
 
 export function Composer({ editor, busy, onError }: { editor: Editor; busy: boolean; onError: (msg: string) => void }) {
   const activePage = useValue('embellishment target', () => getZinePages(editor)[activeZineIndex(editor)], [editor])
-  const chatId = useValue(chatIdAtom)
-  const [photoTarget, setPhotoTarget] = useState<TLShapeId | null>(null)
-  const showPhotoSources = useValue('empty book photo sources', () =>
-    !!photoTarget && photoTarget === activePage && inspectZine(editor)?.occupied.length === 0,
-    [editor, activePage, photoTarget])
-  const previousChat = useRef(chatId)
-  useEffect(() => {
-    if (previousChat.current && previousChat.current !== chatId) setPhotoTarget(null)
-    previousChat.current = chatId
-  }, [chatId])
-  useEffect(() => { if (!showPhotoSources) setPhotoTarget(null) }, [showPhotoSources])
   function reviewCanvas() {
     setMenu(null)
     const context = roadmapReviewContext(editor)
     const book = context?.book
     if (context) markManualReview(context.bookVersion)
-    if (book && !book.occupied.length && activePage) {
-      setPhotoTarget(activePage)
-    }
     void sendToAgent(editor, book ? t('zineReview.manual') : REVIEW_PROMPT, [], null, [], [],
       book ? describeZine(book) : '', book ? 'canvas_review' : undefined).catch(fail)
   }
@@ -212,8 +197,6 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           ))}
         </div>
       )}
-      {showPhotoSources && photoTarget && <EmptyBookPhotos editor={editor} frame={photoTarget} onError={onError} onRequest={() => setPhotoTarget(null)} />}
-      {!busy && <ZinePhotoPrompt editor={editor} onError={onError} />}
       <div className="ca-composer__entry">
         {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
           <div className="ca-composer__chips">

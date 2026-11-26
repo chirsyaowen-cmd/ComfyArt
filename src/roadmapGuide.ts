@@ -8,7 +8,7 @@ import { activeZineIndex, zineSpreads } from './zine'
 import { inspectZine } from './zineReview'
 
 export const roadmapOpen = atom('show project roadmap', false)
-export const guideShown = atom<{ signature: string; advice: RoadmapAdvice } | null>('latest roadmap advice', null)
+export const guideShown = atom<{ noticeId: string; signature: string; advice: RoadmapAdvice } | null>('latest roadmap advice', null)
 
 export function roadmapReviewContext(editor: Editor) {
   const book = inspectZine(editor)

@@ -10,7 +10,7 @@ from ComfyArt.__main__ import create_app
 from conftest import write_settings
 
 
-async def test_blank_book_review_opens_file_chooser_and_places_selected_project_photo():
+async def test_blank_book_review_shows_only_agent_options_before_and_after_import():
     playwright = pytest.importorskip("playwright.async_api")
     write_settings(**{"enable-mcp": True, "enable-bot": True, "proactive-review": True})
     async with TestServer(create_app()) as server, playwright.async_playwright() as pw:
@@ -23,11 +23,26 @@ async def test_blank_book_review_opens_file_chooser_and_places_selected_project_
                 {"kind": "upload_photos", "label": "Choose photos from device"}]}
             await page.route("**/api/comfyart/bot/complete", lambda route: route.fulfill(
                 json={"text": json.dumps({"suggestion": suggestion})}))
+            old_notice = {"id": "older-review", "project": "photo-review-test", "kind": "suggestion",
+                          "title": "Previous review", "body": suggestion["text"], "time": 1,
+                          "source": "canvas_review", "roadmapAdvice": True}
+            saved = await page.request.post(str(server.make_url("/api/userdata/comfyart/notices.json")),
+                                            data=json.dumps([old_notice]))
+            assert saved.ok
             await page.goto(str(server.make_url("/comfyart/?project=photo-review-test&new=1&format=zine")))
-            source = page.get_by_role("button", name="Choose photos from device")
             project = page.get_by_role("button", name="Choose from project photos")
+            bell = page.get_by_title("Notifications", exact=True)
+            await bell.click()
+            old_row = page.locator(".ca-notice__item").filter(has_text="Previous review")
+            new_row = page.locator(".ca-notice__item").filter(has_text="Canvas check-up")
+            source = new_row.get_by_role("button", name="Choose photos from device")
             await playwright.expect(source).to_be_visible(timeout=15000)
-            await playwright.expect(project).to_have_count(0)
+            await playwright.expect(old_row).to_be_visible()
+            await playwright.expect(old_row.locator(".ca-zine-photo button")).to_have_count(0)
+            composer = page.locator(".ca-composer")
+            await playwright.expect(composer.get_by_text(suggestion["text"], exact=True)).to_have_count(0)
+            await playwright.expect(composer.get_by_role("button", name="Choose photos from device")).to_have_count(0)
+            await playwright.expect(page.locator(".ca-zine-photo button")).to_have_text(["Choose photos from device"])
             async def roadmap():
                 response = await page.request.get(str(server.make_url("/api/comfyart/projects/photo-review-test")))
                 return (await response.json())["document"]["store"]["document:document"]["meta"]["roadmap"]
@@ -45,13 +60,15 @@ async def test_blank_book_review_opens_file_chooser_and_places_selected_project_
             chooser = await event.value
             photo = BytesIO()
             Image.new("RGB", (80, 60), "green").save(photo, "PNG")
-            chooser = await event.value
             await chooser.set_files({"name": "leaf.png", "mimeType": "image/png", "buffer": photo.getvalue()})
+            photo_button = page.locator(".ca-photo-import").get_by_role("button", name="leaf.png")
+            await playwright.expect(photo_button).to_be_visible()
+            await bell.click()
             await page.get_by_role("button", name="Add", exact=True).click()
             await page.get_by_role("button", name="Canvas Review", exact=True).click()
-            await project.click()
-            grid = page.locator(".ca-zine-photo")
-            await grid.get_by_role("button", name="leaf.png").click()
-            await playwright.expect(page.get_by_role("button", name="Choose from project photos")).to_have_count(0)
+            await playwright.expect(project).to_have_count(0)
+            await playwright.expect(page.get_by_role("button", name="Suggest a photo")).to_have_count(0)
+            await playwright.expect(page.locator(".ca-zine-photo button")).to_have_count(0)
+            await photo_button.click()
         finally:
             await browser.close()
