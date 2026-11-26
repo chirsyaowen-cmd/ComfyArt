@@ -1,3 +1,4 @@
+import { uuid } from './id'
 import { Box, react, type Editor, type TLShapeId } from 'tldraw'
 
 import { api, readUserJson, uploadImage, viewUrl, writeUserJson } from './comfy'
@@ -174,9 +175,14 @@ export function startProactive(editor: Editor, onError: ErrorSink) {
           layoutContext(editor, editor.getShapeAndDescendantIds(targets)))), plan.steps)
         if (!valid()) return
         last = signature
-        guideShown.set(advice ? { signature, advice } : null)
-        if (advice) await notify({ project, source: 'canvas_review', kind: 'suggestion',
-          title: t('proactive.reviewTitle'), body: advice.text, roadmapAdvice: true })
+        if (!advice) {
+          guideShown.set(null)
+          return
+        }
+        const noticeId = uuid()
+        guideShown.set({ noticeId, signature, advice })
+        await notify({ project, source: 'canvas_review', kind: 'suggestion',
+          title: t('proactive.reviewTitle'), body: advice.text, roadmapAdvice: true }, noticeId)
       })().catch(e => { if (valid()) fail(e) })
     }, 1500)
   })

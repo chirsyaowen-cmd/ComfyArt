@@ -58,7 +58,7 @@ export function NoticeCenter({ editor, onError }: { editor: Editor; onError: (me
               <div className="ca-menu__grow ca-notice__text">
                 <div className="ca-notice__title">{n.title}</div>
                 {n.body && <div className="ca-notice__body">{n.body}</div>}
-                {n.roadmapAdvice && n.body && n.project === currentProject() && <NoticeReviewOptions editor={editor} onError={onError} noticeText={n.body} />}
+                {n.roadmapAdvice && n.body && n.project === currentProject() && <NoticeReviewOptions editor={editor} onError={onError} noticeId={n.id} />}
                 <div className="ca-chat__hint">{timeAgo(n.time)}{n.project !== currentProject() ? t('noticeCenter.otherProject') : ''}</div>
               </div>
               {n.srcs?.[0] && (/\.(mp4|webm|mov)(&|$)/.test(n.srcs[0])

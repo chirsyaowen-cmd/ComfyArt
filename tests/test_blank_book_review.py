@@ -23,12 +23,22 @@ async def test_blank_book_review_shows_only_agent_options_before_and_after_impor
                 {"kind": "upload_photos", "label": "Choose photos from device"}]}
             await page.route("**/api/comfyart/bot/complete", lambda route: route.fulfill(
                 json={"text": json.dumps({"suggestion": suggestion})}))
+            old_notice = {"id": "older-review", "project": "photo-review-test", "kind": "suggestion",
+                          "title": "Previous review", "body": suggestion["text"], "time": 1,
+                          "source": "canvas_review", "roadmapAdvice": True}
+            saved = await page.request.post(str(server.make_url("/api/userdata/comfyart/notices.json")),
+                                            data=json.dumps([old_notice]))
+            assert saved.ok
             await page.goto(str(server.make_url("/comfyart/?project=photo-review-test&new=1&format=zine")))
             project = page.get_by_role("button", name="Choose from project photos")
             bell = page.get_by_title("Notifications", exact=True)
             await bell.click()
-            source = page.locator(".ca-notice").get_by_role("button", name="Choose photos from device")
+            old_row = page.locator(".ca-notice__item").filter(has_text="Previous review")
+            new_row = page.locator(".ca-notice__item").filter(has_text="Canvas check-up")
+            source = new_row.get_by_role("button", name="Choose photos from device")
             await playwright.expect(source).to_be_visible(timeout=15000)
+            await playwright.expect(old_row).to_be_visible()
+            await playwright.expect(old_row.locator(".ca-zine-photo button")).to_have_count(0)
             composer = page.locator(".ca-composer")
             await playwright.expect(composer.get_by_text(suggestion["text"], exact=True)).to_have_count(0)
             await playwright.expect(composer.get_by_role("button", name="Choose photos from device")).to_have_count(0)

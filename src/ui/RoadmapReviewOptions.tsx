@@ -10,9 +10,9 @@ import { currentRoadmapAdvice, guideShown, roadmapReviewContext } from '../roadm
 import { readLocal, writeLocal } from '../localPrefs'
 import { importFiles } from './DropHandlers'
 
-export function NoticeReviewOptions({ editor, onError, noticeText }: { editor: Editor; onError: ErrorSink; noticeText: string }) {
+export function NoticeReviewOptions({ editor, onError, noticeId }: { editor: Editor; onError: ErrorSink; noticeId: string }) {
   const guide = useValue('current roadmap advice', () => currentRoadmapAdvice(editor), [editor])
-  if (!guide || noticeText !== guide.advice.text) return null
+  if (!guide || noticeId !== guide.noticeId) return null
   return <ReviewOptions editor={editor} advice={guide.advice} onError={onError} showText={false}
     valid={() => guide === currentRoadmapAdvice(editor)} close={() => {
       if (guideShown.get() === guide) guideShown.set(null)
