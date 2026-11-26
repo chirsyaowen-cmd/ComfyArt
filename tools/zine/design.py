@@ -219,12 +219,7 @@ async def generate_book(args):
         prepare_originals(png_dir, json.loads(originals.read_text()))
     png_enabled = bool(os.environ.get("BRAVE_SEARCH_API_KEY") or originals.exists())
     if png_enabled:
-        args.prompt += (
-            "\n需要复现独立的插画贴纸、邮票、胶带或装饰印章时，可以调用 search_png，指定 provider 为 Vecteezy、Pngtree 或 PNGimg，"
-            "用装饰风格与图形的英文关键词检索，观察候选图并选择。没有合适的图就保留原样。"
-            "选中后用独立基本图层 {id,name,kind:'png',asset:返回的完整资源键,box:[x,y,w,h],rotation,opacity}；"
-            "数组顺序控制遮挡。PNG 等比内接框，预览保留原貌。不要把这些图当作用户照片或整页背景。"
-        )
+        args.prompt += "\n" + (HERE / "png-contract.txt").read_text()
     args.schema_digest = hashlib.sha256(
         SCHEMA_FILE.read_bytes()
         + ((png_dir / "originals.json").read_bytes() if originals.exists() else b"")
