@@ -65,7 +65,11 @@ class SpreadTeamTest(unittest.IsolatedAsyncioTestCase):
                                     spread=task.key,
                                     token=str(uuid.uuid4()),
                                     json=json.dumps(
-                                        {"treatment": {"contrast": contrast}}
+                                        {
+                                            "treatment": {"contrast": contrast},
+                                            "spreads": [],
+                                            "components": [],
+                                        }
                                     ),
                                 )
                             await event("end", reason="completed")

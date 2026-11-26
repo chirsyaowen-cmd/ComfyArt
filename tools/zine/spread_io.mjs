@@ -10,13 +10,13 @@ function notify(params) {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: '_comfyart/spread', params }) + '\n')
 }
 
-async function validationResult(token) {
+async function receiptResult(token, attempts = 300) {
   const receipt = path.join(root, token + '.receipt')
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < attempts; i++) {
     try {
       const result = JSON.parse(await fs.readFile(receipt, 'utf8'))
       if (result.error) throw Error(result.error)
-      return 'Design accepted. Finish now.'
+      return result
     } catch (error) {
       if (error.code !== 'ENOENT') throw error
       await delay(100)
@@ -68,12 +68,30 @@ export function apply(ctx) {
       return JSON.stringify(result)
     }, (_, value) => JSON.parse(value))
 
+  register('search_png', 'Look for optional transparent Vecteezy, Pngtree or PNGimg decorations for your assigned reference. Results identify design previews and project originals.', { spread: string, query: string, provider: {type:'string', enum:['Vecteezy','Pngtree','PNGimg']} },
+    async ({ spread, query, provider }, exec) => {
+      const child = exec.agent.session.id
+      if (!children.has(child) || assigned.get(child) !== spread) throw Error('Read your reference first')
+      const token = randomUUID()
+      notify({event:'search_png', child, spread, token, query, provider})
+      const {blocks} = await receiptResult(token, 1800)
+      const result = []
+      for (const b of blocks) {
+        if (b.type === 'text') result.push(b)
+        else result.push({type:'image', attachment:await ctx.attachments.saveImage({
+          data:Buffer.from(b.data,'base64'),mediaType:b.mimeType,name:'decoration-candidates.jpg',
+        })})
+      }
+      return JSON.stringify(result)
+    }, (_, value) => JSON.parse(value))
+
   register('submit_spec', 'Submit your complete editable design JSON after reading the reference.',
     { spread: string, json: string }, async ({ spread, json }, exec) => {
       const child = exec.agent.session.id
       if (!children.has(child) || assigned.get(child) !== spread) throw Error('Read your reference first')
       const token = randomUUID()
       notify({ event: 'submit', child, spread, token, json })
-      return await validationResult(token)
+      await receiptResult(token)
+      return 'Design accepted. Finish now.'
     }, (_, text) => [{ type: 'text', text }])
 }

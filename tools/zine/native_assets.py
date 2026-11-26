@@ -53,6 +53,7 @@ class CanvasAssets:
         self.imports = {}
         self.adjustments = {}
         self.grain_url = None
+        self.decorations = {}
 
     async def upload(self, data, name, mime="image/png"):
         form = aiohttp.FormData()
@@ -85,6 +86,25 @@ class CanvasAssets:
             },
         }
         return aid
+
+    async def decoration(self, key):
+        from png_assets import read_png
+
+        if key not in self.decorations:
+            info, raw = read_png(self.png_dir, key)
+            url = await self.upload(raw, "decoration-" + key + ".png")
+            size = [info["width"], info["height"]]
+            aid = self.add(url, info["title"], size, "image/png")
+            self.store[aid]["meta"]["decoration"] = info
+            self.decorations[key] = {"aid": aid, "size": size, "info": info}
+            audit(
+                self.trace,
+                "png.placed_asset",
+                asset=key,
+                origin=info["origin"],
+                page=info["sourcePageUrl"],
+            )
+        return self.decorations[key]
 
     async def source(self, photo_id):
         if photo_id in self.imports:
