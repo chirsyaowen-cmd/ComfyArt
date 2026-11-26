@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { useValue, type Editor } from 'tldraw'
+import { useValue, type Editor, type TLShapeId } from 'tldraw'
 
+import { placeAsset } from '../assets'
+import { busy } from '../bot'
 import { sendToAgent } from '../agent'
 import { thumbUrl, viewUrl } from '../comfy'
 import { t } from '../i18n'
@@ -8,9 +10,36 @@ import { errorText } from '../jobs'
 import { updateRoadmap } from '../roadmap'
 import { KEEP_IMAGE_ONLY, onRequest } from '../roadmapModel'
 import { roadmapGuide, roadmapOpen } from '../roadmapGuide'
-import { frameFacts, placeProjectPhoto } from '../roadmapPhotos'
+import { frameFacts, placeProjectPhoto, projectPhotos } from '../roadmapPhotos'
 import { focusZinePage, getZinePages } from '../zine'
 import { importFiles } from './DropHandlers'
+
+export function EmptyBookPhotos({ editor, frame, onError, onRequest }: {
+  editor: Editor; frame: TLShapeId; onError: (error: string) => void; onRequest: () => void
+}) {
+  const photos = useValue('available project photos', () => projectPhotos(editor).photos.filter(p => p.state === 'ready'), [editor])
+  const working = useValue('agent running', busy, [])
+  const [picker, setPicker] = useState(false)
+  const help = () => {
+    const page = getZinePages(editor).indexOf(frame) + 1
+    void sendToAgent(editor, t('zineReview.helpPhoto', page), [], null).then(onRequest).catch(e => onError(errorText(e)))
+  }
+  return <div className="ca-zine-photo">
+    <div>{t('zineReview.blankBook')}</div>
+    <div className="ca-zine-photo__actions">
+      <button type="button" onClick={() => importFiles(editor, 'image/*')}>{t('zineReview.devicePhotos')}</button>
+      {!!photos.length && <>
+        <button type="button" aria-expanded={picker} onClick={() => setPicker(!picker)}>{t('zineReview.projectPhotos')}</button>
+        <button type="button" disabled={working} onClick={help}>{t('road.help')}</button>
+      </>}
+    </div>
+    {picker && <div className="ca-assets__grid">{photos.map(photo =>
+      <button type="button" key={photo.key} title={photo.name} className="ca-side__cell" onClick={() =>
+        void placeAsset(editor, { kind: 'image', name: photo.name, src: viewUrl(photo.ref) }, frame).catch(e => onError(errorText(e)))}>
+        <img alt={photo.name} src={thumbUrl(viewUrl(photo.ref))} loading="lazy" />
+      </button>)}</div>}
+  </div>
+}
 
 export function ZinePhotoPrompt({ editor, actionsOnly = false }: { editor: Editor; actionsOnly?: boolean }) {
   const guide = useValue('current roadmap guidance', () => roadmapGuide(editor), [editor])
