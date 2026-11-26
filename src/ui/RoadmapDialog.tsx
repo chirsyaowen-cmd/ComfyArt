@@ -6,24 +6,16 @@ import { KEEP_IMAGE_ONLY, applies, treatedCoverTypography } from '../roadmapMode
 import { canUndoRoadmap, roadmap, undoRoadmap, updateRoadmap } from '../roadmap'
 import { roadmapGuide, roadmapOpen } from '../roadmapGuide'
 import { activeZineIndex, getZinePages } from '../zine'
-import { embellishmentPageStatus, makeEmbellishmentOffer, type EmbellishmentOffer } from '../zineEmbellishments'
+import { embellishmentPageStatus } from '../zineEmbellishments'
 import { Modal } from './Modal'
-import { ZineEmbellishmentCard } from './ZineEmbellishmentCard'
+import { RequestEmbellishments } from './ZineEmbellishmentCard'
 
 function EmbellishmentPage({ editor, id, label }: { editor: Editor; id: TLShapeId; label?: string }) {
-  const state = useValue('page embellishments', () => ({
-    status: embellishmentPageStatus(editor, id),
-    offer: makeEmbellishmentOffer(editor, id, true),
-  }), [editor, id])
-  const [offer, setOffer] = useState<EmbellishmentOffer>()
-  if (!state.status && !state.offer && !offer) return null
-  return <div>
-    <div className="ca-zine-photo__actions">
-      {label && <span>{label}</span>}
-      {state.status && <span>{t(`embellishment.${state.status}`)}</span>}
-      {state.offer && <button type="button" onClick={() => setOffer(state.offer)}>{t('embellishment.open')}</button>}
-    </div>
-    {offer && <ZineEmbellishmentCard key={offer.version} editor={editor} initial={offer} />}
+  const status = useValue('page embellishments', () => embellishmentPageStatus(editor, id), [editor, id])
+  return <div className="ca-zine-photo__actions">
+    {label && <span>{label}</span>}
+    {status && <span>{t('embellishment.' + status)}</span>}
+    <RequestEmbellishments editor={editor} frame={id} onSent={() => roadmapOpen.set(false)} />
   </div>
 }
 

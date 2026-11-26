@@ -1,50 +1,50 @@
 import { useState } from 'react'
 import { useValue, type Editor } from 'tldraw'
-
+import { sendToAgent } from '../agent'
+import { busy } from '../bot'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
-import { getZinePages } from '../zine'
-import { decideEmbellishments, embellishmentOfferStatus, makeEmbellishmentOffer, type EmbellishmentOffer } from '../zineEmbellishments'
+import { focusZinePage, getZinePages } from '../zine'
+import { canRequestEmbellishments, decideEmbellishments, embellishmentOfferStatus, type EmbellishmentOffer } from '../zineEmbellishments'
 
-export function ZineEmbellishmentCard({ editor, initial }: { editor: Editor; initial: EmbellishmentOffer }) {
-  const [offer, setOffer] = useState(initial)
-  const [selected, setSelected] = useState<EmbellishmentOffer['options']>([])
+export function RequestEmbellishments({ editor, frame, refresh, onSent }: { editor: Editor; frame: string; refresh?: boolean; onSent?: () => void }) {
+  const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const status = useValue('embellishment offer status', () => embellishmentOfferStatus(editor, offer), [editor, offer])
-  const page = useValue('embellishment page number', () => getZinePages(editor).findIndex(id => id === offer.frame), [editor, offer.frame])
-  const label = page === 0 ? t('embellishment.cover') : page > 0 ? t('road.page', page + 1) : ''
-
-  const refresh = () => {
-    const fresh = makeEmbellishmentOffer(editor, offer.frame, true)
-    if (!fresh) return setError(t('embellishment.unavailable'))
+  const available = useValue('can request embellishments', () => canRequestEmbellishments(editor, frame), [editor, frame])
+  const working = useValue('agent running', busy, [])
+  if (!available) return null
+  async function request() {
+    const page = getZinePages(editor).findIndex(id => id === frame)
+    if (page < 0 || busy()) return
+    setSending(true)
     setError('')
-    setSelected([])
-    setOffer(fresh)
+    try {
+      focusZinePage(editor, page)
+      await sendToAgent(editor, t('embellishment.review'), [], null)
+      onSent?.()
+    } catch (e) { setError(errorText(e)) }
+    finally { setSending(false) }
   }
-  const decide = (selection: EmbellishmentOffer['options'] | 'skip') => {
-    try { decideEmbellishments(editor, offer, selection); setError('') }
+  return <><button type="button" disabled={sending || working} onClick={request}>
+    {t(refresh ? 'embellishment.refresh' : 'embellishment.open')}
+  </button>{error && <span role="alert">{error}</span>}</>
+}
+
+export function ZineEmbellishmentCard({ editor, initial: offer }: { editor: Editor; initial: EmbellishmentOffer }) {
+  const [error, setError] = useState('')
+  const status = useValue('page preview status', () => embellishmentOfferStatus(editor, offer), [editor, offer])
+  const decide = (action: 'apply' | 'skip') => {
+    try { decideEmbellishments(editor, offer, action); setError('') }
     catch (e) { setError(errorText(e)) }
   }
-
   return <div className="ca-ask">
-    <div className="ca-ask__title">{label ? t('embellishment.prompt', label) : t('embellishment.unavailable')}</div>
-    {status === 'open' && <>
-      <div className="ca-panel__chips">
-        {offer.options.map(id => <button key={id} type="button" className="ca-panel__chip" aria-pressed={selected.includes(id)}
-          data-on={selected.includes(id) || undefined} onClick={() => setSelected(items => items.includes(id) ? items.filter(item => item !== id) : [...items, id])}>
-          {t(`embellishment.${id}`)}
-        </button>)}
-      </div>
-      <div className="ca-panel__foot">
-        <button type="button" className="ca-panel__primary" disabled={!selected.length} onClick={() => decide(selected)}>{t('embellishment.add')}</button>
-        <button type="button" className="ca-panel__chip" onClick={() => decide('skip')}>{t('embellishment.skip')}</button>
-      </div>
-    </>}
-    {status === 'stale' && label && <>
-      <div className="ca-chat__hint">{t('embellishment.stale')}</div>
-      <button type="button" className="ca-panel__chip" onClick={refresh}>{t('embellishment.refresh')}</button>
-    </>}
-    {(status === 'applied' || status === 'skipped') && <div className="ca-chat__hint" role="status">{t(`embellishment.${status}`)}</div>}
-    {error && <div role="alert" className="ca-chat__hint">{error}</div>}
+    {offer.preview && <><img style={{ maxWidth: '100%', maxHeight: 360, objectFit: 'contain' }} src={offer.preview} alt={t('embellishment.title')} /><p>{offer.reason}</p></>}
+    {status === 'open' && <div className="ca-panel__foot">
+      <button className="ca-panel__primary" onClick={() => decide('apply')}>{t('embellishment.add')}</button>
+      <button className="ca-panel__chip" onClick={() => decide('skip')}>{t('embellishment.skip')}</button>
+    </div>}
+    {status !== 'open' && <div role="status">{t('embellishment.' + status)}</div>}
+    {status === 'stale' && <RequestEmbellishments editor={editor} frame={offer.frame} refresh />}
+    {error && <div role="alert">{error}</div>}
   </div>
 }

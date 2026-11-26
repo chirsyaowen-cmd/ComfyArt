@@ -143,16 +143,17 @@ export function undoRoadmap(editor: Editor) {
 
 // A new user request supersedes earlier work even before it changes the roadmap.
 export type RoadmapTurn = { token: string; revision: number; source: Source; frame: TLShapeId; inspected: boolean
+  embellishmentDraft?: import('./zineEmbellishments').EmbellishmentOffer; reviewingEmbellishments: boolean
   viewedFrames: Map<TLShapeId, string>; placedText: Set<TLShapeId> }
 const turns = new WeakMap<Editor, RoadmapTurn>()
 export function matchingRoadmapTurn(editor: Editor, token?: string) {
   const turn = turns.get(editor)
   return turn?.token === token ? turn : undefined
 }
-export function beginRoadmapTurn(editor: Editor, source: Source) {
+export function beginRoadmapTurn(editor: Editor, source: Source, reviewingEmbellishments = false) {
   const pages = getZinePages(editor)
   if (!pages.length) return undefined
-  const turn: RoadmapTurn = { token: uuid(), revision: roadmap(editor).revision, source,
+  const turn: RoadmapTurn = { token: uuid(), revision: roadmap(editor).revision, source, reviewingEmbellishments,
     frame: pages[activeZineIndex(editor)], inspected: false, viewedFrames: new Map(), placedText: new Set() }
   turns.set(editor, turn)
   return turn.token

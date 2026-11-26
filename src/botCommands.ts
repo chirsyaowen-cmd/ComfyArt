@@ -360,8 +360,11 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
               throw new Error('TASK_SUPERSEDED: start a fresh request from the Zine editor')
             return msg.roadmap_turn ? checkRoadmapTurn(editor, msg.roadmap_turn) : undefined
           }
-          const readOnly = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source', 'photo_adjust_target', 'suggest_embellishments'].includes(msg.action)
-          const active = readOnly && msg.action !== 'suggest_embellishments' ? undefined : guard()
+          const readOnly = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source', 'photo_adjust_target', 'preview_embellishments', 'suggest_embellishments'].includes(msg.action)
+          const previewTool = msg.action === 'preview_embellishments' || msg.action === 'suggest_embellishments'
+          const active = !readOnly || previewTool ? guard() : undefined
+          if (active?.reviewingEmbellishments && !readOnly)
+            throw new Error('This is a preview. Use preview_embellishments and submit the selected preview for the user to apply.')
           if (active?.placedText.size) {
             const ids = msg.action === 'update_shapes' ? msg.args.updates?.map((u: Args) => u.id)
               : ['delete_shapes', 'focus'].includes(msg.action) ? msg.args.ids : []

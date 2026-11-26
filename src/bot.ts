@@ -85,6 +85,7 @@ export const TOOL_LABELS: Record<string, string> = {
   place_html: t('bot.placeWebPage'),
   create_slides: t('bot.createPpt'),
   add_text: t('bot.addText'),
+  preview_embellishments: t('embellishment.title'),
   suggest_embellishments: t('embellishment.title'),
   add_shape: t('bot.addShape'),
   create_frame: t('bot.createArtboard'),

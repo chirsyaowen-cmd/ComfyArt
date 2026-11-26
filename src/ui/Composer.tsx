@@ -8,7 +8,7 @@ import { PHOTO_ACCEPT } from '../photoImport'
 import { guideShown, roadmapGuide } from '../roadmapGuide'
 import { coverPhoto, COVER_PHOTO_STEP, roadmap } from '../roadmap'
 import { activeZineIndex, getZinePages } from '../zine'
-import { makeEmbellishmentOffer } from '../zineEmbellishments'
+import { RequestEmbellishments } from './ZineEmbellishmentCard'
 import { describeZine, inspectZine } from '../zineReview'
 import { ZinePhotoPrompt } from './ZinePhotoPrompt'
 import { botEnabledAtom, chatIdAtom, messagesAtom } from '../bot'
@@ -72,16 +72,10 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
   const chatId = useValue(chatIdAtom)
   const autoGuide = useValue('automatic roadmap guide', () => !!guideShown.get() && guideShown.get() === roadmapGuide(editor)?.signature, [editor])
   const [photoPromptChat, setPhotoPromptChat] = useState<string | null | undefined>(undefined)
+  const activePage = useValue('embellishment target', () => getZinePages(editor)[activeZineIndex(editor)], [editor])
   function reviewCanvas() {
     setMenu(null)
     const book = inspectZine(editor)
-    const page = getZinePages(editor)[activeZineIndex(editor)]
-    if (book && page && makeEmbellishmentOffer(editor, page)) {
-      setPhotoPromptChat(undefined)
-      void sendToAgent(editor, t('embellishment.review'), [], null, [], [],
-        'This is an explicit Zine embellishment review. Inspect active_book_frame via get_canvas and view_canvas, then call suggest_embellishments once. When a card is posted, simply point to the card in one short sentence.').catch(fail)
-      return
-    }
     if (book && (!book.occupied.length || roadmapGuide(editor)?.step.type === 'typography')) {
       setPhotoPromptChat(chatId)
       return
@@ -286,6 +280,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
                 <span className="ca-icon">{Icons.upload}</span><span className="ca-menu__grow">{t('common.uploadFile')}</span>
               </button>
               <div className="ca-menu__sep" />
+              {activePage && <RequestEmbellishments editor={editor} frame={activePage} onSent={() => setMenu(null)} />}
               <button type="button" className="ca-menu__item" onClick={reviewCanvas}>
                 <span className="ca-icon">{Icons.search}</span><span className="ca-menu__grow">{t('composer.canvasReview')}</span>
               </button>

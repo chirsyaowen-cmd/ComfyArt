@@ -26,7 +26,7 @@ def publish_embellishments(result: dict) -> dict:
         state.blocks.extend(blocks)
         chat_store.update_message(chat_id, state.message_id, blocks=state.blocks)
         broadcast("turn_embellishments", {"chat_id": chat_id, "message_id": state.message_id, "blocks": blocks})
-    return {**result, "embellishment_cards": len(offers), "choices": [offer["options"] for offer in offers]}
+    return {**result, "embellishment_cards": len(offers)}
 
 
 async def suggest_embellishments(args: dict) -> dict:
@@ -192,12 +192,9 @@ ASK_USER_SCHEMA = {
 
 TOOLS: dict[str, dict] = {
     "suggest_embellishments": {
-        "description": ("Show optional Zine decoration choices in chat for existing copy, then return immediately. "
-                        "Use only for a requested embellishment review. First call get_canvas and view_canvas "
-                        "for active_book_frame. The user applies selected choices directly in the card. "
-                        "After a card is posted, reply with one short sentence pointing to it."),
-        "inputSchema": {"type": "object", "properties": {"frame": {"type": "string"}},
-                        "required": ["frame"], "additionalProperties": False},
+        "description": "Post the inspected preview in chat for the user to apply or skip.",
+        "inputSchema": {"type": "object", "properties": {"preview_id": {"type": "string"}},
+                        "required": ["preview_id"], "additionalProperties": False},
         "handler": suggest_embellishments,
     },
     "ask_user": {
