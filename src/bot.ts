@@ -6,6 +6,7 @@ import { resultsAtom } from './jobs'
 import { notify } from './notices'
 import { onComfyEvent, onReconnect } from './ws'
 import { t } from './i18n'
+import type { EmbellishmentOffer } from './zineEmbellishments'
 
 export interface AskOption { id: string; label: string; description?: string }
 export interface BotBlock {
@@ -22,6 +23,7 @@ export interface BotBlock {
   ask_id?: string
   prompt?: string
   options?: AskOption[]
+  offer?: EmbellishmentOffer & { project: string }
   min_selections?: number
   max_selections?: number
   allow_other?: boolean
@@ -83,6 +85,7 @@ export const TOOL_LABELS: Record<string, string> = {
   place_html: t('bot.placeWebPage'),
   create_slides: t('bot.createPpt'),
   add_text: t('bot.addText'),
+  suggest_embellishments: t('embellishment.title'),
   add_shape: t('bot.addShape'),
   create_frame: t('bot.createArtboard'),
   update_shapes: t('bot.adjustElements'),
@@ -276,6 +279,7 @@ const reducers: Record<string, (e: any) => void> = {
   turn_ask_resolved: (e) => patchMessages(e.chat_id, e.message_id, (m) => ({
     ...m, blocks: m.blocks.map((b) => (b.type === 'ask' && b.ask_id === e.ask_id ? { ...b, status: e.status, selected: e.selected ?? b.selected, other_text: e.other_text ?? b.other_text } : b)),
   })),
+  turn_embellishments: (e) => patchMessages(e.chat_id, e.message_id, (m) => ({ ...m, blocks: [...m.blocks, ...e.blocks] })),
   turn_done: (e) => {
     const chat = chatsAtom.get().find((c) => c.id === e.chat_id)
     chatsAtom.set(chatsAtom.get().map((c) => (c.id === e.chat_id ? { ...c, busy: false, ...(e.title ? { title: e.title } : {}) } : c)))

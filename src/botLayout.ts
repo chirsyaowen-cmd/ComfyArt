@@ -5,6 +5,7 @@ import { thumbUrl, viewUrl } from './comfy'
 import { roadmap, roadmapSource, updateRoadmap, type RoadmapTurn } from './roadmap'
 import { frameFacts, placeProjectPhoto, projectPhotos } from './roadmapPhotos'
 import { activeZineIndex, focusZinePage, getZinePages } from './zine'
+import { embellishmentPageStatus, makeEmbellishmentOffer } from './zineEmbellishments'
 import { BUNDLED_FONTS, fontLabel } from './fonts'
 import { bookFonts, chooseZineFont } from './zineFonts'
 import { placeInChatFrame } from './chatFrame'
@@ -110,7 +111,9 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       bundled_fonts: BUNDLED_FONTS.map(family => ({ family, name: fontLabel(family) })),
       ...(getZinePages(editor).length ? { roadmap: roadmap(editor),
         active_book_frame: turn?.frame ?? getZinePages(editor)[activeZineIndex(editor)], book_fonts: bookFonts(editor),
-        book_frames: getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame').map(id => frameFacts(editor, id)),
+        book_frames: getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame').map(id => ({
+          ...frameFacts(editor, id), embellishment: embellishmentPageStatus(editor, id),
+        })),
         uploads: { batch: uploads.batch, photos: uploads.photos.map(({ key, name, state }) => ({ key, name, state })) } } : {}),
       shapes,
       truncated: ids.length > MAX_SHAPES || undefined,
@@ -211,8 +214,16 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       updateRoadmap(editor, plan.revision, [{ id: step.id, action: 'done' }], roadmapSource(editor))
     })
     for (const shape of shapes) turn?.placedText.add(shape.id)
-    return { id: shapes[0].id, handoff: 'First layout complete. Reply now. The user has the text toolbar for further edits.', boxes: shapes.map(s => ({ id: s.id, frame: s.parentId, font: s.props.font })),
+    const embellishments = turn ? [...versions.keys()].flatMap(id => makeEmbellishmentOffer(editor, id) ?? []) : []
+    return { id: shapes[0].id, embellishments, handoff: 'First layout complete. Reply now. The user has the text toolbar for further edits.', boxes: shapes.map(s => ({ id: s.id, frame: s.parentId, font: s.props.font })),
       completed_step: step.id, revision: roadmap(editor).revision }
+  },
+  suggest_embellishments: (editor, args, _onError, _chat, _check, turn) => {
+    const frame = turn?.frame
+    if (!frame || frame !== args.frame || turn.viewedFrames.get(frame) !== frameFacts(editor, frame).frame_version)
+      throw new Error('Inspect active_book_frame with get_canvas and view_canvas before suggesting embellishments.')
+    const offer = makeEmbellishmentOffer(editor, frame)
+    return { embellishments: offer ? [offer] : [] }
   },
   add_shape: (editor, args) => {
     const kinds = ['rect', 'ellipse', 'polygon', 'star']
