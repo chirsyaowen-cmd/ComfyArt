@@ -1,0 +1,131 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>跨页设计 · 换图试排</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f4ef;color:#242924;font:15px/1.55 system-ui,"PingFang SC",sans-serif}header{display:flex;align-items:center;gap:16px;padding:14px 4vw;border-bottom:1px solid #cccec4}h1{font:600 23px "Songti SC",serif;margin:0 auto 0 0}button,select,input{font:inherit;color:inherit}button,select{padding:6px 10px;background:#fffefa;border:1px solid #bec4ba;border-radius:5px;cursor:pointer}main{display:grid;grid-template-columns:minmax(0,2fr) minmax(255px,1fr);gap:24px;max-width:1260px;padding:20px 4vw;margin:auto}#stage{position:sticky;top:12px;align-self:start;text-align:center}#stage svg{height:auto;max-height:84vh;width:100%;filter:drop-shadow(0 2px 4px #0002)}aside{min-width:0}h2{font-size:17px;margin:0 0 8px}#slots label{display:block;margin:0 0 10px}#slots input{display:block;width:100%;margin-top:3px;padding:5px;background:white;border:1px solid #cccec4;border-radius:4px}small{display:block;color:#535c54}details{margin:16px 0;border-top:1px solid #c4c7bf;padding-top:8px}summary{cursor:pointer;font-weight:600}ol{padding-left:1.5em}li{margin-bottom:10px}#status{color:#923b2e}header select{max-width:47vw}label{overflow-wrap:anywhere}@media(max-width:760px){main{display:block}#stage{position:static;margin:0 0 15px}#stage svg{max-height:60vh}header{flex-wrap:wrap;gap:8px}h1{width:100%}header select{max-width:68vw}}
+</style><header><h1>跨页设计</h1><select id="spread" aria-label="选择跨页"></select><button id="save">导出分层 SVG</button></header>
+<main><div id="stage"></div><aside><h2>替换内容</h2><div id="slots"></div><div id="status" role="status"></div><details open><summary>制作路线</summary><ol id="steps"></ol></details><details><summary>图层顺序 · 从底到顶</summary><ol id="layers"></ol></details></aside></main>
+<script type="application/json" id="spec">__SPEC__</script>
+<script>
+'use strict';
+const spec=JSON.parse(document.querySelector('#spec').textContent);
+const $=id=>document.getElementById(id), ns='http://www.w3.org/2000/svg';
+const all=spec.designs.flatMap((design,index)=>design.spreads.map(spread=>({design,index,spread})));
+const values=new Map(), tokens=new Map();let serial=0;
+function svg(tag,attrs={},parent){
+  const el=document.createElementNS(ns,tag);
+  for(const [k,v] of Object.entries(attrs)) if(v!==undefined)el.setAttribute(k,String(v));
+  if(parent)parent.append(el);return el;
+}
+function box(b){return {x:b[0],y:b[1],width:b[2],height:b[3]}}
+function state(){return all[Number($('spread').value)]}
+function key(index,id){return index+'/'+id}
+function fileData(file){
+  return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>resolve(r.result);r.readAsDataURL(file)});
+}
+async function bindPhoto(index,id,file){
+  const k=key(index,id),token=Symbol();tokens.set(k,token);
+  if(!file){values.delete(k);draw();return}
+  const src=await fileData(file),im=new Image();im.src=src;await im.decode();
+  if(tokens.get(k)!==token)return;
+  const canvas=document.createElement('canvas'),scale=Math.min(1,256/Math.max(im.naturalWidth,im.naturalHeight));
+  canvas.width=Math.max(1,Math.round(im.naturalWidth*scale));canvas.height=Math.max(1,Math.round(im.naturalHeight*scale));
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(im,0,0,canvas.width,canvas.height);
+  values.set(k,{src,ctx,label:file.name});draw()
+}
+function sample(p,index){
+  if(typeof p!=='object')return p;
+  const v=values.get(key(index,p.sample));if(!v)return p.fallback;
+  const c=v.ctx, x=Math.round(p.at[0]*(c.canvas.width-1)),y=Math.round(p.at[1]*(c.canvas.height-1));
+  const [r,g,b]=c.getImageData(x,y,1,1).data;return 'rgb('+[r,g,b].join(',')+')'
+}
+function draw(){
+  const {design,index,spread}=state(),slots=new Map(design.slots.map(s=>[s.id,s]));
+  serial=0;const fresh=()=> 'z'+(++serial);
+  const frames=spec.frames && spread.pageIds.map(id=>spec.frames.find(f=>f.id===id));
+  const [width,height]=frames?[frames[0].w+frames[1].w,Math.max(frames[0].h,frames[1].h)]:spec.size;
+  const root=svg('svg',{xmlns:ns,viewBox:'0 0 '+width+' '+height,width,height,role:'img','aria-label':spread.name});
+  const defs=svg('defs',{},root),componentIds=new Map(design.components.map(c=>[c.id,fresh()]));
+  function clip(parent,b,r=0){
+    const id=fresh(),cp=svg('clipPath',{id,clipPathUnits:'userSpaceOnUse'},defs);
+    svg('rect',{...box(b),rx:r},cp);return svg('g',{'clip-path':'url(#'+id+')'},parent)
+  }
+  function filter(t){
+    if(!t||!Object.keys(t).length)return;
+    const id=fresh(),f=svg('filter',{id,'color-interpolation-filters':'sRGB'},defs);
+    if(t.saturation!==undefined||t.duotone)svg('feColorMatrix',{type:'saturate',values:t.duotone?0:t.saturation},f);
+    if(t.contrast!==undefined){
+      const transfer=svg('feComponentTransfer',{},f);
+      for(const c of 'RGB')svg('feFunc'+c,{type:'linear',slope:t.contrast,intercept:(1-t.contrast)/2},transfer)
+    }
+    if(t.duotone){
+      const transfer=svg('feComponentTransfer',{},f);
+      for(const [i,c] of [...'RGB'].entries())svg('feFunc'+c,{type:'table',tableValues:t.duotone.map(s=>parseInt(s.slice(i*2+1,i*2+3),16)/255).join(' ')},transfer)
+    }
+    return 'url(#'+id+')'
+  }
+  function paint(l,parent){
+    let g=svg('g',{'data-layer':l.id,'aria-label':l.name,opacity:l.opacity},parent);
+    const title=svg('title',{},g);title.textContent=l.name;
+    if(l.kind==='use'){svg('use',{href:'#'+componentIds.get(l.component),transform:'matrix('+l.matrix.join(' ')+')'},g);return}
+    if(l.clip)g=clip(g,l.clip);
+    if(l.rotation){const [x,y,w,h]=l.box;g=svg('g',{transform:'rotate('+[l.rotation,x+w/2,y+h/2].join(' ')+')'},g)}
+    if(l.kind==='photo'){
+      const [x,y,w,h]=l.box,v=values.get(key(index,l.slot));g=clip(g,l.box,l.radius);
+      if(v){
+        const a=l.anchor||'midMid',align='x'+a[0].toUpperCase()+a.slice(1,3)+'Y'+a.slice(3);
+        svg('image',{...box(l.box),href:v.src,preserveAspectRatio:align+(l.fit==='cover'?' slice':' meet'),filter:filter(l.treatment)},g)
+      }else{
+        svg('rect',{...box(l.box),fill:'#d6dcd6'},g);
+        svg('path',{d:'M '+x+' '+y+' l '+w+' '+h+' M '+(x+w)+' '+y+' l '+(-w)+' '+h,stroke:'#a2aea5',fill:'none'},g);
+        svg('text',{x:x+w/2,y:y+h/2,'text-anchor':'middle','font-family':'sans-serif','font-size':Math.max(6,Math.min(22,h/7,w/8)),fill:'#43554c'},g).textContent=slots.get(l.slot).label
+      }
+      return
+    }
+    if(l.kind==='text'){
+      const [x,y,w,h]=l.box,align=l.align||'left',content=values.get(key(index,l.slot))??slots.get(l.slot).label;
+      const a={left:['start',0],center:['middle',.5],right:['end',1]}[align];
+      const size=l.size,family={serif:'serif',sans:'sans-serif',mono:'monospace',hand:'cursive'}[l.family||'serif'];
+      const tx=svg('text',{x:x+w*a[1],y:y+size*.88,'text-anchor':a[0],'font-family':family,'font-size':size,fill:sample(l.fill,index)},clip(g,l.box));
+      const ctx=document.createElement('canvas').getContext('2d');ctx.font=size+'px '+family;
+      const lines=[];
+      for(const paragraph of content.split('\n')){
+        let line='';
+        for(const ch of paragraph){if(line&&ctx.measureText(line+ch).width>w){lines.push(line);line=''}line+=ch}
+        lines.push(line)
+      }
+      lines.forEach((line,i)=>svg('tspan',{x:x+w*a[1],y:y+size*(.88+i*1.22)},tx).textContent=line);
+      return
+    }
+    if(l.kind==='texture'){
+      const id=fresh(),f=svg('filter',{id,x:0,y:0,width:'100%',height:'100%','color-interpolation-filters':'sRGB'},defs);
+      svg('feTurbulence',{type:'fractalNoise',baseFrequency:'.75',numOctaves:3,seed:7},f);
+      svg('feColorMatrix',{type:'saturate',values:0},f);svg('rect',{...box(l.box),filter:'url(#'+id+')'},g);return
+    }
+    const attrs={fill:sample(l.fill||'none',index),stroke:l.stroke,'stroke-width':l.sw};
+    if(l.kind==='rect')svg('rect',{...box(l.box),rx:l.radius,...attrs},g);
+    else if(l.kind==='ellipse'){const [x,y,w,h]=l.box;svg('ellipse',{cx:x+w/2,cy:y+h/2,rx:w/2,ry:h/2,...attrs},g)}
+    else if(l.kind==='path')svg(l.closed?'polygon':'polyline',{points:l.points.map(p=>p.join(',')).join(' '),...attrs},g)
+  }
+  for(const c of design.components){const e=svg('g',{id:componentIds.get(c.id),'data-component':c.id},defs);for(const l of c.layers)paint(l,e)}
+  svg('rect',{width,height,fill:spread.paper},root);for(const l of spread.layers)paint(l,root);
+  $('stage').replaceChildren(root)
+}
+function show(){
+  const {design,index,spread}=state();$('status').textContent='';$('slots').replaceChildren();$('steps').replaceChildren();$('layers').replaceChildren();
+  for(const s of design.slots){
+    const label=document.createElement('label'),input=document.createElement('input');label.textContent=s.label;
+    input.dataset.slot=s.id;input.type=s.kind==='photo'?'file':'text';
+    if(s.kind==='photo'){
+      input.accept='image/*';input.onchange=()=>bindPhoto(index,s.id,input.files[0]).catch(()=>{$('status').textContent='照片读取失败，请重新选择。'});
+      const current=values.get(key(index,s.id));if(current)label.append(' · '+current.label)
+    }else{input.placeholder=s.label;input.value=values.get(key(index,s.id))??'';input.oninput=()=>{values.set(key(index,s.id),input.value);draw()}}
+    label.append(input);$('slots').append(label)
+  }
+  for(const step of spread.steps){const li=document.createElement('li'),small=document.createElement('small');li.textContent=step.action;small.textContent=step.check;li.append(small);$('steps').append(li)}
+  for(const l of spread.layers){const li=document.createElement('li');li.textContent=l.name;if(l.kind==='use'){const small=document.createElement('small');small.textContent=design.components.find(c=>c.id===l.component).layers.map(x=>x.name).join('、');li.append(small)}$('layers').append(li)}
+  draw()
+}
+all.forEach(({spread},i)=>$('spread').add(new Option(spread.name,i)));
+$('spread').onchange=show;
+$('save').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString($('stage').firstElementChild)],{type:'image/svg+xml'}));a.download=state().spread.name+'.svg';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+show()
+</script></html>
