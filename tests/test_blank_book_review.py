@@ -24,9 +24,14 @@ async def test_blank_book_review_shows_only_agent_options_before_and_after_impor
             await page.route("**/api/comfyart/bot/complete", lambda route: route.fulfill(
                 json={"text": json.dumps({"suggestion": suggestion})}))
             await page.goto(str(server.make_url("/comfyart/?project=photo-review-test&new=1&format=zine")))
-            source = page.get_by_role("button", name="Choose photos from device")
             project = page.get_by_role("button", name="Choose from project photos")
+            bell = page.get_by_title("Notifications", exact=True)
+            await bell.click()
+            source = page.locator(".ca-notice").get_by_role("button", name="Choose photos from device")
             await playwright.expect(source).to_be_visible(timeout=15000)
+            composer = page.locator(".ca-composer")
+            await playwright.expect(composer.get_by_text(suggestion["text"], exact=True)).to_have_count(0)
+            await playwright.expect(composer.get_by_role("button", name="Choose photos from device")).to_have_count(0)
             await playwright.expect(page.locator(".ca-zine-photo button")).to_have_text(["Choose photos from device"])
             async def roadmap():
                 response = await page.request.get(str(server.make_url("/api/comfyart/projects/photo-review-test")))
@@ -48,6 +53,7 @@ async def test_blank_book_review_shows_only_agent_options_before_and_after_impor
             await chooser.set_files({"name": "leaf.png", "mimeType": "image/png", "buffer": photo.getvalue()})
             photo_button = page.locator(".ca-photo-import").get_by_role("button", name="leaf.png")
             await playwright.expect(photo_button).to_be_visible()
+            await bell.click()
             await page.get_by_role("button", name="Add", exact=True).click()
             await page.get_by_role("button", name="Canvas Review", exact=True).click()
             await playwright.expect(project).to_have_count(0)

@@ -9,7 +9,6 @@ import { activeZineIndex, getZinePages } from '../zine'
 import { RequestEmbellishments } from './ZineEmbellishmentCard'
 import { markManualReview, roadmapReviewContext } from '../roadmapGuide'
 import { describeZine } from '../zineReview'
-import { ZinePhotoPrompt } from './ZinePhotoPrompt'
 import { botEnabledAtom, messagesAtom } from '../bot'
 import { imageUrl } from '../comfy'
 import { VIDEO_RATIOS } from '../genOptions'
@@ -198,7 +197,6 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           ))}
         </div>
       )}
-      {!busy && <ZinePhotoPrompt editor={editor} onError={onError} />}
       <div className="ca-composer__entry">
         {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
           <div className="ca-composer__chips">

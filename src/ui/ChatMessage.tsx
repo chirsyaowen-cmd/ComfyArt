@@ -12,7 +12,7 @@ import { Thumb } from './TaskDetails'
 import { CopyButton } from './CopyButton'
 import { t } from '../i18n'
 import { currentProject } from '../notices'
-import { ManualReviewOptions } from './ZinePhotoPrompt'
+import { ManualReviewOptions } from './RoadmapReviewOptions'
 import { reportError } from './ErrorToasts'
 import { RequestEmbellishments, ZineEmbellishmentCard } from './ZineEmbellishmentCard'
 
