@@ -3,7 +3,8 @@ import asyncio
 from ...bot import bot_asks
 from .. import chat_store
 from ..bot_turns import ACTIVE_TURNS, broadcast
-from ._context import BOT_CHAT_ID
+from ..mcp_commands import submit_command
+from ._context import BOT_CHAT_ID, PROJECT
 
 
 def bot_turn_state():
@@ -11,6 +12,29 @@ def bot_turn_state():
     if not chat_id:
         return "", None
     return chat_id, ACTIVE_TURNS.get(chat_id)
+
+
+def publish_embellishments(result: dict) -> dict:
+    offers = result.pop("embellishments", [])
+    chat_id, state = bot_turn_state()
+    if state is None or not offers:
+        return result
+    blocks = [{"type": "embellishment", "offer": {**offer, "project": PROJECT.get()}}
+              for offer in offers]
+    blocks = [block for block in blocks if block not in state.blocks]
+    if blocks:
+        state.blocks.extend(blocks)
+        chat_store.update_message(chat_id, state.message_id, blocks=state.blocks)
+        broadcast("turn_embellishments", {"chat_id": chat_id, "message_id": state.message_id, "blocks": blocks})
+    return {**result, "embellishment_cards": len(offers), "choices": [offer["options"] for offer in offers]}
+
+
+async def suggest_embellishments(args: dict) -> dict:
+    chat_id, state = bot_turn_state()
+    if state is None:
+        raise ValueError("Open an active ComfyArt Agent chat first")
+    result = await submit_command("suggest_embellishments", args, PROJECT.get(), chat=chat_id)
+    return publish_embellishments(result) or {"embellishment_cards": 0}
 
 
 async def _await_ask(chat_id: str, state, spec: dict, *,
@@ -167,6 +191,15 @@ ASK_USER_SCHEMA = {
 }
 
 TOOLS: dict[str, dict] = {
+    "suggest_embellishments": {
+        "description": ("Show optional Zine decoration choices in chat for existing copy, then return immediately. "
+                        "Use only for a requested embellishment review. First call get_canvas and view_canvas "
+                        "for active_book_frame. The user applies selected choices directly in the card. "
+                        "After a card is posted, reply with one short sentence pointing to it."),
+        "inputSchema": {"type": "object", "properties": {"frame": {"type": "string"}},
+                        "required": ["frame"], "additionalProperties": False},
+        "handler": suggest_embellishments,
+    },
     "ask_user": {
         "description": (
             "Pause and ask the user a question in the chat panel; blocks "

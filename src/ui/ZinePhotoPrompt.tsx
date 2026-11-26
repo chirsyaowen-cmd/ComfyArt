@@ -6,7 +6,7 @@ import { thumbUrl, viewUrl } from '../comfy'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
 import { updateRoadmap } from '../roadmap'
-import { onRequest } from '../roadmapModel'
+import { KEEP_IMAGE_ONLY, onRequest } from '../roadmapModel'
 import { roadmapGuide, roadmapOpen } from '../roadmapGuide'
 import { frameFacts, placeProjectPhoto } from '../roadmapPhotos'
 import { focusZinePage, getZinePages } from '../zine'
@@ -48,7 +48,10 @@ export function ZinePhotoPrompt({ editor, actionsOnly = false }: { editor: Edito
         {['road.addTitle', 'road.addCaption'].map(key =>
           <button key={key} disabled={sendingText} onClick={() => void startText(t(key))}>{t(key)}</button>)}
         <button disabled={sendingText} onClick={() => {
-          try { updateRoadmap(editor, revision, [{ action: 'defer', id: step.id, reason: t('road.imageOnly') }], 'button') }
+          try {
+            if (roadmapGuide(editor)?.signature !== guide.signature) return
+            updateRoadmap(editor, revision, [{ action: KEEP_IMAGE_ONLY, id: step.id, reason: t('road.imageOnly') }], 'button')
+          }
           catch (e) { setError(errorText(e)) }
         }}>{t('road.imageOnly')}</button>
       </>}

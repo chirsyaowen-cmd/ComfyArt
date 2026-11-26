@@ -1,6 +1,6 @@
 from ..mcp_commands import submit_command
 from ._context import BOT_CHAT_ID, PROJECT
-from .bot_tools import maybe_ask_run_approval
+from .bot_tools import maybe_ask_run_approval, publish_embellishments
 
 WAIT_MAX_S = 170
 SLOW_S = 90.0
@@ -30,7 +30,7 @@ def _relay(action: str, *, timeout: float = 20.0, approval: str = ""):
         image = result.pop("png", None)
         if image:
             result["_images"] = [{"data": image, "mime": "image/png"}]
-        return result
+        return publish_embellishments(result) if action == "add_text" else result
     return handler
 
 
@@ -256,7 +256,8 @@ SPECS: dict[str, dict] = {
         "then view_canvas(ids=[target frame(s)]) to inspect the treated page. Pass frame and role. Place related "
         "boxes together using additional (same page or spread; frame defaults to first box's frame). Each box "
         "has independent text/style/coordinates. Book fonts with full coverage have priority. Success selects "
-        "the first box and completes only this typography step.",
+        "the first box, completes typography, and posts optional decoration cards when the pages are ready. "
+        "Cards handle user selection separately. Reply after the text is placed.",
         {**_TEXT_BOX, "additional": {"type": "array", "items": _schema(_TEXT_BOX, ["text"])}},
         ["text"]),
     "add_shape": _tool(

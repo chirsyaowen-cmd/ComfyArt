@@ -10,6 +10,8 @@ import { Markdown } from './Markdown'
 import { Thumb } from './TaskDetails'
 import { CopyButton } from './CopyButton'
 import { t } from '../i18n'
+import { currentProject } from '../notices'
+import { ZineEmbellishmentCard } from './ZineEmbellishmentCard'
 
 const GEN_TOOLS = new Set(['generate_image', 'generate_video', 'edit_image', 'animate_image', 'upscale_image', 'remove_background', 'expand_image', 'split_layers', 'change_angle', 'replace_text', 'edit_region', 'erase_region', 'move_object', 'style_transfer', 'extend_video', 'upscale_video', 'remove_video_background', 'generate_music', 'generate_sound_effect', 'text_to_speech', 'image_to_3d', 'edit_elements', 'create_mockup', 'create_slides'])
 
@@ -175,6 +177,8 @@ export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }
       if (b.type === 'thinking' && b.text?.trim()) items.push(<Thought key={i} text={b.text} live={!done && i === m.blocks.length - 1} />)
       if (b.type === 'tool_use') items.push(<Step key={i} editor={editor} use={b} result={resultOf(b, i)} />)
       if (b.type === 'ask') items.push(<Ask key={b.ask_id ?? i} b={b} />)
+      if (b.type === 'embellishment' && b.offer?.project === currentProject())
+        items.push(<ZineEmbellishmentCard key={`${b.offer.frame}/${b.offer.version}`} editor={editor} initial={b.offer} />)
       if (b.type === 'task') items.push(<Task key={i} editor={editor} b={b} />)
       if (b.type === 'notice') items.push(<div key={i} className="ca-chat__notice" data-level={b.level}>{b.text}</div>)
     }

@@ -7,6 +7,28 @@ type Decision = { stepId: string; action: string; reason: string; source: Source
 export type Roadmap = { goal: string; currentStepId: string | null; steps: Step[]; decisions: Decision[]; revision: number }
 export type Change = { action: string; id?: string; type?: string; title?: string; targetFrameIds?: string[]; scope?: string; before?: string; reason?: string; goal?: string }
 
+export const COVER_PHOTO_STEP = 'cover-photo-adjust'
+export const KEEP_IMAGE_ONLY = 'keep_image_only'
+
+export function treatedCoverTypography(plan: Roadmap) {
+  const photo = plan.steps.find(step => step.id === COVER_PHOTO_STEP && step.status === 'done')
+  const frame = photo?.targetFrameIds[0]
+  return frame ? plan.steps.find(step => step.type === 'typography' && step.targetFrameIds.includes(frame)) : undefined
+}
+
+export function readCoverTypography(plan: Roadmap, hasText: boolean): Roadmap {
+  const step = treatedCoverTypography(plan)
+  if (!step) return plan
+  const imageOnly = plan.decisions.some(decision => decision.stepId === step.id && decision.source === 'button' && (
+    decision.action === KEEP_IMAGE_ONLY || (decision.action === 'defer' && ['保留纯图片', 'Keep image only'].includes(decision.reason))
+  ))
+  const status = hasText ? 'done' : imageOnly ? 'deferred' : step.status === 'in_progress' ? 'in_progress' : 'pending'
+  if (step.status === status) return plan
+  const view: Roadmap = { ...plan, steps: plan.steps.map(item => item === step ? { ...item, status } : item) }
+  if (view.currentStepId === step.id && status !== 'in_progress') view.currentStepId = nextFocus(view)
+  return view
+}
+
 export function applies(step: Step, frame: TLShapeId) {
   return step.scope === 'book' || step.targetFrameIds.includes(frame)
 }
@@ -131,12 +153,15 @@ function edit(frames: TLShapeId[], plan: Roadmap, change: Change, source: Source
       if (plan.currentStepId === id || !plan.currentStepId) plan.currentStepId = nextFocus(plan)
       break
     case 'last':
+    case KEEP_IMAGE_ONLY:
     case 'defer': {
+      if (action === KEEP_IMAGE_ONLY && (source !== 'button' || step.type !== 'typography'))
+        throw new Error('Keeping an image-only page requires a typography choice')
       if (step.status === 'deferred' && !change.before && action === 'defer') break
       delete step.startedByCanvas
       step.status = 'deferred'
       const closing = step.type === 'review' ? undefined : closingStep(plan, step, action === 'last')
-      if (action !== 'defer' || step.type !== 'typography' || change.before)
+      if (action === 'last' || step.type !== 'typography' || change.before)
         move(plan, step, change.before ?? closing?.id)
       if (plan.currentStepId === id || !plan.currentStepId) plan.currentStepId = nextFocus(plan)
       break
@@ -145,9 +170,9 @@ function edit(frames: TLShapeId[], plan: Roadmap, change: Change, source: Source
     default: throw new Error('Unknown roadmap action ' + action)
   }
   if (before !== JSON.stringify([plan.steps, plan.currentStepId]) ||
-      (action === 'last' && !plan.decisions.some(d => d.stepId === id && d.action === 'last')) ||
+      ((action === 'last' || action === KEEP_IMAGE_ONLY) && !plan.decisions.some(d => d.stepId === id && d.action === action)) ||
       (reason && !plan.decisions.some(d => d.stepId === id && d.action === action && d.reason === reason))) {
-    const statusChoices = ['start', 'resume', 'done', 'defer', 'last']
+    const statusChoices = ['start', 'resume', 'done', 'defer', 'last', KEEP_IMAGE_ONLY]
     const replaced = statusChoices.includes(action) ? statusChoices : [action]
     plan.decisions = plan.decisions.filter(d => d.stepId !== id || !replaced.includes(d.action))
     plan.decisions.push({ stepId: id, action, reason, source, revision: plan.revision + 1 })

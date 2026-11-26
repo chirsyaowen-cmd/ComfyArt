@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { nextStep, reviewStep, repeatsLastCompletion, reviseRoadmap } from '../src/roadmapModel.ts'
+import { COVER_PHOTO_STEP, KEEP_IMAGE_ONLY, readCoverTypography, nextStep, reviewStep, repeatsLastCompletion, reviseRoadmap } from '../src/roadmapModel.ts'
 
 const frames = ['shape:front', 'shape:left', 'shape:right']
 function book() {
@@ -114,4 +114,41 @@ test('review offers typography on the visible spread after photo decisions, and 
     const postponed = change(ready, { id: 'cover', action: 'last' })
     assert.notEqual(reviewStep(postponed, frames[0], true)?.id, 'cover-typography')
   }
+})
+
+test('a treated cover with no text offers typography again unless the user chose image-only', () => {
+  const plan = book()
+  const id = 'cover-typography'
+  plan.steps.splice(1, 0,
+    { ...plan.steps[0], id: COVER_PHOTO_STEP, type: 'photo_adjust' },
+    { ...plan.steps[0], id, type: 'typography', status: 'done' },
+  )
+  assert.equal(reviewStep(readCoverTypography(plan, false), frames[0], true).id, COVER_PHOTO_STEP)
+  const treated = change(plan, { action: 'done', id: COVER_PHOTO_STEP })
+  const empty = readCoverTypography(treated, false)
+  assert.equal(reviewStep(empty, frames[0], true).status, 'pending')
+  assert.equal(reviewStep(empty, frames[0], true).id, id)
+  assert.equal(empty.revision, treated.revision)
+  assert.equal(treated.steps.find(s => s.id === id).status, 'done')
+
+  const requested = change(treated, { action: 'start', id })
+  assert.equal(reviewStep(readCoverTypography(requested, false), frames[0], true).status, 'in_progress')
+  const withText = readCoverTypography(requested, true)
+  assert.equal(withText.steps.find(s => s.id === id).status, 'done')
+  assert.notEqual(reviewStep(withText, frames[0], true).id, id)
+
+  const deferred = change(treated, { action: 'defer', id })
+  assert.equal(reviewStep(readCoverTypography(deferred, false), frames[0], true).id, id)
+  const skips = [
+    change(deferred, { action: KEEP_IMAGE_ONLY, id }),
+    change(treated, { action: 'defer', id, reason: '保留纯图片' }),
+    change(treated, { action: 'defer', id, reason: 'Keep image only' }),
+  ]
+  for (const skipped of skips) {
+    assert.notEqual(reviewStep(readCoverTypography(skipped, false), frames[0], true).id, id)
+    const resumed = change(skipped, { action: 'resume', id })
+    assert.equal(reviewStep(readCoverTypography(resumed, false), frames[0], true).id, id)
+  }
+  const agentDeferred = reviseRoadmap(treated, frames, [{ action: 'defer', id, reason: '保留纯图片' }], 'chat')
+  assert.equal(reviewStep(readCoverTypography(agentDeferred, false), frames[0], true).id, id)
 })
