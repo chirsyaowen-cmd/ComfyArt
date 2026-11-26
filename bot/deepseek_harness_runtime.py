@@ -66,6 +66,8 @@ def overlay_entries(prefix: str, route: Optional[tuple[str, str]]) -> list[dict]
             "defaultPreset": preset,
         },
     }]
+    entries.append({"insert": [{"id": "comfyart-live-text",
+                                "name": Path(__file__).with_name("dsh_live_text.mjs").resolve().as_uri()}]})
     entries += [{"id": entry_id, "disabled": True} for entry_id in DISABLED_ENTRY_IDS]
     if route is not None:
         entries.append({"id": "acp", "config": {"provider": route[0], "model": route[1]}})
