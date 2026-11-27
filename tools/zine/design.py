@@ -50,6 +50,8 @@ def packets(manifest, binding, frames):
             "id": f"spread-{i + 1:02}",
             "pageIds": [left["id"], right["id"]],
             "geometry": spread_geometry(left, right),
+            "pageNumbers": [len(frames), 1] if i == 0 else [2 * i, 2 * i + 1],
+            "pageRoles": ["backCover", "frontCover"] if i == 0 else ["interior", "interior"],
         }
     emitted = set()
     for k in order:
@@ -154,7 +156,12 @@ async def prepare_layout(packet, conf):
         for spread in data["spreads"]:
             if spread["id"] in measured:
                 spread["paper"] = measured[spread["id"]]
+        from layout_schema import resolve_step_elements
+        from frame_geometry import editorial_pages
+
+        resolve_step_elements(data)
         valid(data)
+        editorial_pages(data, targets)
 
     def save(data):
         finalize(data)

@@ -29,11 +29,16 @@ export const inject = ['tools', 'attachments', 'subagents']
 export function apply(ctx) {
   const children = new Set()
   const assigned = new Map()
+  const submitted = new Set()
   ctx.on('subagent/start', ({ id }) => {
     children.add(id)
     notify({ event: 'spawn', child: id })
   })
-  ctx.on('subagent/end', ({ id, stopReason }) => notify({ event: 'end', child: id, reason: stopReason }))
+  ctx.on('subagent/end', ({ id, stopReason }) => {
+    children.delete(id)
+    if (!submitted.has(assigned.get(id))) assigned.delete(id)
+    notify({ event: 'end', child: id, reason: stopReason })
+  })
 
   function register(name, description, properties, execute, render) {
     ctx.tools.register({
@@ -92,6 +97,7 @@ export function apply(ctx) {
       const token = randomUUID()
       notify({ event: 'submit', child, spread, token, json })
       await receiptResult(token)
+      submitted.add(spread)
       return 'Design accepted. Finish now.'
     }, (_, text) => [{ type: 'text', text }])
 }

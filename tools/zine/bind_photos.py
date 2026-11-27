@@ -86,6 +86,25 @@ async def main(args, generate=request):
             for slot in d["slots"]
         ]
         slots.append({"id": d["spreads"][0]["id"], "layout": d["name"], "slots": hints})
+    fixed = {}
+    if spec.get("frames"):
+        from frame_geometry import editorial_pages, spread_geometry
+
+        frames = {p["id"]: p for p in spec["frames"]}
+        numbers = {k: i for i, k in enumerate(frames, 1)}
+        for design, info in zip(spec["designs"], slots):
+            targets = []
+            for spread in design["spreads"]:
+                left, right = spread["pageIds"]
+                targets.append({"geometry": spread_geometry(frames[left], frames[right]),
+                                "pageNumbers": [numbers[left], numbers[right]]})
+            info["physicalPages"] = [t["pageNumbers"] for t in targets]
+            pages = editorial_pages(design, targets)
+            fixed[info["id"]] = {
+                s["id"]: args.title if s["role"] == "bookTitle" else str(pages[s["id"]]).zfill(s.get("minDigits", 1))
+                for s in design["slots"] if s.get("role")
+            }
+            info["fixedText"] = fixed[info["id"]]
     facts = [
         {"id": p["id"], "title": p["title"], "notes": p.get("description", "")[:230]}
         for p in photos
@@ -114,6 +133,9 @@ async def main(args, generate=request):
         prompt += "\n尽量让每张独立上传照片至少出现一次。无可靠日期、地点或人物身份时，日期或版记槽填册序或篇章短注，文案根据画面的可见事实写，不补个人经历。"
 
     def validate_result(data):
+        for group, values in fixed.items():
+            if group in data and isinstance(data[group], dict):
+                data[group].update(values)
         validate(spec, photos, data)
         if require_coverage:
             missing = expected_photos - {data[d][slot] for d, slot in photo_slots}
@@ -129,6 +151,7 @@ async def main(args, generate=request):
         args.trace,
         "binding",
     )
+    validate_result(data)
     write_json(args.output, data)
 
 

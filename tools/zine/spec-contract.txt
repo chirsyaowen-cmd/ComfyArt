@@ -6,6 +6,7 @@ paper 使用输入中程序测得的书页底色。它来自模型在参考图�
 
 只输出一个 JSON 对象，其键恰好是 name, slots, components, spreads。name 为自然中文设计名称。ID 用简短的抽象英文，不翻译参考的主体名称。
 slots 数组，每项 {"id":"p1","kind":"photo"或"text","label":"主图或标题等功能名"}，同一素材重复使用必须引用同一槽。
+若设计有书名或印刷页码，把书名文字槽标 role:"bookTitle"，每个页码槽标 role:"pageNumber"（两位补零时写 minDigits:2，未补零可省略），普通文案不要 role。书名在正封面（封套右边，第1页），左边是封底（最后一页）。内页按 pageNumbers 和 geometry 排。书名与页码的实际文字由装订程序填写，每个槽的框只占自己的物理页，组件变换后也如此。参考若仅有正封，应对照右页。steps.elements 写跨页上实际绘制的 layer.id（组件实例写 use 图层 id）。
 components 数组，每项 {"id":"g1","name":"设计作用","layers":[图层...]}，组件内只用基本图层，坐标与跨页共用；由 use 实例复用。
 spreads 数组与输入跨页顺序一致。每项 {"id":"输入的跨页ID","pageIds":["左页frame ID","右页frame ID"],"name":"版式名","paper":"#rrggbb","steps":[{"action":"具体可执行的设计操作","check":"换图后可见的验收条件","elements":["本跨页实际使用的图层或组件内部元素ID"]}],"layers":[图层...]}。用完整路线涵盖照片/文字占位、尺寸位置、遮挡、编组及复用。纸面背景色由paper表示，无需用一个独立步骤专门检查导出。除左右顺序外不把原成品的图号写入可读文案。
 

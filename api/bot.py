@@ -1,10 +1,11 @@
+import json
 import logging
 
 from aiohttp import web
 
 from ..bot import bot_asks, get_provider, list_providers
 from ..bot.providers import ProviderStatus
-from . import chat_store
+from . import chat_store, project_store
 from . import bot_send as send_core
 from ._common import error, json_body, request_user, routes
 from .bot_turns import ACTIVE_TURNS, QUEUED, broadcast
@@ -171,6 +172,12 @@ async def bot_send(request: web.Request) -> web.Response:
     display_blocks += [{"type": "kit", "name": k["name"]} for k in kits]
     if body.get("roadmap_turn"):
         display_blocks.append({"type": "roadmap_turn", "token": str(body["roadmap_turn"])})
+    elif chat.get("project"):
+        snapshot = project_store.get_snapshot(request_user(request), chat["project"])
+        if snapshot and json.loads(snapshot).get("document", {}).get("store", {}).get("document:document", {}).get("meta", {}).get("zinePages"):
+            lines.append("[This request was sent outside the Zine editor. For live canvas work including "
+                         "reference search, end the turn and ask to resend from the open project editor. "
+                         "Saved project tools such as make_reference_zine inputs, preview and status remain available.]")
     if body.get("source") == "schedule":
         display_blocks.append({"type": "trigger", "name": "schedule"})
         lines.append("[Automatic scheduled task. Only carry out this scheduled request.]")

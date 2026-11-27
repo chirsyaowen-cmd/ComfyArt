@@ -138,6 +138,10 @@ async def image_results(query: str, count: int) -> list[dict]:
     return images
 
 
+def reference_id(key: str) -> str:
+    return "ref-" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+
+
 async def search_images(args: dict) -> dict:
     images = await image_results(args.get("query"), args.get("count", 6))
     if not images:
@@ -153,13 +157,14 @@ async def search_images(args: dict) -> dict:
     if saved:
         result = await submit_command("add_search_references", {"images": saved}, PROJECT.get(), chat=BOT_CHAT_ID.get())
         added = result["added"]
-    return {"images": [local or image for image, local in zip(images, downloads)], "added": added}
+    return {"images": [local or image for image, local in zip(images, downloads)], "added": added,
+            "savedReferences": [{"refId": reference_id(r["imageUrl"]), "name": r["title"]} for r in saved]}
 
 
 TOOLS = {
     "search_images": {
         "description": "Search for images, save images as project references (Brave previews if originals are unavailable) and open the reference panel. "
-                       "Use sourcePageUrl for citations. Only results with localUrl were saved.",
+                       "Use sourcePageUrl for citations. Use savedReferences.refId for make_reference_zine preview and start. Only results with localUrl were saved.",
         "inputSchema": {
             "type": "object",
             "properties": {
