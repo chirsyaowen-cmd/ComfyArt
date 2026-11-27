@@ -100,5 +100,27 @@ class StepElementsTests(unittest.TestCase):
         self.assertEqual(step["elements"], ["group"])
 
 
+class PhotoAllocationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_editor_allocates_uploads_before_the_layouts(self):
+        import json
+        from design import plan_photo_slots
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            photos = root / "photos.json"
+            photos.write_text(json.dumps([{"id": "P01"}, {"id": "P02"}, {"id": "P03"}]))
+            args = SimpleNamespace(photos=photos, brief="", records=root, release=root)
+            work = [[({}, {"id": k})] for k in ("cover", "inside")]
+            async def choose(_, blocks, valid, trace, stage):
+                with self.assertRaises(ValueError):
+                    valid({"cover": 1, "inside": 1})
+                valid({"cover": 1, "inside": 2})
+                return {"cover": 1, "inside": 2}
+            with patch("harness_json.request", choose):
+                plan = await plan_photo_slots(args, work)
+            self.assertEqual(plan, json.loads((root / "photo-plan.json").read_text()))
+            self.assertEqual(plan["inside"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()
