@@ -128,7 +128,8 @@ async def main(args, generate=request):
         for slot in d["slots"]
         if slot["kind"] == "photo"
     ]
-    require_coverage = args.use_all_photos and len(photo_slots) >= len(photos)
+    if args.use_all_photos and len(photo_slots) < len(expected_photos):
+        raise ValueError(f"Book has {len(photo_slots)} photo slots for {len(expected_photos)} distinct uploads")
     if args.use_all_photos:
         prompt += "\n尽量让每张独立上传照片至少出现一次。无可靠日期、地点或人物身份时，日期或版记槽填册序或篇章短注，文案根据画面的可见事实写，不补个人经历。"
 
@@ -137,7 +138,7 @@ async def main(args, generate=request):
             if group in data and isinstance(data[group], dict):
                 data[group].update(values)
         validate(spec, photos, data)
-        if require_coverage:
+        if args.use_all_photos:
             missing = expected_photos - {data[d][slot] for d, slot in photo_slots}
             if missing:
                 raise ValueError(
@@ -164,6 +165,6 @@ if __name__ == "__main__":
     ap.add_argument(
         "--use-all-photos",
         action="store_true",
-        help="Include every supplied photo when enough photo slots exist",
+        help="Require every supplied photo in the finished bindings",
     )
     asyncio.run(main(ap.parse_args()))

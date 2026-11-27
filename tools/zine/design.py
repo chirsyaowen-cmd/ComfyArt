@@ -108,6 +108,9 @@ async def prepare_layout(packet, conf):
         prompt += "\n复用以下槽位ID和类型，使同一图文能对比新旧留白。" + json.dumps(
             old["slots"], ensure_ascii=False
         )
+    minimum_photos = getattr(conf, "photo_plan", {}).get(targets[0]["id"], 0)
+    if minimum_photos:
+        prompt += f"\n主编为这一组分配了至少 {minimum_photos} 张不同的用户照片。为它们分别设计可见且可独立换图的照片槽。"
     prompt += "\n纸色数据：" + json.dumps(measured)
     if len(packet) > 1:
         prompt += "\n这些是相关联的两面设计。把静止的底图、取景与可移动的叠层做成共享定义；用实例变换表达翻面关系。"
@@ -126,6 +129,8 @@ async def prepare_layout(packet, conf):
             }
         )
         check_design(data, expected)
+        if sum(slot["kind"] == "photo" for slot in data["slots"]) < minimum_photos:
+            raise ValueError(f"Provide {minimum_photos} separate photo slots for this group")
         if old and {a["id"]: a["kind"] for a in data["slots"]} != {
             a["id"]: a["kind"] for a in old["slots"]
         }:
@@ -206,6 +211,32 @@ def arguments():
     return parser
 
 
+async def plan_photo_slots(args, work):
+    """Have the editor allocate the upload batch before individual layouts are sealed."""
+    from harness_json import request
+
+    count = len(json.loads(args.photos.read_text()))
+    blocks = []
+    keys = []
+    for packet in work:
+        key = packet[0][1]["id"]
+        keys.append(key)
+        blocks.append({"type": "text", "text": key})
+        blocks.extend(reference(group) for group, _ in packet if group.get("reference"))
+    blocks.append({"type": "text", "text":
+        f"你是整本小志的主编。这里有 {count} 张不同照片需要全部入册。根据每组参考的构图与创作要求，"
+        "分配每组至少需要几个可独立替换的照片槽。返回纯 JSON，键为上面的组编号，值为非负整数，总数等于照片数。"
+        "每页一张的要求意味着每个双页要容纳两张不同的照片。创作要求：" + args.brief})
+    def valid(plan):
+        if (not isinstance(plan, dict) or set(plan) != set(keys)
+                or any(type(v) is not int or v < 0 for v in plan.values())
+                or sum(plan.values()) != count):
+            raise ValueError(f"Allocate exactly {count} uploads among {keys}")
+    plan = await request(args.release, blocks, valid, args.records / "trace.jsonl", "photo_slots")
+    write_json(args.records / "photo-plan.json", plan)
+    return plan
+
+
 async def generate_book(args):
     if bool(args.photos) != bool(args.bindings_output) or (
         args.photos and not args.title
@@ -264,6 +295,8 @@ async def generate_book(args):
         args.previous[work[0][0][1]["id"]] = covers[0]
     from spread_team import run_team
 
+    if args.photos and args.use_all_photos and not args.preserve_content:
+        args.photo_plan = await plan_photo_slots(args, work)
     prepared = await asyncio.gather(*(prepare_layout(p, args) for p in work))
     trace = args.records / "trace.jsonl"
 
