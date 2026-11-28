@@ -72,17 +72,23 @@ async def test_send_streams_blocks_and_titles_the_chat(bot_client, fake_provider
 async def test_messages_queue_while_busy_and_stop_aborts(bot_client, fake_provider):
     fake_provider.gate = asyncio.Event()
     chat = await _chat(bot_client)
-    await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "one", "canvas_turn": "first"})
-    second = await (await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "two", "canvas_turn": "second"})).json()
+    await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "one", "canvas_turn": "origin:first"})
+    second = await (await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "two", "canvas_turn": "origin:second"})).json()
     assert second["queued"] is True
+    for tab, token in (("origin", "origin:first"), ("another-tab", None)):
+        registration = await bot_client.post("/comfyart/mcp_page", json={"client_id": tab, "project": "p"})
+        assert (await registration.json())["active_canvas_turn"] == token
     await asyncio.sleep(0.15)
-    assert fake_provider.last_turn.mcp_endpoint.endswith("canvas_turn=first")
+    assert fake_provider.last_turn.mcp_endpoint.endswith("canvas_turn=origin%3Afirst")
     assert (await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/stop")).status == 200
     fake_provider.gate = None
     data = await wait_bot_done(bot_client, chat["id"])
     statuses = [m["status"] for m in data["messages"] if m["role"] == "assistant"]
     assert statuses == ["aborted", "done"]
-    assert fake_provider.last_turn.mcp_endpoint.endswith("canvas_turn=second")
+    assert fake_provider.last_turn.mcp_endpoint.endswith("canvas_turn=origin%3Asecond")
+    started = [payload["user_message"]["blocks"][0]["token"]
+               for event, payload in SENT if event == "comfyart-bot" and payload["event"] == "turn_start"]
+    assert started == ["origin:first", "origin:second"]
 
 
 async def test_scheduled_request_has_its_own_source(bot_client, fake_provider):

@@ -6,6 +6,7 @@ from .. import runtime
 
 from ..bot.command_relay import CommandRelay
 from ._common import json_body, routes
+from .bot_turns import active_canvas_turn
 
 DEFAULT_TIMEOUT_S = 20.0
 
@@ -66,7 +67,7 @@ async def register_page(request: web.Request) -> web.Response:
         return web.json_response({"error": "client_id and project are required"}, status=400)
     _pages.pop(client, None)
     _pages[client] = project
-    return web.json_response({"ok": True})
+    return web.json_response({"ok": True, "active_canvas_turn": active_canvas_turn(client)})
 
 
 @routes.post("/comfyart/mcp_command_result")

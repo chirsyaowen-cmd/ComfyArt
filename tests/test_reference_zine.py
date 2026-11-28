@@ -81,7 +81,13 @@ async def test_chat_status_is_immediate_and_scoped(monkeypatch, tmp_path):
     folder = tmp_path / "zine-runs" / job
     folder.mkdir(parents=True)
     (folder / "status.json").write_text(json.dumps({"sourceProject": "source", "status": "running", "job": job}))
-    task = asyncio.create_task(asyncio.Event().wait())
+    released = asyncio.Event()
+
+    async def finish():
+        await released.wait()
+        (folder / "status.json").write_text(json.dumps({"sourceProject": "source", "status": "complete", "job": job}))
+
+    task = asyncio.create_task(finish())
     monkeypatch.setattr(zine.runtime, "DATA", tmp_path)
     monkeypatch.setattr(zine, "_jobs", {("source", job): task})
     monkeypatch.setattr(zine, "_last_job", {"source": job})
@@ -95,6 +101,11 @@ async def test_chat_status_is_immediate_and_scoped(monkeypatch, tmp_path):
                 await zine.handle({"action": "status", "job": job})
         finally:
             PROJECT.reset(other)
+        poll = asyncio.create_task(zine.handle({"action": "status", "job": job, "wait": True}))
+        await asyncio.sleep(0)
+        assert not poll.done()
+        released.set()
+        assert (await asyncio.wait_for(poll, 1))["status"] == "complete"
     finally:
         BOT_CHAT_ID.reset(chat)
         PROJECT.reset(token)

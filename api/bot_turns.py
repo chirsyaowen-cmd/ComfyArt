@@ -16,6 +16,11 @@ _log = logging.getLogger(__name__)
 _canvas_turns: dict[str, str] = {}
 
 
+def active_canvas_turn(client: str) -> str | None:
+    prefix = f"{client}:"
+    return next((token for token in reversed(_canvas_turns.values()) if token.startswith(prefix)), None)
+
+
 def broadcast(event: str, payload: dict) -> None:
     if event == "turn_start":
         token = next((b["token"] for b in payload["user_message"]["blocks"] if b.get("type") == "canvas_turn"), "")

@@ -14,7 +14,10 @@ from .settings import mcp_enabled
 VERSION = re.search(r'^version = "([^"]+)"', (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8"), re.MULTILINE).group(1)
 
 INSTRUCTIONS = (
-    "For a whole reference-based Zine use make_reference_zine and wait for its canvas URL. "
+    "When the user only asks to find references, judge them from the numbered search_images preview. "
+    "Inspect uploaded photo pixels only if the user asks you to match those photos. "
+    "For a whole reference-based Zine use make_reference_zine. If it returns running, call only its status action "
+    "with the same job ID until it finishes, then report the canvas URL or error. "
     "Work in the current ComfyArt project. Use get_canvas for its selection and shape IDs. "
     "Use render_vectorcraft to create and place vector artwork. Use ask_user for choices. "
     "Only report changes after receiving a successful tool result."

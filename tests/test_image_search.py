@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import io
 import json
 
@@ -13,7 +14,7 @@ from ComfyArt.api.mcp_tools import image_search
 
 async def test_search_images_through_mcp(bot_client, monkeypatch):
     png = io.BytesIO()
-    Image.new("RGB", (3, 4)).save(png, format="PNG")
+    Image.new("RGB", (120, 160), "red").save(png, format="PNG")
 
     async def brave(request):
         assert request.headers["X-Subscription-Token"] == "test-token"
@@ -21,7 +22,7 @@ async def test_search_images_through_mcp(bot_client, monkeypatch):
         row = {"title": "Zine", "url": "https://example.org/zine",
                "properties": {"url": str(server.make_url("/cover"))}}
         bad = {**row, "properties": {"url": str(server.make_url("/not-an-image"))}}
-        return web.json_response({"results": [{}, row, row, bad]})
+        return web.json_response({"results": [{}, bad, row, row]})
 
     async def cover(request):
         assert "X-Subscription-Token" not in request.headers
@@ -46,11 +47,19 @@ async def test_search_images_through_mcp(bot_client, monkeypatch):
         command, = await _answer_commands(bot_client, lambda _: {"ok": True, "result": {"added": 1}})
         result = (await (await call).json())["result"]
         assert not result["isError"]
-        data = json.loads(result["content"][0]["text"])
-        saved, failed = data["images"]
+        metadata, preview = result["content"]
+        data = json.loads(metadata["text"])
+        failed, saved = data["images"]
         assert data["added"] == 1 and "localUrl" not in failed
         assert saved == {"title": "Zine", "thumbnailUrl": None, "imageUrl": str(server.make_url("/cover")),
                          "sourcePageUrl": "https://example.org/zine", "localUrl": saved["localUrl"], "savedFrom": "original"}
+        assert data["savedReferences"] == [{
+            "refId": image_search.reference_id(saved["imageUrl"]), "name": "Zine", "previewNumber": 2,
+        }]
+        assert preview["type"] == "image" and preview["mimeType"] == "image/jpeg"
+        with Image.open(io.BytesIO(base64.b64decode(preview["data"]))) as sheet:
+            r, g, b = sheet.getpixel((175, 80))
+            assert r > 200 and g < 30 and b < 30
         assert command["action"] == "add_search_references" and command["project"] == "current"
         assert command["args"]["images"] == [saved]
         response = await bot_client.get(saved["localUrl"].removeprefix("/api"))
