@@ -12,7 +12,8 @@ import { enterMode } from './ui/mode'
 import { adjustedOf, applyAdjust, sourceAsset } from './imageOps'
 import { adjustedCanvas, loadImage, NO_ADJUST } from './adjust'
 import { frameFacts } from './projectPhotos'
-import { checkCanvasTurn, matchingCanvasTurn } from './canvasTurn'
+import { activateCanvasTurn, checkCanvasTurn, currentCanvasTurn, matchingCanvasTurn } from './canvasTurn'
+import type { BotMessage } from './bot'
 import { LAYOUT_HANDLERS, shapeOf, type Args, type Handler } from './botLayout'
 import { placeInChatFrame } from './chatFrame'
 import { capRefs, createGenerator, generate } from './generate'
@@ -334,10 +335,26 @@ const HANDLERS: Record<string, Handler> = {
 }
 
 export function registerCommandBus(editor: Editor, project: string, isStale: () => boolean, onError: ErrorSink) {
-  const announce = () => api('/comfyart/mcp_page', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID, project }) }).catch((e) => onError(errorText(e)))
+  async function announce() {
+    const prior = currentCanvasTurn(editor)
+    try {
+      const response = await api('/comfyart/mcp_page', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID, project }) })
+      const data: { active_canvas_turn?: unknown } = await response.json()
+      const token = data.active_canvas_turn
+      if (!isStale() && currentCanvasTurn(editor) === prior && typeof token === 'string')
+        activateCanvasTurn(editor, token)
+    } catch (error) {
+      onError(errorText(error))
+    }
+  }
   void announce()
   const stops = [
     onReconnect(() => void announce()),
+    onComfyEvent('comfyart-bot', (event: { event: string; user_message?: BotMessage }) => {
+      if (event.event !== 'turn_start' || isStale()) return
+      const token = event.user_message?.blocks.find(block => block.type === 'canvas_turn')?.token
+      if (token) activateCanvasTurn(editor, token)
+    }),
     onComfyEvent('comfyart-mcp-command', (msg: { id: string; action: string; project: string; chat?: string; canvas_turn?: string; args: Args }) => {
       if (msg.project !== project) return
       const handler = HANDLERS[msg.action]

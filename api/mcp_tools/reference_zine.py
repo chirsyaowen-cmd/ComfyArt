@@ -8,14 +8,11 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlencode
 
-from PIL import Image, ImageDraw, ImageOps
-
 from ... import runtime
-from ...bot.media_sheet import jpeg
 from .. import project_store
 from .._common import read_json, view_path, write_json
 from ._context import BOT_CHAT_ID, PROJECT
-from .image_search import reference_id
+from .image_search import numbered_reference_sheet, reference_id, reference_tile
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "tools/zine"
 _jobs = {}
@@ -33,18 +30,9 @@ def inputs(meta):
 def preview_references(refs, keys):
     if not isinstance(keys, list) or not 1 <= len(keys) <= 8 or any(k not in refs for k in keys):
         raise ValueError("Choose 1–8 saved reference keys from inputs")
-    cols = min(len(keys), 4)
-    board = Image.new("RGB", (cols * 350, ((len(keys) + cols - 1) // cols) * 300), "white")
-    labels = ImageDraw.Draw(board)
-    for i, key in enumerate(keys):
-        with Image.open(view_path(refs[key]["src"])) as original:
-            tile = ImageOps.exif_transpose(original)
-            tile.thumbnail((342, 272))
-            x, y = (i % cols) * 350, (i // cols) * 300
-            board.paste(tile.convert("RGB"), (x + (350 - tile.width) // 2, y))
-            labels.text((x + 6, y + 276), str(i + 1), fill="black")
-    sheet = jpeg(board, 1400)
-    return {"refIdsInImageOrder": [reference_id(k) for k in keys], "keysInImageOrder": keys, "_images": [{"data": sheet["data"], "mime": sheet["media_type"]}]}
+    tiles = [(number, reference_tile(view_path(refs[key]["src"]))) for number, key in enumerate(keys, 1)]
+    return {"refIdsInImageOrder": [reference_id(k) for k in keys], "keysInImageOrder": keys,
+            "_images": [numbered_reference_sheet(tiles)]}
 
 
 def prepare(folder, args, pages, refs, library, meta):
@@ -230,7 +218,7 @@ async def handle(args):
         if state.get("sourceProject") != project:
             raise ValueError("Unknown job for this project")
         task = _jobs.get((project, job))
-        if task is not None and not BOT_CHAT_ID.get():
+        if task is not None and (args.get("wait") is True or not BOT_CHAT_ID.get()):
             await asyncio.wait([task], timeout=12)
             state = read_json(folder / "status.json", state)
         elif task is None and state["status"] == "running":
@@ -304,10 +292,10 @@ async def handle(args):
 TOOL = {
     "description": "Default workflow for making a complete editable Zine from reference spreads and project photos. "
     "When choosing interior references, compare them as a set. Prefer shared visual style (paper, type, spacing or photographic treatment), allow varied compositions and different books, and honor explicit user choices. "
-    "Copy short refId values from search_images.savedReferences or inputs; call preview with references=[refIds] to visually compare saved references (up to eight per call); assign one per spread, cover first. Use start with the user's title and creative direction. "
+    "Use the search_images preview to compare references and copy their refId values; use preview with references=[refIds] for another look at up to eight saved references. Assign one per spread, cover first. Use start with the user's title and creative direction. "
     "Children can search Brave for transparent decorations from Vecteezy, Pngtree and PNGimg. Indexed assets are visibly marked as previews; pngOriginals matches uploaded originals to their resource pages. "
     "Native DeepSeek children extract layouts and treatments before the master binds photos and copy. "
-    "Poll status (omit job for this project’s latest run) until complete and deliver the verified new canvas link immediately without asking to wait or inspecting it through the source tab. Existing source project is preserved.",
+    "While running, call only status with the same job. Set wait=true to wait briefly for a change. Once complete, deliver the verified canvas link. If it fails, report the error. Existing source project is preserved.",
     "inputSchema": {
         "type": "object",
         "required": ["action"],
@@ -315,6 +303,7 @@ TOOL = {
         "properties": {
             "action": {"enum": ["inputs", "preview", "start", "status"]},
             "job": {"type": "string"},
+            "wait": {"type": "boolean"},
             "title": {"type": "string"},
             "brief": {
                 "type": "string",

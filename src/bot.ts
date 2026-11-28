@@ -13,6 +13,7 @@ import type { ReviewAdvice } from './reviewAdvice'
 export interface AskOption { id: string; label: string; description?: string }
 export interface BotBlock {
   type: string
+  token?: string
   text?: string
   name?: string
   input?: Record<string, any>

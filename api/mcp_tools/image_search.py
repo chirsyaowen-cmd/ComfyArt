@@ -3,6 +3,7 @@ import hashlib
 import io
 import ipaddress
 import json
+import logging
 import os
 import socket
 import tempfile
@@ -10,9 +11,11 @@ from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 
 import aiohttp
-from PIL import Image
+from PIL import Image, ImageDraw, ImageOps
 
+from ...bot.media_sheet import jpeg
 from ...runtime import DATA
+from .._common import view_path
 from ..mcp_commands import submit_command
 from ._context import BOT_CHAT_ID, PROJECT
 
@@ -21,6 +24,7 @@ ENDPOINT = "https://api.search.brave.com/res/v1/images/search"
 MAX_COUNT = 12
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 IMAGE_EXTENSIONS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp", "GIF": "gif"}
+_log = logging.getLogger(__name__)
 
 
 def _public_socket(addr_info):
@@ -142,6 +146,44 @@ def reference_id(key: str) -> str:
     return "ref-" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
+def reference_tile(path: str) -> Image.Image:
+    with Image.open(path) as original:
+        tile = ImageOps.exif_transpose(original)
+        tile.thumbnail((342, 272))
+        return tile.convert("RGB")
+
+
+def numbered_reference_sheet(tiles: list[tuple[int, Image.Image]]) -> dict:
+    cols = min(len(tiles), 4)
+    board = Image.new("RGB", (cols * 350, ((len(tiles) + cols - 1) // cols) * 300), "white")
+    labels = ImageDraw.Draw(board)
+    for i, (number, tile) in enumerate(tiles):
+        x, y = (i % cols) * 350, (i // cols) * 300
+        board.paste(tile, (x + (350 - tile.width) // 2, y))
+        labels.text((x + 6, y + 276), str(number), fill="black")
+    sheet = jpeg(board, 1400)
+    return {"data": sheet["data"], "mime": sheet["media_type"]}
+
+
+def _search_preview(results: list[dict]) -> tuple[list[dict], list[dict]]:
+    references = []
+    tiles = []
+    for number, image in enumerate(results, 1):
+        url = image.get("localUrl")
+        if not url:
+            continue
+        reference = {"refId": reference_id(image["imageUrl"]), "name": image["title"]}
+        references.append(reference)
+        try:
+            tile = reference_tile(view_path(url))
+        except (OSError, ValueError, SyntaxError, Image.DecompressionBombError):
+            _log.warning("Unable to preview saved search result %d", number, exc_info=True)
+            continue
+        reference["previewNumber"] = number
+        tiles.append((number, tile))
+    return references, [numbered_reference_sheet(tiles)] if tiles else []
+
+
 async def search_images(args: dict) -> dict:
     images = await image_results(args.get("query"), args.get("count", 6))
     if not images:
@@ -157,14 +199,16 @@ async def search_images(args: dict) -> dict:
     if saved:
         result = await submit_command("add_search_references", {"images": saved}, PROJECT.get(), chat=BOT_CHAT_ID.get())
         added = result["added"]
-    return {"images": [local or image for image, local in zip(images, downloads)], "added": added,
-            "savedReferences": [{"refId": reference_id(r["imageUrl"]), "name": r["title"]} for r in saved]}
+    results = [local or image for image, local in zip(images, downloads)]
+    references, previews = await asyncio.to_thread(_search_preview, results) if saved else ([], [])
+    return {"images": results, "added": added, "savedReferences": references, "_images": previews}
 
 
 TOOLS = {
     "search_images": {
         "description": "Search for images, save images as project references (Brave previews if originals are unavailable) and open the reference panel. "
-                       "Use sourcePageUrl for citations. Use savedReferences.refId for make_reference_zine preview and start. Only results with localUrl were saved.",
+                       "Compare the attached numbered preview before choosing references. Match each number to savedReferences.previewNumber and pass its refId to make_reference_zine. "
+                       "Use sourcePageUrl for citations. Only results with localUrl were saved.",
         "inputSchema": {
             "type": "object",
             "properties": {
