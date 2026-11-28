@@ -12,16 +12,16 @@ from .settings import SETTINGS_SPEC, get_setting
 _log = logging.getLogger(__name__)
 
 
-# Bind the websocket editor's revision lease to this turn's MCP URL, including queued turns.
-_roadmap_turns: dict[str, str] = {}
+# Bind the originating editor to this turn's MCP URL, including queued turns.
+_canvas_turns: dict[str, str] = {}
 
 
 def broadcast(event: str, payload: dict) -> None:
     if event == "turn_start":
-        token = next((b["token"] for b in payload["user_message"]["blocks"] if b.get("type") == "roadmap_turn"), "")
-        _roadmap_turns[payload["chat_id"]] = token
+        token = next((b["token"] for b in payload["user_message"]["blocks"] if b.get("type") == "canvas_turn"), "")
+        _canvas_turns[payload["chat_id"]] = token
     elif event == "turn_done":
-        _roadmap_turns.pop(payload["chat_id"], None)
+        _canvas_turns.pop(payload["chat_id"], None)
     try:
         runtime.send_event("comfyart-bot", {"event": event, **payload})
     except Exception:
@@ -30,8 +30,8 @@ def broadcast(event: str, payload: dict) -> None:
 
 def _mcp_endpoint(chat_id: str) -> str:
     query = {"bot_chat": chat_id}
-    if token := _roadmap_turns.get(chat_id):
-        query["roadmap_turn"] = token
+    if token := _canvas_turns.get(chat_id):
+        query["canvas_turn"] = token
     return f"http://127.0.0.1:{runtime.port}/comfyart/mcp?{urlencode(query)}"
 
 

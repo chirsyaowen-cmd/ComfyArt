@@ -66,14 +66,14 @@ async def test_canvas_tool_is_relayed_to_the_project_page(bot_client):
     await _open(bot_client, "other", "tab-0")
     await _open(bot_client, "proj-7")
     chat = chat_store.create_chat(user="default", project="proj-7", provider="codex")
-    call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}&roadmap_turn=first",
+    call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}&canvas_turn=first",
                                                json=_rpc("tools/call", {"name": "get_canvas", "arguments": {}})))
-    commands = await _answer_commands(bot_client, lambda c: {"ok": True, "result": {"shapes": [], "page": "page:1"}})
+    commands = await _answer_commands(bot_client, lambda c: {"ok": True, "result": {"shapes": [], "page": "page:1", "roadmap": {"goal": "obsolete"}}})
     data = await (await call).json()
-    assert commands[0]["roadmap_turn"] == "first"
+    assert commands[0]["canvas_turn"] == "first"
     assert commands[0]["action"] == "get_canvas" and commands[0]["project"] == "proj-7" and commands[0]["_sid"] == "tab-1"
     assert data["result"]["isError"] is False
-    assert '"page": "page:1"' in data["result"]["content"][0]["text"]
+    assert json.loads(data["result"]["content"][0]["text"]) == {"shapes": [], "page": "page:1"}
 
 
 async def test_repeated_reviews_use_the_requesting_tab(bot_client):
@@ -81,12 +81,12 @@ async def test_repeated_reviews_use_the_requesting_tab(bot_client):
     chat = chat_store.create_chat(user="default", project="book", provider="deepseek-harness")
     for token in ("origin:first", "origin:second"):
         await _open(bot_client, "book", "other")
-        path = f"/comfyart/mcp?bot_chat={chat['id']}&roadmap_turn={token}"
+        path = f"/comfyart/mcp?bot_chat={chat['id']}&canvas_turn={token}"
         for name in ("get_canvas", "view_canvas"):
             call = asyncio.create_task(bot_client.post(path, json=_rpc("tools/call", {"name": name, "arguments": {}})))
             commands = await _answer_commands(bot_client, lambda _: {"ok": True, "result": {"shapes": []}})
             assert not (await (await call).json())["result"]["isError"]
-            assert (commands[0]["_sid"], commands[0]["roadmap_turn"]) == ("origin", token)
+            assert (commands[0]["_sid"], commands[0]["canvas_turn"]) == ("origin", token)
     runtime.sockets.pop("origin")
     response = await bot_client.post(path, json=_rpc("tools/call", {"name": "get_canvas", "arguments": {}}))
     assert (await response.json())["result"]["isError"]
@@ -99,7 +99,7 @@ async def test_second_review_publishes_its_card_when_another_tab_opens_after_ins
 
     for turn in ("first", "second"):
         token = f"origin:{turn}"
-        endpoint = f"/comfyart/mcp?bot_chat={chat['id']}&roadmap_turn={token}"
+        endpoint = f"/comfyart/mcp?bot_chat={chat['id']}&canvas_turn={token}"
         msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
         ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
         advice = {"text": f"Suggestion for {turn}", "options": [{"kind": "dismiss", "label": "Close"}]}
@@ -108,14 +108,14 @@ async def test_second_review_publishes_its_card_when_another_tab_opens_after_ins
             for name, args, result in [
                 ("get_canvas", {}, {"book_frames": [{"id": "shape:cover"}]}),
                 ("view_canvas", {"ids": ["shape:cover"]}, {"png": "QUJD"}),
-                ("offer_roadmap_advice", advice, review),
+                ("offer_canvas_advice", advice, review),
             ]:
-                if turn == "second" and name == "offer_roadmap_advice":
+                if turn == "second" and name == "offer_canvas_advice":
                     await _open(bot_client, "book", "other")
                 call = asyncio.create_task(bot_client.post(endpoint, json=_rpc(
                     "tools/call", {"name": name, "arguments": args})))
                 commands = await _answer_commands(bot_client, lambda c: {"ok": True, "result": result}
-                    if (c["_sid"], c["roadmap_turn"]) == ("origin", token)
+                    if (c["_sid"], c["canvas_turn"]) == ("origin", token)
                     else {"ok": False, "error": "TASK_SUPERSEDED"})
                 response = (await (await call).json())["result"]
                 assert not response["isError"], (turn, name, commands[0]["_sid"], response["content"])
@@ -125,7 +125,7 @@ async def test_second_review_publishes_its_card_when_another_tab_opens_after_ins
 
     for message_id, expected in messages:
         assert chat_store.get_message(chat["id"], message_id)["blocks"] == [
-            {"type": "roadmap_advice", "review": expected}]
+            {"type": "canvas_advice", "review": expected}]
 
 
 async def test_view_canvas_png_becomes_an_image_block(bot_client):
@@ -193,11 +193,11 @@ async def test_manual_review_posts_clickable_advice_in_the_same_message_once(bot
     msg = chat_store.create_message(chat_id=chat["id"], role="assistant", blocks=[], status="streaming")
     ACTIVE_TURNS[chat["id"]] = TurnState(TurnHandle(), chat["id"], msg["id"])
     advice = {"text": "Keep this page quiet?", "options": [
-        {"kind": "keep_image_only", "label": "Keep page 1 image-only", "stepId": "cover-typography"},
+        {"kind": "request", "label": "Adjust page 1", "request": "Reduce the page 1 caption size."},
         {"kind": "dismiss", "label": "Close"}]}
     review = {"advice": advice, "bookVersion": "reviewed"}
     endpoint = f"/comfyart/mcp?bot_chat={chat['id']}"
-    command = _rpc("tools/call", {"name": "offer_roadmap_advice", "arguments": advice})
+    command = _rpc("tools/call", {"name": "offer_canvas_advice", "arguments": advice})
     try:
         call = asyncio.create_task(bot_client.post(endpoint, json=command))
         await _answer_commands(bot_client, lambda _: {"ok": True, "result": review})
@@ -206,7 +206,7 @@ async def test_manual_review_posts_clickable_advice_in_the_same_message_once(bot
         again = await (await bot_client.post(endpoint, json=command)).json()
         assert not again["result"]["isError"]
         assert chat_store.get_message(chat["id"], msg["id"])["blocks"] == [
-            {"type": "roadmap_advice", "review": review}]
+            {"type": "canvas_advice", "review": review}]
     finally:
         ACTIVE_TURNS.pop(chat["id"], None)
 

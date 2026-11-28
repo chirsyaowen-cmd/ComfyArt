@@ -2,7 +2,7 @@
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f5f4ef;color:#242924;font:15px/1.55 system-ui,"PingFang SC",sans-serif}header{display:flex;align-items:center;gap:16px;padding:14px 4vw;border-bottom:1px solid #cccec4}h1{font:600 23px "Songti SC",serif;margin:0 auto 0 0}button,select,input{font:inherit;color:inherit}button,select{padding:6px 10px;background:#fffefa;border:1px solid #bec4ba;border-radius:5px;cursor:pointer}main{display:grid;grid-template-columns:minmax(0,2fr) minmax(255px,1fr);gap:24px;max-width:1260px;padding:20px 4vw;margin:auto}#stage{position:sticky;top:12px;align-self:start;text-align:center}#stage svg{height:auto;max-height:84vh;width:100%;filter:drop-shadow(0 2px 4px #0002)}aside{min-width:0}h2{font-size:17px;margin:0 0 8px}#slots label{display:block;margin:0 0 10px}#slots input{display:block;width:100%;margin-top:3px;padding:5px;background:white;border:1px solid #cccec4;border-radius:4px}small{display:block;color:#535c54}details{margin:16px 0;border-top:1px solid #c4c7bf;padding-top:8px}summary{cursor:pointer;font-weight:600}ol{padding-left:1.5em}li{margin-bottom:10px}#status{color:#923b2e}header select{max-width:47vw}label{overflow-wrap:anywhere}@media(max-width:760px){main{display:block}#stage{position:static;margin:0 0 15px}#stage svg{max-height:60vh}header{flex-wrap:wrap;gap:8px}h1{width:100%}header select{max-width:68vw}}
 </style><header><h1>跨页设计</h1><select id="spread" aria-label="选择跨页"></select><button id="save">导出分层 SVG</button></header>
-<main><div id="stage"></div><aside><h2>替换内容</h2><div id="slots"></div><div id="status" role="status"></div><details open><summary>制作路线</summary><ol id="steps"></ol></details><details><summary>图层顺序 · 从底到顶</summary><ol id="layers"></ol></details></aside></main>
+<main><div id="stage"></div><aside><h2>替换内容</h2><div id="slots"></div><div id="status" role="status"></div><details><summary>图层顺序 · 从底到顶</summary><ol id="layers"></ol></details></aside></main>
 <script type="application/json" id="spec">__SPEC__</script>
 <script>
 'use strict';
@@ -115,7 +115,7 @@ function draw(){
   $('stage').replaceChildren(root)
 }
 function show(){
-  const {design,index,spread}=state();$('status').textContent='';$('slots').replaceChildren();$('steps').replaceChildren();$('layers').replaceChildren();
+  const {design,index,spread}=state();$('status').textContent='';$('slots').replaceChildren();$('layers').replaceChildren();
   for(const s of design.slots){
     const label=document.createElement('label'),input=document.createElement('input');label.textContent=s.label;
     input.dataset.slot=s.id;input.type=s.kind==='photo'?'file':'text';
@@ -125,7 +125,6 @@ function show(){
     }else{input.placeholder=s.label;input.value=values.get(key(index,s.id))??'';input.oninput=()=>{values.set(key(index,s.id),input.value);draw()}}
     label.append(input);$('slots').append(label)
   }
-  for(const step of spread.steps){const li=document.createElement('li'),small=document.createElement('small');li.textContent=step.action;small.textContent=step.check;li.append(small);$('steps').append(li)}
   for(const l of spread.layers){const li=document.createElement('li');li.textContent=l.name;if(l.kind==='use'){const small=document.createElement('small');small.textContent=design.components.find(c=>c.id===l.component).layers.map(x=>x.name).join('、');li.append(small)}$('layers').append(li)}
   draw()
 }

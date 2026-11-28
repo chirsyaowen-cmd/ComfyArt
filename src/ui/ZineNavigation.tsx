@@ -4,15 +4,12 @@ import { useEditor, useValue, type TLEventInfo } from 'tldraw'
 import { createPortal } from 'react-dom'
 import { lang, t } from '../i18n'
 import { activeZineIndex, addZineSpread, focusZinePage, getZinePages, selectZinePage } from '../zine'
-import { roadmapOpen } from '../roadmapGuide'
-import { RoadmapDialog } from './RoadmapDialog'
 import { openBookPreview } from './Slideshow'
 import { Icons } from './icons'
 import '../styles/zine.css'
 
 export function ZineNavigation() {
   const editor = useEditor()
-  const showRoadmap = useValue(roadmapOpen)
   const active = useValue('active book page', () => activeZineIndex(editor), [editor])
   const pages = useValue('zine pages', () => getZinePages(editor), [editor])
 
@@ -36,7 +33,7 @@ export function ZineNavigation() {
   if (!pages.length || !canvas) return null
   const zh = lang === 'zh'
   const pageName = (i: number) => zh ? `第 ${i + 1} 页` : `Page ${i + 1}`
-  return createPortal(<>{showRoadmap && <RoadmapDialog editor={editor} />}<nav className="ca-zine-nav" aria-label={zh ? '书页' : 'Book pages'} onPointerDown={e => e.stopPropagation()}>
+  return createPortal(<nav className="ca-zine-nav" aria-label={zh ? '书页' : 'Book pages'} onPointerDown={e => e.stopPropagation()}>
     {pages.map((id, i) => <button key={id} type="button" aria-label={pageName(i)}
       aria-current={i === active ? 'page' : undefined}
       data-spread-start={i % 2 === 1 || undefined}
@@ -44,7 +41,6 @@ export function ZineNavigation() {
       onClick={() => { editor.complete(); editor.selectNone(); focusZinePage(editor, i) }}>
       {i === 0 ? (zh ? '封面' : 'Cover') : i === pages.length - 1 ? (zh ? '封底' : 'Back') : i + 1}
     </button>)}
-    <button type="button" onClick={() => roadmapOpen.set(true)}>{t('road.title')}</button>
     <button type="button" className="ca-zine-add" disabled={!canAdd} onClick={() => addZineSpread(editor)}>
       {zh ? '+ 加两页' : '+ Add two pages'}
     </button>
@@ -52,5 +48,5 @@ export function ZineNavigation() {
       aria-label={t('frameToolbar.playFullscreen')} onClick={() => { editor.complete(); openBookPreview(pages, active) }}>
       <span className="ca-icon">{Icons.play}</span>
     </button>
-  </nav></>, canvas)
+  </nav>, canvas)
 }

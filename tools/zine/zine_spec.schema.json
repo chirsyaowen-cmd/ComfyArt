@@ -157,37 +157,6 @@
                 "type": "string",
                 "pattern": "^#[A-Fa-f0-9]{6}$"
               },
-              "steps": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "action": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "check": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "elements": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 1
-                    }
-                  },
-                  "required": [
-                    "action",
-                    "check",
-                    "elements"
-                  ],
-                  "additionalProperties": false
-                },
-                "minItems": 1
-              },
               "layers": {
                 "type": "array",
                 "items": {
@@ -246,7 +215,6 @@
               "pageIds",
               "name",
               "paper",
-              "steps",
               "layers"
             ],
             "additionalProperties": false

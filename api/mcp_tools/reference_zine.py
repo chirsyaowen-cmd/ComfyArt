@@ -22,7 +22,7 @@ def inputs(meta):
     if len(pages) < 8 or len(pages) % 2:
         raise ValueError("Open a saved Zine with at least eight pages")
     refs = {r.get("key") or r["src"]: r for r in meta.get("references", [])}
-    return pages, refs, meta.get("roadmapPhotos", {})
+    return pages, refs, meta.get("projectPhotos", meta.get("roadmapPhotos", {}))
 
 
 def prepare(folder, args, pages, refs, library, meta):

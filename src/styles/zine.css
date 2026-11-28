@@ -44,10 +44,6 @@
 .ca-zine-photo { padding: 8px 4px; font-size: 13px; line-height: 1.5; }
 .ca-zine-photo__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
-.ca-roadmap { width: min(420px, 90vw); max-height: 76vh; overflow: auto; padding: 16px; }
-.ca-roadmap ol { padding-inline-start: 24px; }
-.ca-roadmap li { margin-block: 12px; }
-.ca-roadmap li[aria-current] strong { color: light-dark(#315c77, #8ab8d4); }
 .ca-zine-photo__actions button { font: inherit; color: var(--ca-text); background: var(--ca-float); border: 1px solid var(--ca-border); border-radius: 5px; cursor: pointer; padding: 3px 7px; }
 .ca-photo-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .ca-photo-import { font-size: 13px; line-height: 1.5; }

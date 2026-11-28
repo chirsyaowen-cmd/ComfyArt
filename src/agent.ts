@@ -1,8 +1,8 @@
 import { atom, createShapeId, type Editor, type TLImageShape, type TLShape, type TLShapeId, type TLVideoShape } from 'tldraw'
 
 import { importPhotos, isPhoto } from './photoImport'
-import { PHOTO_REVIEW_INSTRUCTION } from './roadmapAdvice'
-import { beginRoadmapTurn, roadmap } from './roadmap'
+import { PHOTO_REVIEW_INSTRUCTION } from './reviewAdvice'
+import { beginCanvasTurn } from './canvasTurn'
 import { getZinePages } from './zine'
 import { commentTarget } from './actions'
 import { botEnabledAtom, logDirect, sendMessage, type BotBlock } from './bot'
@@ -79,13 +79,9 @@ export async function uploadRefs(editor: Editor, files: File[]) {
 
 export async function sendToAgent(editor: Editor, text: string, refs: RefShape[], skill: Skill | null, kits: LibraryItem[] = [], docs: ChatDoc[] = [], context = '', purpose?: 'schedule' | 'canvas_review' | 'embellishment') {
   const source = purpose === 'schedule' ? purpose : undefined
-  const roadmapTurn = beginRoadmapTurn(editor, source ?? 'chat', purpose)
-  if (purpose === 'canvas_review') context += '\nThis is a read-only design review. Inspect the actual book pages (get_canvas then view_canvas for each populated frame, max_px=512; inspect active_book_frame if all pages are blank). Consider the goal, roadmap, recorded decisions, and current composition. Write at most one short observation in the user’s language before the card. When a useful next step follows from the actual work, call offer_roadmap_advice once during THIS turn with the reason and 1–3 clickable options in the user’s language. The tool shows the card immediately. Use real step IDs from get_canvas and explicit page numbers in the request. Do not list those options as prose or call ask_user. The published card is the complete answer. End the turn immediately after it succeeds, with no additional text, review conclusion, or recap. If there is no useful next step, finish with one short observation. If a specific embellishment would help, call recommend_embellishment with that page and a concrete visual idea in the user’s language. A page can be finished as it is. Never start a preview during inspection. ' + PHOTO_REVIEW_INSTRUCTION
-  if (roadmapTurn) context += '\n[Project Roadmap revision ' + roadmap(editor).revision +
-    '. Start this turn with get_canvas. It returns current project photos, book frames, progress derived from the live canvas, and recorded user decisions. Follow only this request. ' +
-    'During reviews, honor an explicit keep_image_only choice until the user asks to add text. ' +
-    'For a change of direction call update_roadmap first. Use action last for “封面最后做” (last creative step before review), defer for “跳过”, then start the requested step. ' +
-    'Page typography is on request, after photo treatment and before optional embellishments. For a title, caption, diary or date: ' +
+  const canvasTurn = beginCanvasTurn(editor, purpose)
+  if (purpose === 'canvas_review') context += '\nThis is a read-only design review. Inspect the actual book pages (get_canvas then view_canvas for each populated frame, max_px=512; inspect active_book_frame if all pages are blank). Consider the user’s request and current composition. Write at most one short observation in the user’s language before the card. When a useful next step follows from the actual work, call offer_canvas_advice once during THIS turn with the reason and 1–3 clickable options in the user’s language. The tool shows the card immediately. Use explicit page numbers in each request. Do not list those options as prose or call ask_user. The published card is the complete answer. End the turn immediately after it succeeds, with no additional text, review conclusion, or recap. If there is no useful next step, finish with one short observation. If a specific embellishment would help, call recommend_embellishment with that page and a concrete visual idea in the user’s language. A page can be finished as it is. Never start a preview during inspection. ' + PHOTO_REVIEW_INSTRUCTION
+  if (canvasTurn) context += '\n[Zine: follow the current request. For page typography: ' +
     'Use get_canvas first. For “这页” / “this page”, active_book_frame is the confirmed target at send time, even when blank or a previous turn used another page. Go directly to view_canvas(ids=[target frame(s)]). ' +
     'Preserve supplied copy exactly; when asked to write, draft from this page. Choose a readable font, size, color, frame-local x/y, width and alignment around the subject and negative space. ' +
     'Call add_text directly with frame and role. Put all requested boxes in one call using additional, e.g. a title plus a separate date. ' +
@@ -116,7 +112,7 @@ export async function sendToAgent(editor: Editor, text: string, refs: RefShape[]
     return [{ id: r.id, src, name: mediaName(editor, r), kind, ...(transcript ? { transcript } : {}) }]
   }))
   await sendMessage({
-    text, source, roadmap_turn: roadmapTurn,
+    text, source, canvas_turn: canvasTurn,
     refs: sent.flat(),
     docs,
     kits: kits.map((k) => ({ name: k.name, description: describeItem(k), images: itemImages(k) })),

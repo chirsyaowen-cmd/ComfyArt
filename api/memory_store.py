@@ -191,6 +191,23 @@ def mutate(user, project, args, *, source, message_id=None, management=False, au
         return _entry(m)
 
 
+def retire_legacy_zine_sessions(s, user):
+    migration = "retire-zine-roadmap-context"
+    if s.get(db.Migration, (user, migration)):
+        return
+    # Provider sessions keep the previous tool results, even when a tool is removed.
+    candidates = s.execute(select(db.Message.chat_id, db.Message.blocks)
+                           .join(db.Chat, db.Chat.id == db.Message.chat_id)
+                           .where(db.Chat.user == user, db.Message.role == "user",
+                                  db.Message.blocks.contains("roadmap_turn")))
+    affected = {chat_id for chat_id, blocks in candidates
+                if any(b.get("type") == "roadmap_turn" for b in json.loads(blocks))}
+    if affected:
+        s.execute(update(db.Chat).where(db.Chat.id.in_(affected)).values(resume_token=None))
+        s.execute(update(db.Message).where(db.Message.chat_id.in_(affected)).values(resume_token_after=None))
+    s.add(db.Migration(user=user, name=migration, done_at=time.time()))
+
+
 def turn_context(chat, prompt):
     user, project = chat["user"], chat["project"]
     with transaction(user) as s:
@@ -200,7 +217,8 @@ def turn_context(chat, prompt):
         for m in memories:
             context["global_preferences" if m.scope == "global" else "project_notes"].append(m.text)
         header = json.dumps(context, ensure_ascii=False)
-        token = chat.get("resume_token")
+        retire_legacy_zine_sessions(s, user)
+        token = s.scalar(select(db.Chat.resume_token).where(db.Chat.id == chat["id"]))
         if chat["provider"] == "deepseek-harness":
             # A transient note may have been read by a tool and deleted within the
             # same turn. The next prompt can match byte-for-byte while that session is stale.

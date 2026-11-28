@@ -4,17 +4,16 @@ import { useValue, type Editor } from 'tldraw'
 import { busy, type BotBlock } from '../bot'
 import { sendToAgent } from '../agent'
 import { errorText, type ErrorSink } from '../jobs'
-import { roadmap, updateRoadmap } from '../roadmap'
-import { roadmapChangeForAdvice, type AdviceOption } from '../roadmapAdvice'
-import { currentRoadmapAdvice, guideShown, roadmapReviewContext } from '../roadmapGuide'
+import { currentReviewAdvice, guideShown, canvasReviewContext } from '../canvasReview'
+import type { AdviceOption } from '../reviewAdvice'
 import { readLocal, writeLocal } from '../localPrefs'
 import { importFiles } from './DropHandlers'
 
 export function NoticeReviewOptions({ editor, onError, noticeId }: { editor: Editor; onError: ErrorSink; noticeId: string }) {
-  const guide = useValue('current roadmap advice', () => currentRoadmapAdvice(editor), [editor])
+  const guide = useValue('current canvas advice', () => currentReviewAdvice(editor), [editor])
   if (!guide || noticeId !== guide.noticeId) return null
   return <ReviewOptions editor={editor} advice={guide.advice} onError={onError} showText={false}
-    valid={() => guide === currentRoadmapAdvice(editor)} close={() => {
+    valid={() => guide === currentReviewAdvice(editor)} close={() => {
       if (guideShown.get() === guide) guideShown.set(null)
     }} />
 }
@@ -24,7 +23,7 @@ export function ManualReviewOptions({ editor, review, messageId, streaming, onEr
 }) {
   const key = 'comfyart.reviewChoice.' + messageId
   const [closed, setClosed] = useState(() => !!readLocal(key))
-  const valid = () => roadmapReviewContext(editor)?.bookVersion === review.bookVersion
+  const valid = () => canvasReviewContext(editor)?.bookVersion === review.bookVersion
   const current = useValue('review still current', valid, [editor, review])
   if (closed || !current) return <div>{review.advice.text}</div>
   return <ReviewOptions editor={editor} advice={review.advice} onError={onError} showText allowBusy={streaming}
@@ -46,9 +45,6 @@ function ReviewOptions({ editor, advice, onError, valid, close, showText, allowB
     }
     setSending(true)
     try {
-      const plan = roadmap(editor)
-      const change = roadmapChangeForAdvice(option, plan.steps)
-      if (change) updateRoadmap(editor, plan.revision, [change], 'button')
       if (option.kind === 'request') await sendToAgent(editor, option.request, [], null)
       close()
     } catch (e) {

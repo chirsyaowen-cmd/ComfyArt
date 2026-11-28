@@ -47,13 +47,6 @@ class GenerateSpreadTests(unittest.IsolatedAsyncioTestCase):
                             "pageIds": target["pageIds"],
                             "name": "Cover",
                             "paper": "#ffffff",
-                            "steps": [
-                                {
-                                    "action": "Place rule",
-                                    "check": "At fold",
-                                    "elements": ["line"],
-                                }
-                            ],
                             "layers": [
                                 {
                                     "id": "line",

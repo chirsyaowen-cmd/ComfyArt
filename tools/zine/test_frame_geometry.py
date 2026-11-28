@@ -49,9 +49,6 @@ class FrameGeometryTests(unittest.IsolatedAsyncioTestCase):
                     "fit": "cover",
                 }
             ],
-            "steps": [
-                {"action": "place", "check": "to both edges", "elements": ["photo"]}
-            ],
         }
         adapter = Spread(
             store,
