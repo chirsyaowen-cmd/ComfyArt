@@ -96,6 +96,21 @@ def rotate_box(box, degrees):
     return co, si, -si, co, cx - co * cx + si * cy, cy - si * cx - co * cy
 
 
+def native_box_transform(layer, parent_matrix, label):
+    """Return the composed transform and whether the box needs a vector outline."""
+    matrix = compose(parent_matrix, rotate_box(layer["box"], layer.get("rotation", 0)))
+    a, b, c, d, _, _ = matrix
+    sx, sy = math.hypot(a, b), math.hypot(c, d)
+    if min(sx, sy) < 1e-9 or abs(a * d - b * c) <= 1e-12 * sx * sy:
+        raise ValueError(f"{label}: singular transform; use a non-collapsing component matrix")
+    shear = abs(a * c + b * d) > 1e-4 * sx * sy
+    if shear:
+        has_stroke = layer.get("stroke", "none") != "none" and layer.get("sw", 1) > 0
+        if layer["kind"] != "rect" or layer.get("radius", 0) or has_stroke:
+            raise ValueError(f"{label}: unsupported shear on {layer['kind']}; revise the component transform")
+    return matrix, shear
+
+
 def bounds(points):
     xs, ys = zip(*points)
     return min(xs), min(ys), max(xs), max(ys)
