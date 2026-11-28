@@ -69,5 +69,25 @@ class FrameGeometryTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
+
+
+class EditorialRolesTests(unittest.TestCase):
+    def test_cover_and_folios_follow_transformed_layers_and_reading_order(self):
+        from frame_geometry import editorial_pages
+
+        pages = [{"id": "back", "w": 160, "h": 200}, {"id": "front", "w": 135, "h": 200}]
+        target = {"geometry": spread_geometry(*pages), "pageNumbers": [8, 1]}
+        title = {"kind": "text", "slot": "title", "box": [5, 10, 66, 20]}
+        instance = {"kind": "use", "component": "masthead", "matrix": [1, 0, 0, 1, 160, 0]}
+        design = {"slots": [{"id": "title", "kind": "text", "role": "bookTitle"},
+                            {"id": "folio", "kind": "text", "role": "pageNumber"}],
+                  "components": [{"id": "masthead", "layers": [title]}],
+                  "spreads": [{"layers": [instance, {"kind": "text", "slot": "folio", "box": [8, 30, 22, 16]}]}]}
+        self.assertEqual(editorial_pages(design, [target]), {"title": 1, "folio": 8})
+        instance["matrix"][-2] = 0
+        with self.assertRaisesRegex(ValueError, "front cover"):
+            editorial_pages(design, [target])
+
+
 if __name__ == "__main__":
     unittest.main()

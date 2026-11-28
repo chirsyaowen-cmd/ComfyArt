@@ -90,6 +90,17 @@
                   "photo",
                   "text"
                 ]
+              },
+              "role": {
+                "enum": [
+                  "bookTitle",
+                  "pageNumber"
+                ]
+              },
+              "minDigits": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6
               }
             },
             "required": [

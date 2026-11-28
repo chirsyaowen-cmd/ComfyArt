@@ -4,7 +4,7 @@ These local CLI tools turn reference spreads into reusable layouts and place the
 
 ## Default in ComfyArt
 
-Ask the project chat to make a complete zine from the reference spreads and uploaded photos. The agent uses `make_reference_zine` with one project reference per spread in reading order (back/front cover first). It reads saved frame sizes and measures exposed paper. Each native DeepSeek child receives its own reference and writes reusable layout, editable treatments and text slots. After every layout passes validation the same parent session receives the photo sheets and binds the whole book. The chat returns a new editable project. The source book stays available. The project data directory holds per-job specs, bindings, and traces under `zine-runs/`.
+Ask the project chat to make a complete zine from the reference spreads and uploaded photos. The agent uses `make_reference_zine` with one project reference per spread in reading order (back/front cover first). It reads saved frame sizes and identifies the paper stock color visually. Each native DeepSeek child receives its own reference and writes reusable layout, editable treatments and text slots. After every layout passes validation the same parent session receives the photo sheets and binds the whole book. The chat returns a new editable project. The source book stays available. The project data directory holds per-job specs, bindings, and traces under `zine-runs/`.
 
 ## Setup
 
@@ -28,7 +28,7 @@ python tools/zine/project.py "$ZINE_RUN" --url http://127.0.0.1:8190 \
 
 The search stage proposes interior spreads from the uploaded photo thumbnails. For an eight-page zine it selects three interior references. Supply a cover image in the cover entry of `素材清单.json`, or pass an existing cover layout to `design.py --reuse-cover existing-spec.json`. Local reference manifests can also be used directly. A group has an `id`, `reference` file path and optional `referenceBox` in source pixels. The adjacent `装订顺序.json` specifies `cover`, ordered `spreads` and optional `relatedSpreads` groups.
 
-The design agent chooses the slot roles, composition, component instances, and treatments from the reference. It identifies exposed paper and reviews the marked samples. The program measures accepted pixels and inserts the resulting color in the specification. Sampling evidence and cached model output live in the records directory. If the reference does not reveal a reliable paper color, choose another reference or inspect the saved evidence.
+The design agent chooses the slot roles, composition, component instances, and treatments from the reference. During the initial reference reading the agent supplies the paper stock color as a HEX value, or null if the paper is hidden. A supplied color is carried directly into the spread specification. The observations are saved in records/reference-structure.json.
 
 Each generation reads the saved project frames in book order. New specs store actual page IDs and dimensions. Each spread is laid out in native page units, with the spine at the left page's width. The importer retains the legacy virtual coordinate mapping for v2 files without frame metadata. Use `--preserve-content` when reflowing a zine that already has slot bindings. Successful designs are cached by input digest so a failed generation can be resumed.
 

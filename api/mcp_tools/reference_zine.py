@@ -8,13 +8,18 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlencode
 
+from PIL import Image, ImageDraw, ImageOps
+
 from ... import runtime
+from ...bot.media_sheet import jpeg
 from .. import project_store
 from .._common import read_json, view_path, write_json
-from ._context import PROJECT
+from ._context import BOT_CHAT_ID, PROJECT
+from .image_search import reference_id
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "tools/zine"
 _jobs = {}
+_last_job = {}
 
 
 def inputs(meta):
@@ -23,6 +28,23 @@ def inputs(meta):
         raise ValueError("Open a saved Zine with at least eight pages")
     refs = {r.get("key") or r["src"]: r for r in meta.get("references", [])}
     return pages, refs, meta.get("projectPhotos", meta.get("roadmapPhotos", {}))
+
+
+def preview_references(refs, keys):
+    if not isinstance(keys, list) or not 1 <= len(keys) <= 8 or any(k not in refs for k in keys):
+        raise ValueError("Choose 1–8 saved reference keys from inputs")
+    cols = min(len(keys), 4)
+    board = Image.new("RGB", (cols * 350, ((len(keys) + cols - 1) // cols) * 300), "white")
+    labels = ImageDraw.Draw(board)
+    for i, key in enumerate(keys):
+        with Image.open(view_path(refs[key]["src"])) as original:
+            tile = ImageOps.exif_transpose(original)
+            tile.thumbnail((342, 272))
+            x, y = (i % cols) * 350, (i // cols) * 300
+            board.paste(tile.convert("RGB"), (x + (350 - tile.width) // 2, y))
+            labels.text((x + 6, y + 276), str(i + 1), fill="black")
+    sheet = jpeg(board, 1400)
+    return {"refIdsInImageOrder": [reference_id(k) for k in keys], "keysInImageOrder": keys, "_images": [{"data": sheet["data"], "mime": sheet["media_type"]}]}
 
 
 def prepare(folder, args, pages, refs, library, meta):
@@ -181,15 +203,15 @@ async def generate(folder, project, title, brief):
         records / "trace.jsonl",
     )
     snapshot = project_store.get_snapshot("default", dest)
-    decorations = json.loads(snapshot)["document"]["store"]["document:document"][
-        "meta"
-    ].get("zineDecorations", {})
+    meta = json.loads(snapshot)["document"]["store"]["document:document"]["meta"]
+    decorations = meta.get("zineDecorations", {})
     return {
         "decorationPreviews": [
             {"provider": v["provider"], "sourcePageUrl": v["sourcePageUrl"]}
             for v in decorations.values()
             if v["origin"] == "search-preview"
         ],
+        "verified": {"pages": len(meta["zinePages"])},
         "status": "complete",
         "project": dest,
         "url": url + "/comfyart/?project=" + dest,
@@ -200,7 +222,7 @@ async def handle(args):
     project = PROJECT.get()
     action = args.get("action")
     if action == "status":
-        job = args.get("job")
+        job = args.get("job") or _last_job.get(project)
         if not isinstance(job, str) or not re.fullmatch(r"zine-[a-z0-9_]{8}", job):
             raise ValueError("Invalid job ID")
         folder = runtime.DATA / "zine-runs" / job
@@ -208,10 +230,10 @@ async def handle(args):
         if state.get("sourceProject") != project:
             raise ValueError("Unknown job for this project")
         task = _jobs.get((project, job))
-        if task is not None:
+        if task is not None and not BOT_CHAT_ID.get():
             await asyncio.wait([task], timeout=12)
             state = read_json(folder / "status.json", state)
-        elif state["status"] == "running":
+        elif task is None and state["status"] == "running":
             return {
                 "status": "interrupted",
                 "job": job,
@@ -223,10 +245,16 @@ async def handle(args):
         raise ValueError("Open a saved project first")
     meta = json.loads(snapshot)["document"]["store"]["document:document"]["meta"]
     pages, refs, library = inputs(meta)
+    if action in ("preview", "start") and isinstance(args.get("references"), list):
+        # Store canonical source keys on the canvas, even when callers use compact IDs.
+        aliases = {reference_id(key): key for key in refs}
+        args = {**args, "references": [k if k in refs else aliases.get(k, k) for k in args["references"]]}
+    if action == "preview":
+        return await asyncio.to_thread(preview_references, refs, args.get("references"))
     if action == "inputs":
         return {
             "spreadCount": len(pages) // 2,
-            "references": [{"key": k, "name": r.get("name")} for k, r in refs.items()],
+            "references": [{"refId": reference_id(k), "key": k, "name": r.get("name")} for k, r in refs.items()],
             "assigned": meta.get("zineReferenceSources", {}),
             "photoBatch": library.get("batch", []),
         }
@@ -257,6 +285,7 @@ async def handle(args):
         )
 
     record({"status": "running"})
+    _last_job[project] = folder.name
 
     async def work():
         try:
@@ -275,16 +304,16 @@ async def handle(args):
 TOOL = {
     "description": "Default workflow for making a complete editable Zine from reference spreads and project photos. "
     "When choosing interior references, compare them as a set. Prefer shared visual style (paper, type, spacing or photographic treatment), allow varied compositions and different books, and honor explicit user choices. "
-    "Use inputs to inspect available saved references; assign one per spread, cover first. Use start with the user's title and creative direction. "
+    "Copy short refId values from search_images.savedReferences or inputs; call preview with references=[refIds] to visually compare saved references (up to eight per call); assign one per spread, cover first. Use start with the user's title and creative direction. "
     "Children can search Brave for transparent decorations from Vecteezy, Pngtree and PNGimg. Indexed assets are visibly marked as previews; pngOriginals matches uploaded originals to their resource pages. "
     "Native DeepSeek children extract layouts and treatments before the master binds photos and copy. "
-    "Poll status until complete and give the user the new canvas link. Existing source project is preserved.",
+    "Poll status (omit job for this project’s latest run) until complete and deliver the verified new canvas link immediately without asking to wait or inspecting it through the source tab. Existing source project is preserved.",
     "inputSchema": {
         "type": "object",
         "required": ["action"],
         "additionalProperties": False,
         "properties": {
-            "action": {"enum": ["inputs", "start", "status"]},
+            "action": {"enum": ["inputs", "preview", "start", "status"]},
             "job": {"type": "string"},
             "title": {"type": "string"},
             "brief": {

@@ -9,60 +9,14 @@ from pathlib import Path
 import aiohttp
 from bind_photos import validate
 from canvas_records import positions, schema_from, shape
-from frame_geometry import checked_frames, spread_geometry
-from layout_schema import discard_legacy_steps, check_design, validate_schema
+from frame_geometry import IDENTITY, bounds, checked_frames, compose, intersects, point, rotate_box, spread_geometry
+from layout_schema import check_design, discard_legacy_steps, validate_schema
 from local_runtime import audit, configure
 from native_assets import CanvasAssets
 
 
 def native_id(page_id):
     return page_id if page_id.startswith("shape:") else "shape:" + page_id
-
-
-IDENTITY = (1, 0, 0, 1, 0, 0)
-
-
-def point(m, x, y):
-    a, b, c, d, e, f = m
-    return a * x + c * y + e, b * x + d * y + f
-
-
-def compose(m, n):
-    a, b, c, d, e, f = m
-    u, v, w, z, x, y = n
-    return (
-        a * u + c * v,
-        b * u + d * v,
-        a * w + c * z,
-        b * w + d * z,
-        a * x + c * y + e,
-        b * x + d * y + f,
-    )
-
-
-def rotate_box(box, degrees):
-    x, y, w, h = box
-    cx = x + w / 2
-    cy = y + h / 2
-    a = math.radians(degrees)
-    co = math.cos(a)
-    si = math.sin(a)
-    return co, si, -si, co, cx - co * cx + si * cy, cy - si * cx - co * cy
-
-
-def bounds(points):
-    xs, ys = zip(*points)
-    return min(xs), min(ys), max(xs), max(ys)
-
-
-def intersects(points, page):
-    x, y, r, b = bounds(points)
-    return (
-        r > page["x"] + 1e-7
-        and x < page["x"] + page["w"] - 1e-7
-        and b > 1e-7
-        and y < page["h"] - 1e-7
-    )
 
 
 def vector(kind, w, h, fill, stroke="", sw=0, radius=0, d="", image=""):

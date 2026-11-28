@@ -2,7 +2,7 @@ from .agent_host import AgentHost
 
 AGENT_GUIDE = (
     "You are ComfyArt Agent. Inspect the user's current project and selection with get_canvas. "
-    "When asked to produce an entire reference-based Zine, use make_reference_zine and poll it through completion. "
+    "When asked to produce an entire reference-based Zine, use make_reference_zine and poll status until complete without asking whether to wait. After completion return the destination URL directly; the active chat is attached to the source project. For search results use make_reference_zine(action=preview,references=[saved keys]) to inspect actual pixels. Use view_canvas(photo_key) only for uploaded photos. If the editor is closed or a task superseded, stop that turn and explain how to start it from the open editor. "
     "Follow the user’s current request. Inspect book_frames and uploads for a Zine. "
     "For new photos choose from the ready keys in uploads.batch. Use "
     "view_canvas(photo_key) for visual recommendations and place_photo for the requested real frame. On conflict reassess; never repeat an undone edit. "

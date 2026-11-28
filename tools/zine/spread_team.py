@@ -133,37 +133,40 @@ async def run_team(release, tasks, trace, finish, *, binding, png_dir=None):
                 for task in batch:
                     write_json(folder / (task.key + ".json"), task.blocks)
                 ids = [task.key for task in batch]
-                before = spawned.copy()
-                await transport.request(
-                    "session/prompt",
-                    {
-                        "sessionId": sid,
-                        "prompt": [
-                            {
-                                "type": "text",
-                                "text": "你是制作主编。请立即用原生 subagent 工具并行派生，每个编号一个全新子会话，description 使用编号。"
-                                "只告诉孩子自己的编号，调用 read_reference 读取本组参考及规格契约，按原图拆版，"
-                                "注明哪些区域保留色彩、哪些要处理，并将参数写入照片层。调用 submit_spec 提交，校验失败自行修正。"
-                                "此时不接触用户素材、不配图文。你只派发，不替孩子设计，也不审稿。本批编号："
-                                + ", ".join(ids),
-                            }
-                        ],
-                    },
-                    timeout=900,
-                )
-
-                async def wait_children(previous_children):
-                    while spawned - previous_children - ended:
-                        if transport.returncode is not None:
-                            raise RuntimeError("DeepSeek Harness stopped during layout")
-                        await asyncio.sleep(0.2)
-
-                await asyncio.wait_for(wait_children(before), timeout=900)
-                missing = [key for key in ids if key not in accepted]
-                if missing or len(spawned - before) != len(batch):
-                    raise RuntimeError(
-                        f"Native layout team did not complete the batch; unsubmitted spreads: {missing}"
+                for attempt in range(2):
+                    before = spawned.copy()
+                    await transport.request(
+                        "session/prompt",
+                        {
+                            "sessionId": sid,
+                            "prompt": [
+                                {
+                                    "type": "text",
+                                    "text": "你是制作主编。请立即用原生 subagent 工具并行派生，每个编号一个全新子会话，description 使用编号。"
+                                    "只告诉孩子自己的编号，调用 read_reference 读取本组参考及规格契约，按原图拆版，"
+                                    "注明哪些区域保留色彩、哪些要处理，并将参数写入照片层。调用 submit_spec 提交，校验失败自行修正。"
+                                    "此时不接触用户素材、不配图文。你只派发，不替孩子设计，也不审稿。本批编号："
+                                    + ", ".join(ids),
+                                }
+                            ],
+                        },
+                        timeout=900,
                     )
+
+                    async def wait_children(previous_children):
+                        while spawned - previous_children - ended:
+                            if transport.returncode is not None:
+                                raise RuntimeError("DeepSeek Harness stopped during layout")
+                            await asyncio.sleep(0.2)
+
+                    await asyncio.wait_for(wait_children(before), timeout=900)
+                    missing = [key for key in ids if key not in accepted]
+                    if not missing:
+                        break
+                    audit(trace, "batch.incomplete", spreads=missing, attempt=attempt + 1)
+                    ids = missing
+                else:
+                    raise RuntimeError(f"Native layout team did not complete the batch; unsubmitted spreads: {missing}")
                 for task in batch:
                     (folder / (task.key + ".json")).unlink()
 
