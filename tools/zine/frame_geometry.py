@@ -65,6 +65,84 @@ def spread_geometry(left, right):
     }
 
 
+IDENTITY = (1, 0, 0, 1, 0, 0)
+
+
+def point(m, x, y):
+    a, b, c, d, e, f = m
+    return a * x + c * y + e, b * x + d * y + f
+
+
+def compose(m, n):
+    a, b, c, d, e, f = m
+    u, v, w, z, x, y = n
+    return (
+        a * u + c * v,
+        b * u + d * v,
+        a * w + c * z,
+        b * w + d * z,
+        a * x + c * y + e,
+        b * x + d * y + f,
+    )
+
+
+def rotate_box(box, degrees):
+    x, y, w, h = box
+    cx = x + w / 2
+    cy = y + h / 2
+    a = math.radians(degrees)
+    co = math.cos(a)
+    si = math.sin(a)
+    return co, si, -si, co, cx - co * cx + si * cy, cy - si * cx - co * cy
+
+
+def bounds(points):
+    xs, ys = zip(*points)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def intersects(points, page):
+    x, y, r, b = bounds(points)
+    return (
+        r > page["x"] + 1e-7
+        and x < page["x"] + page["w"] - 1e-7
+        and b > 1e-7
+        and y < page["h"] - 1e-7
+    )
+
+
+def editorial_pages(design, targets):
+    """Resolve typed editorial slots against the same transformed boxes as the importer."""
+    roles = {s["id"]: s["role"] for s in design["slots"] if s.get("role")}
+    if any("minDigits" in s and s.get("role") != "pageNumber" for s in design["slots"]):
+        raise ValueError("minDigits belongs to a pageNumber slot")
+    if not roles:
+        return {}
+    if any(s["kind"] != "text" for s in design["slots"] if s.get("role")):
+        raise ValueError("Editorial roles require text slots")
+    groups = {g["id"]: g["layers"] for g in design["components"]}
+    result = {}
+    for spread, target in zip(design["spreads"], targets, strict=True):
+        for layer in spread["layers"]:
+            matrix = layer.get("matrix", IDENTITY)
+            layers = groups[layer["component"]] if layer["kind"] == "use" else [layer]
+            for item in layers:
+                slot = item.get("slot")
+                if slot not in roles:
+                    continue
+                x, y, w, h = item["box"]
+                transform = compose(matrix, rotate_box(item["box"], item.get("rotation", 0)))
+                corners = [point(transform, a, b) for a in (x, x + w) for b in (y, y + h)]
+                pages = [n for p, n in zip(target["geometry"]["pages"], target["pageNumbers"])
+                         if intersects(corners, p)]
+                if len(pages) != 1 or slot in result and result[slot] != pages[0]:
+                    raise ValueError(f"{slot}: use a separate editorial slot inside each physical page")
+                result[slot] = pages[0]
+                if roles[slot] == "bookTitle" and pages != [1]:
+                    raise ValueError(f"{slot}: move the front cover title to physical page 1 (right of the cover spine)")
+    return result
+
+
 def checked_frames(book):
     frames = book["frames"]
     expected = [

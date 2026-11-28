@@ -23,6 +23,31 @@ def unique(rows, what):
     return {r["id"]: r for r in rows}
 
 
+def resolve_step_elements(design):
+    """Expand unambiguous slot/definition references into visible layer IDs."""
+    groups = {g["id"]: g["layers"] for g in design["components"]}
+    for spread in design["spreads"]:
+        aliases = {}
+        visible = set()
+        for layer in spread["layers"]:
+            visible.add(layer["id"])
+            if layer["kind"] == "use":
+                key = layer["component"]
+                aliases.setdefault(key, set()).add(layer["id"])
+                children = groups[key]
+            else:
+                children = [layer]
+            for child in children:
+                visible.add(child["id"])
+                if "slot" in child:
+                    aliases.setdefault(child["slot"], set()).add(child["id"])
+        for step in spread["steps"]:
+            step["elements"] = [
+                next(iter(aliases[k])) if k not in visible and len(aliases.get(k, ())) == 1 else k
+                for k in step["elements"]
+            ]
+
+
 def check_design(design, expected):
     slots = unique(design["slots"], "slot")
     components = unique(design["components"], "component")

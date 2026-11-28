@@ -11,7 +11,7 @@ from spread_team import run_team
 
 
 class SpreadTeamTest(unittest.IsolatedAsyncioTestCase):
-    async def exercise(self, missing=False, contrast=1.13):
+    async def exercise(self, missing=False, contrast=1.13, recover=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             trace = root / "trace.jsonl"
@@ -35,8 +35,11 @@ class SpreadTeamTest(unittest.IsolatedAsyncioTestCase):
                     async def request(parent, method, args, timeout):
                         self.assertEqual(args["sessionId"], "editor")
                         self.assertNotIn("photo catalog", str(args))
+                        ids = args["prompt"][0]["text"].split("本批编号：")[-1].split(", ")
                         for task in tasks:
-                            child = "child-" + task.key
+                            if task.key not in ids:
+                                continue
+                            child = str(uuid.uuid4())
 
                             async def event(kind, child=child, **fields):
                                 await on_event(
@@ -49,7 +52,7 @@ class SpreadTeamTest(unittest.IsolatedAsyncioTestCase):
                                 task.blocks,
                             )
                             await event("reference", spread=task.key, images=1)
-                            if not missing or task is tasks[0]:
+                            if not missing or task is tasks[0] or recover and len(ids) == 1:
                                 token = str(uuid.uuid4())
                                 await event(
                                     "submit", spread=task.key, token=token, json="{}"
@@ -96,7 +99,7 @@ class SpreadTeamTest(unittest.IsolatedAsyncioTestCase):
                 patch("spread_team.session", harness),
                 patch("spread_team.json_turn", bind),
             ):
-                if missing:
+                if missing and not recover:
                     with self.assertRaisesRegex(RuntimeError, "spread-02"):
                         await run_team(root, tasks, trace, seal, binding=True)
                     self.assertFalse(read_material)
@@ -111,3 +114,6 @@ class SpreadTeamTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_incomplete_layout_never_releases_photos(self):
         await self.exercise(missing=True)
+
+    async def test_replacement_child_finishes_only_the_missing_spread(self):
+        await self.exercise(missing=True, recover=True)

@@ -11,7 +11,7 @@ from local_runtime import audit, configure
 
 
 @asynccontextmanager
-async def session(release, *, team=False, on_event=None):
+async def session(release, *, team=False, on_event=None, paper_stage=None, reports=None):
     configure(release)
     from ComfyArt.bot._acp import AcpTransport
     from ComfyArt.bot.deepseek_harness_runtime import (
@@ -66,10 +66,15 @@ async def session(release, *, team=False, on_event=None):
                     },
                 ]
             )
+        if paper_stage:
+            entries.append({"insert": [{"id": "comfyart-paper", "name": Path(__file__).with_name("paper_report.mjs").as_uri()}]})
         overlay.write_text(json.dumps(entries))
         chunks = []
 
         async def receive(method, params):
+            if method == "_comfyart/paper" and reports is not None:
+                reports.append(params)
+                return
             if method == "_comfyart/spread" and on_event:
                 await on_event(folder, params)
                 return
@@ -89,6 +94,8 @@ async def session(release, *, team=False, on_event=None):
             if k in os.environ
         }
         env["DSH_HOME"] = tmp
+        if paper_stage:
+            env["COMFYART_PAPER_STAGE"] = paper_stage
         t = AcpTransport(
             [*argv, "--profile", "comfyart-acp", "--patch", str(overlay)],
             cwd=tmp,
@@ -139,15 +146,20 @@ async def session(release, *, team=False, on_event=None):
             await t.dispose()
 
 
-async def json_turn(t, sid, chunks, blocks, validate, trace, stage):
+async def json_turn(t, sid, chunks, blocks, validate, trace, stage, reports=None):
     for i in range(3):
         chunks.clear()
+        if reports is not None:
+            reports.clear()
+            blocks = [*blocks, {"type": "text", "text": "请调用 submit_paper_report 提交观察结果，参数按工具定义填写。提交后直接结束。"}]
         audit(trace, stage + ".request", session=sid, attempt=i + 1)
         await t.request(
             "session/prompt", {"sessionId": sid, "prompt": blocks}, timeout=420
         )
         try:
-            data = json.loads(
+            if reports is not None and not reports:
+                raise ValueError("Submit the observation using submit_paper_report")
+            data = reports[-1] if reports is not None else json.loads(
                 "".join(chunks)
                 .strip()
                 .removeprefix("```json")
@@ -172,8 +184,11 @@ async def json_turn(t, sid, chunks, blocks, validate, trace, stage):
 
 async def request(release, blocks, validate, trace, stage):
     try:
-        async with session(release) as (t, sid, chunks, _):
-            return await json_turn(t, sid, chunks, blocks, validate, trace, stage)
+        suffix = stage.rsplit(".paper.", 1)
+        paper_stage = suffix[1] if len(suffix) == 2 and suffix[1] in ("locate", "review") else None
+        reports = [] if paper_stage else None
+        async with session(release, paper_stage=paper_stage, reports=reports) as (t, sid, chunks, _):
+            return await json_turn(t, sid, chunks, blocks, validate, trace, stage, reports)
     except Exception as exc:
         audit(trace, stage + ".failed", error=str(exc)[:350])
         raise
