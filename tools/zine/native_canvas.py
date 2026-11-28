@@ -9,7 +9,7 @@ from pathlib import Path
 import aiohttp
 from bind_photos import validate
 from canvas_records import positions, schema_from, shape
-from frame_geometry import IDENTITY, bounds, checked_frames, compose, intersects, point, rotate_box, spread_geometry
+from frame_geometry import IDENTITY, bounds, checked_frames, compose, intersects, native_box_transform, point, spread_geometry
 from layout_schema import check_design, discard_legacy_steps, validate_schema
 from local_runtime import audit, configure
 from native_assets import CanvasAssets
@@ -182,7 +182,15 @@ class Spread:
             )
         else:
             box = l["box"]
-            m = compose(m, rotate_box(box, l.get("rotation", 0)))
+            m, needs_outline = native_box_transform(l, m, sid)
+            if needs_outline:
+                x, y, w, h = box
+                outline = {
+                    **l, "kind": "path", "closed": True, "stroke": "none", "sw": 0,
+                    "points": [(x, y), (x + w, y), (x + w, y + h), (x, y + h)],
+                }
+                await self.paint(outline, parent, side, m, instance)
+                return
             if kind in ("photo", "png"):
                 if kind == "png":
                     src = await self.assets.decoration(l["asset"])
@@ -226,11 +234,6 @@ class Spread:
             a, b, c, d, _, _ = m
             xscale = math.hypot(a, b)
             yscale = math.hypot(c, d)
-            if (
-                min(xscale, yscale) < 1e-9
-                or abs(a * c + b * d) > 1e-4 * xscale * yscale
-            ):
-                raise ValueError("Unsupported shear or singular matrix in " + sid)
             flip = a * d - b * c < 0
             angle = math.atan2(-b if flip else b, -a if flip else a)
             w *= xscale * self.scale

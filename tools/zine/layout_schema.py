@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from frame_geometry import native_box_transform
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import best_match
 
@@ -50,6 +51,8 @@ def check_design(design, expected):
                 used_groups.add(key)
                 children = components[key]["layers"]
             for child in children:
+                if layer["kind"] == "use" and "box" in child:
+                    native_box_transform(child, layer["matrix"], f"{s['id']}/{layer['id']}/{child['id']}")
                 if child["kind"] in ("photo", "text"):
                     key = child["slot"]
                     if slots[key]["kind"] != child["kind"]:
