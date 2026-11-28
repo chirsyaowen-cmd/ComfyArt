@@ -138,3 +138,19 @@ def test_automatic_global_requires_matching_user_evidence():
     assert extract("封面用绿色", quote)["scope"] == "project"
     assert extract("用小白语言", quote)["scope"] == "global"
     assert [r["text"] for r in memory_store.listing("default", "a")["memories"]] == ["用小白语言"]
+
+
+def test_previous_zine_sessions_start_clean_without_erasing_the_visible_chat():
+    old = chat_store.create_chat(user="default", project="book", provider="deepseek-harness")
+    other = chat_store.create_chat(user="default", project="canvas", provider="fake-test")
+    message = chat_store.create_message(chat_id=old["id"], role="user", blocks=[
+        {"type": "roadmap_turn", "token": "old-editor"}, {"type": "text", "text": "封面用绿色"}])
+    chat_store.update_message(old["id"], message["id"], resume_token_after="old-session")
+    old = chat_store.update_chat(old["id"], resume_token="old-session")
+    other = chat_store.update_chat(other["id"], resume_token="other-session")
+    assert memory_store.turn_context(other, "hello")[1] == "other-session"
+    assert memory_store.turn_context(old, "继续")[1] is None
+    saved, = chat_store.list_messages(old["id"])
+    assert saved["blocks"] == message["blocks"] and saved["resume_token_after"] is None
+    current = chat_store.update_chat(old["id"], resume_token="new-session")
+    assert memory_store.turn_context(current, "继续")[1] == "new-session"

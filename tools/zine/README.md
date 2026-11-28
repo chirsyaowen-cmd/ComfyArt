@@ -28,11 +28,11 @@ python tools/zine/project.py "$ZINE_RUN" --url http://127.0.0.1:8190 \
 
 The search stage proposes interior spreads from the uploaded photo thumbnails. For an eight-page zine it selects three interior references. Supply a cover image in the cover entry of `素材清单.json`, or pass an existing cover layout to `design.py --reuse-cover existing-spec.json`. Local reference manifests can also be used directly. A group has an `id`, `reference` file path and optional `referenceBox` in source pixels. The adjacent `装订顺序.json` specifies `cover`, ordered `spreads` and optional `relatedSpreads` groups.
 
-The design agent chooses the slot roles, composition, component instances, treatments and steps from the reference. During the initial reference reading the agent supplies the paper stock color as a HEX value, or null if the paper is hidden. A supplied color is carried directly into the spread specification. The observations are saved in records/reference-structure.json.
+The design agent chooses the slot roles, composition, component instances, and treatments from the reference. During the initial reference reading the agent supplies the paper stock color as a HEX value, or null if the paper is hidden. A supplied color is carried directly into the spread specification. The observations are saved in records/reference-structure.json.
 
 Each generation reads the saved project frames in book order. New specs store actual page IDs and dimensions. Each spread is laid out in native page units, with the spine at the left page's width. The importer retains the legacy virtual coordinate mapping for v2 files without frame metadata. Use `--preserve-content` when reflowing a zine that already has slot bindings. Successful designs are cached by input digest so a failed generation can be resumed.
 
-Running `python tools/zine/project.py "$ZINE_RUN"` creates an offline HTML layout reader with replaceable slots and layered SVG export. The native import instead creates editable photo, vector, text and group records, and links roadmap steps to their canvas elements. Split instances can be edited independently on the canvas. Mirrored text boxes retain readable native glyphs. Source photos, references, bindings, traces and finished projects belong in the local output directory.
+Running `python tools/zine/project.py "$ZINE_RUN"` creates an offline HTML layout reader with replaceable slots and layered SVG export. The native import instead creates editable photo, vector, text and group records. Split instances can be edited independently on the canvas. Mirrored text boxes retain readable native glyphs. Source photos, references, bindings, traces and finished projects belong in the local output directory.
 
 ### Transparent decoration layers
 

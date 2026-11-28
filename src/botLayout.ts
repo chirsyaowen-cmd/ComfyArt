@@ -2,11 +2,11 @@ import { createShapeId, type Editor, type TLFrameShape, type TLShape, type TLSha
 
 import { loadImage } from './adjust'
 import { thumbUrl, viewUrl } from './comfy'
-import { roadmap, roadmapSource, updateRoadmap, type RoadmapTurn } from './roadmap'
-import { markManualReview, roadmapReviewContext } from './roadmapGuide'
-import { parseRoadmapAdvice } from './roadmapAdvice'
-import { frameFacts, placeProjectPhoto, projectPhotos } from './roadmapPhotos'
-import { activeZineIndex, focusZinePage, getZinePages } from './zine'
+import type { CanvasTurn } from './canvasTurn'
+import { markManualReview, canvasReviewContext } from './canvasReview'
+import { parseReviewAdvice } from './reviewAdvice'
+import { frameFacts, placeProjectPhoto, projectPhotos } from './projectPhotos'
+import { activeZineIndex, focusZinePage, getZinePages, zineSpreads } from './zine'
 import { canRequestEmbellishments, embellishmentVersion, embellishmentPageStatus, embellishmentOfferStatus, previewEmbellishments } from './zineEmbellishments'
 import { BUNDLED_FONTS, fontLabel } from './fonts'
 import { bookFonts, chooseZineFont } from './zineFonts'
@@ -27,7 +27,7 @@ import { t } from './i18n'
 import { uuid } from './id'
 
 export type Args = Record<string, any>
-export type Handler = (editor: Editor, args: Args, onError: ErrorSink, chat: string, checkTask: () => void, turn?: RoadmapTurn) => unknown
+export type Handler = (editor: Editor, args: Args, onError: ErrorSink, chat: string, checkTask: () => void, turn?: CanvasTurn) => unknown
 
 const MAX_SHAPES = 300
 const VIEW_MAX_PX = 1024
@@ -95,12 +95,8 @@ function textProps(args: Args): Partial<TextShape['props']> {
 }
 
 export const LAYOUT_HANDLERS: Record<string, Handler> = {
-  update_roadmap: (editor, args, _onError, chat, _check, turn) => {
-    if (turn && !turn.inspected) throw new Error('Read get_canvas before updating the roadmap.')
-    return updateRoadmap(editor, args.expected_revision, args.changes, chat ? roadmapSource(editor) : 'chat')
-  },
   place_photo: (editor, args, _onError, _chat, checkTask) => placeProjectPhoto(editor, {
-    frame: args.frame, frame_version: args.frame_version, expected_revision: args.expected_revision, fit: args.fit, photo_key: args.photo_key,
+    frame: args.frame, frame_version: args.frame_version, fit: args.fit, photo_key: args.photo_key,
   }, checkTask),
   get_canvas: (editor, args, _onError, _chat, _check, turn) => {
     const page = pageOf(editor, args.page)
@@ -114,7 +110,7 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       pages: editor.getPages().map((p) => ({ id: p.id, name: p.name, current: p.id === editor.getCurrentPageId() })),
       page: page.id,
       bundled_fonts: BUNDLED_FONTS.map(family => ({ family, name: fontLabel(family) })),
-      ...(getZinePages(editor).length ? { roadmap: roadmap(editor),
+      ...(getZinePages(editor).length ? {
         active_book_frame: turn?.frame ?? getZinePages(editor)[activeZineIndex(editor)], book_fonts: bookFonts(editor),
         book_frames: getZinePages(editor).filter(id => editor.getShape(id)?.type === 'frame').map(id => ({
           ...frameFacts(editor, id), embellishment: embellishmentPageStatus(editor, id),
@@ -143,9 +139,9 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
     const bounds = shapes.map((s) => editor.getShapePageBounds(s)!).reduce((a, b) => a.union(b))
     const maxPx = Math.min(2048, Number(args.max_px) || VIEW_MAX_PX)
     const viewed = turn?.inspected ? getZinePages(editor).filter(id => ids.includes(id)).map(id => frameFacts(editor, id)) : []
-    const reviewed = turn?.purpose === 'canvas_review' ? roadmapReviewContext(editor) : null
+    const reviewed = turn?.purpose === 'canvas_review' ? canvasReviewContext(editor) : null
     const { blob, width, height } = await exportImage(editor, ids, { format: 'png', background: true, scale: Math.min(1, maxPx / Math.max(bounds.w, bounds.h)) })
-    if (reviewed && viewed.length && turn && roadmapReviewContext(editor)?.bookVersion === reviewed.bookVersion) {
+    if (reviewed && viewed.length && turn && canvasReviewContext(editor)?.bookVersion === reviewed.bookVersion) {
       turn.reviewVersion = reviewed.bookVersion
       markManualReview(reviewed.bookVersion)
     }
@@ -194,14 +190,12 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       return { id }
     }
 
-    const plan = roadmap(editor)
-    const step = plan.steps.find(s => s.type === 'typography' && s.targetFrameIds.includes(frame.id))
-    if (!step) throw new Error('Missing page typography step. Read get_canvas again.')
+    const spread = zineSpreads(pages.length).find(group => group.includes(pages.indexOf(frame.id)))!
     const items: Args[] = [args, ...(args.additional ?? [])]
     const versions = new Map<TLShapeId, string>()
     const shapes = await Promise.all(items.map(async item => {
       const parent = item.frame ? shapeOf(editor, item.frame) : frame
-      if (parent.type !== 'frame' || !step.targetFrameIds.includes(parent.id)) throw new Error('Text must belong to the target page or spread')
+      if (parent.type !== 'frame' || !spread.includes(pages.indexOf(parent.id))) throw new Error('Text must belong to the target page or spread')
       const version = frameFacts(editor, parent.id).frame_version
       if (turn && turn.viewedFrames.get(parent.id) !== version)
         throw new Error('Inspect the target with get_canvas, then view_canvas(ids=[frame]) before placing text.')
@@ -213,7 +207,7 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
         meta: { textRole: role }, props: { ...textProps(item), font } } as const
     }))
     checkTask()
-    if (roadmap(editor).revision !== plan.revision || [...versions].some(([id, version]) => frameFacts(editor, id).frame_version !== version))
+    if ([...versions].some(([id, version]) => frameFacts(editor, id).frame_version !== version))
       throw new Error('Target changed during placement. Read get_canvas and view_canvas again.')
     if (!editor.canCreateShapes(shapes)) throw new Error('Cannot create the requested text boxes')
     editor.run(() => {
@@ -221,21 +215,19 @@ export const LAYOUT_HANDLERS: Record<string, Handler> = {
       if (shapes.some(s => editor.getShape(s.id)?.parentId !== s.parentId)) throw new Error('Text placement failed')
       focusZinePage(editor, pages.indexOf(frame.id))
       editor.setCurrentTool('select').select(shapes[0].id)
-      updateRoadmap(editor, plan.revision, [{ id: step.id, action: 'done' }], roadmapSource(editor))
     })
     for (const shape of shapes) turn?.placedText.add(shape.id)
-    return { id: shapes[0].id, handoff: 'First layout complete. Reply now. The user has the text toolbar for further edits.', boxes: shapes.map(s => ({ id: s.id, frame: s.parentId, font: s.props.font })),
-      completed_step: step.id, revision: roadmap(editor).revision }
+    return { id: shapes[0].id, handoff: 'First layout complete. Reply now. The user has the text toolbar for further edits.', boxes: shapes.map(s => ({ id: s.id, frame: s.parentId, font: s.props.font })) }
   },
-  offer_roadmap_advice: (editor, args, _error, _chat, _check, turn) => {
-    const context = roadmapReviewContext(editor)
+  offer_canvas_advice: (editor, args, _error, _chat, _check, turn) => {
+    const context = canvasReviewContext(editor)
     if (turn?.purpose !== 'canvas_review' || !context)
-      throw new Error('Roadmap options require a manual canvas review.')
+      throw new Error('Review options require a manual canvas review.')
     if (turn.reviewVersion !== context.bookVersion)
       throw new Error('The canvas changed. Inspect the current pages with view_canvas again.')
     if (![...turn.viewedFrames].some(([id, version]) => frameFacts(editor, id).frame_version === version))
       throw new Error('Inspect a book page with get_canvas and view_canvas before offering advice.')
-    const advice = parseRoadmapAdvice({ suggestion: args }, context.plan.steps)
+    const advice = parseReviewAdvice({ suggestion: args })
     return { advice, bookVersion: context.bookVersion }
   },
   recommend_embellishment: (editor, args, _error, _chat, _check, turn) => {

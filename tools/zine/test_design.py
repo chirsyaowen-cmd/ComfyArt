@@ -47,13 +47,6 @@ class GenerateSpreadTests(unittest.IsolatedAsyncioTestCase):
                             "pageIds": target["pageIds"],
                             "name": "Cover",
                             "paper": "#ffffff",
-                            "steps": [
-                                {
-                                    "action": "Place rule",
-                                    "check": "At fold",
-                                    "elements": ["line"],
-                                }
-                            ],
                             "layers": [
                                 {
                                     "id": "line",
@@ -76,22 +69,6 @@ class GenerateSpreadTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 actual["spreads"][0]["layers"][0]["points"], [[320, 0], [320, 510]]
             )
-
-
-class StepElementsTests(unittest.TestCase):
-    def test_resolve_component_and_slot_only_if_unambiguous(self):
-        from layout_schema import resolve_step_elements
-
-        step = {"elements": ["group", "photo", "unknown"]}
-        use = {"id": "cover-use", "kind": "use", "component": "group"}
-        design = {"components": [{"id": "group", "layers": [{"id": "image", "kind": "photo", "slot": "photo"}]}],
-                  "spreads": [{"layers": [use], "steps": [step]}]}
-        resolve_step_elements(design)
-        self.assertEqual(step["elements"], ["cover-use", "image", "unknown"])
-        design["spreads"][0]["layers"].append({**use, "id": "other"})
-        step["elements"] = ["group"]
-        resolve_step_elements(design)
-        self.assertEqual(step["elements"], ["group"])
 
 
 class PhotoAllocationTests(unittest.IsolatedAsyncioTestCase):

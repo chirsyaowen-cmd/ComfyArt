@@ -10,7 +10,7 @@ from ._common import json_body, routes
 DEFAULT_TIMEOUT_S = 20.0
 
 RELAY = CommandRelay("comfyart-mcp-command", runtime.send_event)
-ROADMAP_TURN = ContextVar("roadmap_turn", default="")
+CANVAS_TURN = ContextVar("canvas_turn", default="")
 _pages: dict[str, str] = {}
 
 
@@ -23,9 +23,9 @@ def _open_pages() -> dict[str, str]:
 
 def _target(project: str) -> tuple[str, str]:
     pages = _open_pages()
-    # New roadmap turns carry their originating websocket client ID. A second
+    # Canvas turns carry their originating websocket client ID. A second
     # tab may register the same project while the agent is inspecting it.
-    origin, separator, _ = ROADMAP_TURN.get().partition(":")
+    origin, separator, _ = CANVAS_TURN.get().partition(":")
     if separator:
         if not project or pages.get(origin) != project:
             raise ValueError("The tab that started this request was closed or refreshed. Start a new request in the current tab.")
@@ -48,7 +48,7 @@ async def submit_command(action: str, payload: dict, project: str,
     client, project = _target(project)
     try:
         return await RELAY.submit({"action": action, "project": project, "chat": chat, "args": payload,
-                                   "roadmap_turn": ROADMAP_TURN.get()},
+                                   "canvas_turn": CANVAS_TURN.get()},
                                   sid=client, timeout=timeout)
     except asyncio.TimeoutError:
         if client not in _open_pages():

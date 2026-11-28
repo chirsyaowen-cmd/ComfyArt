@@ -2,9 +2,12 @@ import base64
 import json
 from pathlib import Path
 
+from layout_schema import discard_legacy_steps
+
 
 def build(specification, destination):
     spec = json.loads(specification.read_text())
+    discard_legacy_steps(spec)
     if spec.get("schemaVersion") != 2:
         raise ValueError("The reusable design reader expects zine_spec version 2")
     from png_assets import decoration_keys, read_png

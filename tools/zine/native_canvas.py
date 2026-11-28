@@ -3,14 +3,14 @@
 import json
 import math
 import time
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 import aiohttp
 from bind_photos import validate
 from canvas_records import positions, schema_from, shape
 from frame_geometry import IDENTITY, bounds, checked_frames, compose, intersects, point, rotate_box, spread_geometry
-from layout_schema import check_design, validate_schema
+from layout_schema import check_design, discard_legacy_steps, validate_schema
 from local_runtime import audit, configure
 from native_assets import CanvasAssets
 
@@ -85,8 +85,6 @@ class Spread:
         self.s = spread
         self.bindings = bindings
         self.components = {c["id"]: c for c in design["components"]}
-        self.targets = defaultdict(set)
-        self.records = defaultdict(list)
         self.mirrored_text = []
         self.counts = Counter()
         left, right = [store[native_id(p)] for p in spread["pageIds"]]
@@ -121,7 +119,6 @@ class Spread:
 
     async def paint(self, l, parent, side, m, instance=None):
         kind = l["kind"]
-        fid = native_id(self.s["pageIds"][side])
         page = self.pages[side]
         origin = page["x"]
         sid = "shape:" + ":".join(
@@ -344,8 +341,6 @@ class Spread:
                     image=await self.assets.grain() if texture else "",
                 )
                 self.add(sid, "ca-shape", parent, px, py, props, meta, angle, opacity)
-        self.targets[l["id"]].add(fid)
-        self.records[l["id"]].append(sid)
 
     async def install(self):
         for side, page_id in enumerate(self.s["pageIds"]):
@@ -362,49 +357,6 @@ class Spread:
             )
             for l in self.s["layers"]:
                 await self.paint(l, area, side, IDENTITY)
-        all_pages = [native_id(k) for k in self.s["pageIds"]]
-        anchors = (
-            ["cover", "back_cover"] if self.is_cover else ["spread-" + all_pages[0]]
-        )
-        anchors = [
-            base + suffix
-            for base in anchors
-            for suffix in ("", "-typography", "-embellishment")
-        ]
-        steps = []
-        decisions = []
-        for i, step in enumerate(self.s["steps"]):
-            targets = set().union(*(self.targets[e] for e in step["elements"]))
-            elements = [node for e in step["elements"] for node in self.records[e]]
-            if not elements:
-                raise ValueError(
-                    "Route has no actual canvas objects: " + step["action"]
-                )
-            sid = anchors[i] if i < len(anchors) else self.s["id"] + "-s" + str(i + 1)
-            name = self.s["name"] + " · " + step["action"]
-            steps.append(
-                {
-                    "id": sid,
-                    "type": "reference_step",
-                    "title": name,
-                    "targetFrameIds": [f for f in all_pages if f in targets],
-                    "scope": "frames",
-                    "status": "done",
-                    "elementIds": elements,
-                }
-            )
-            decisions.append(
-                {
-                    "stepId": sid,
-                    "action": "create",
-                    "reason": step["check"],
-                    "source": "chat",
-                    "revision": 1,
-                }
-            )
-            for element in elements:
-                self.store[element]["meta"].setdefault("specStepIds", []).append(sid)
-        return steps, decisions
 
 
 async def import_book(
@@ -426,6 +378,7 @@ async def import_book(
     spec = json.loads(spec_path.read_text())
     photos = json.loads(photo_path.read_text())
     bindings = json.loads(binding_path.read_text())
+    discard_legacy_steps(spec)
     validate_schema(spec)
     validate(spec, photos, bindings)
     for design in spec["designs"]:
@@ -464,8 +417,6 @@ async def import_book(
             {"w": p["w"], "h": p["h"], "name": str(i + 1), "color": "black"},
             {"style": {"fill": paper[p["id"]], "stroke": "#cecac1"}},
         )
-    steps = []
-    decisions = []
     warnings = []
     start = time.monotonic()
     audit(
@@ -497,9 +448,7 @@ async def import_book(
                     frames,
                     None if "frames" in spec else spec["size"],
                 )
-                added, actions = await spread.install()
-                steps.extend(added)
-                decisions.extend(actions)
+                await spread.install()
                 if spread.mirrored_text:
                     warnings.extend(spread.mirrored_text)
                 audit(
@@ -508,23 +457,11 @@ async def import_book(
                     spread=s["id"],
                     name=s["name"],
                     pageIds=s["pageIds"],
-                    steps=len(added),
-                    shapeInstances=sum(map(len, spread.records.values())),
+                    shapeInstances=sum(spread.counts.values()),
                     seconds=round(time.monotonic() - t, 2),
                 )
         cover_urls = (
             [next(iter(assets.imports.values()))["url"]] if assets.imports else []
-        )
-        checked_steps = len(steps)
-        steps.append(
-            {
-                "id": "review",
-                "type": "review",
-                "title": "逐跨页检查图文与装订",
-                "scope": "book",
-                "targetFrameIds": [],
-                "status": "pending",
-            }
         )
         library = [p["library"] for p in assets.imports.values()]
         catalog = {
@@ -541,14 +478,7 @@ async def import_book(
             "zine_spec": spec,
             "zineBindings": bindings,
             "zineBindingPhotos": catalog,
-            "roadmapPhotos": {"photos": library, "batch": [p["key"] for p in library]},
-            "roadmap": {
-                "revision": 1,
-                "currentStepId": "review",
-                "goal": title + " · 按跨页查看制作步骤和验收条件",
-                "steps": steps,
-                "decisions": decisions,
-            },
+            "projectPhotos": {"photos": library, "batch": [p["key"] for p in library]},
         }
         if references is not None:
             from PIL import Image
@@ -624,9 +554,6 @@ async def import_book(
             saved = await r.json()
         if saved != snapshot:
             raise RuntimeError("Saved book differs from the submitted snapshot")
-        for step in steps[:-1]:
-            if not all(sid in store for sid in step["elementIds"]):
-                raise ValueError("Unresolved roadmap object")
         urls = {r["props"]["src"] for r in store.values() if r["typeName"] == "asset"}
         if assets.grain_url:
             urls.add(assets.grain_url)
@@ -645,7 +572,6 @@ async def import_book(
             project=project_id,
             spreads=len(spreads),
             pages=len(frames),
-            steps=checked_steps,
             sourcePhotos=len(assets.imports),
             verifiedMedia=len(urls),
             counts=dict(counts),
@@ -662,5 +588,4 @@ async def import_book(
             project=project_id,
             url=url + "/comfyart/?project=" + project_id,
             counts=dict(counts),
-            steps=checked_steps,
         )

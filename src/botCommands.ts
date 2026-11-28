@@ -11,8 +11,8 @@ import { getZinePages } from './zine'
 import { enterMode } from './ui/mode'
 import { adjustedOf, applyAdjust, sourceAsset } from './imageOps'
 import { adjustedCanvas, loadImage, NO_ADJUST } from './adjust'
-import { frameFacts } from './roadmapPhotos'
-import { coverPhoto, COVER_PHOTO_STEP, updateRoadmap, checkRoadmapTurn, matchingRoadmapTurn, roadmap } from './roadmap'
+import { frameFacts } from './projectPhotos'
+import { checkCanvasTurn, matchingCanvasTurn } from './canvasTurn'
 import { LAYOUT_HANDLERS, shapeOf, type Args, type Handler } from './botLayout'
 import { placeInChatFrame } from './chatFrame'
 import { capRefs, createGenerator, generate } from './generate'
@@ -225,14 +225,7 @@ const HANDLERS: Record<string, Handler> = {
       if (bounds) editor.zoomToBounds(bounds, { inset: 120, targetZoom: 1 })
       enterMode('photoAdjust')
     }
-    const result = { id: photo.id, status: args.keep ? 'kept_original' : 'applied' }
-    const plan = roadmap(editor)
-    if (coverPhoto(editor)?.id === photo.id && plan.steps.some(s => s.id === COVER_PHOTO_STEP)) {
-      const updated = updateRoadmap(editor, plan.revision, [{ id: COVER_PHOTO_STEP, action: 'done',
-        reason: args.keep ? '保留原图' : '已应用照片调整' }], 'button')
-      return { ...result, roadmap: { revision: updated.revision, completed_step_id: COVER_PHOTO_STEP } }
-    }
-    return result
+    return { id: photo.id, status: args.keep ? 'kept_original' : 'applied' }
   },
   vectorcraft_photo_source: (editor, args) => {
     const photo = imageOf(editor, args.id)
@@ -345,7 +338,7 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
   void announce()
   const stops = [
     onReconnect(() => void announce()),
-    onComfyEvent('comfyart-mcp-command', (msg: { id: string; action: string; project: string; chat?: string; roadmap_turn?: string; args: Args }) => {
+    onComfyEvent('comfyart-mcp-command', (msg: { id: string; action: string; project: string; chat?: string; canvas_turn?: string; args: Args }) => {
       if (msg.project !== project) return
       const handler = HANDLERS[msg.action]
       const reply = (body: object) => api('/comfyart/mcp_command_result', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command_id: msg.id, ...body }) })
@@ -356,15 +349,15 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
         .then(() => {
           const guard = () => {
             if (isStale() || editor.isDisposed) throw new Error('EDITOR_STALE: reopen the project')
-            if (msg.chat && !msg.roadmap_turn && getZinePages(editor).length)
+            if (msg.chat && !msg.canvas_turn && getZinePages(editor).length)
               throw new Error('TASK_SUPERSEDED: start a fresh request from the Zine editor')
-            return msg.roadmap_turn ? checkRoadmapTurn(editor, msg.roadmap_turn) : undefined
+            return msg.canvas_turn ? checkCanvasTurn(editor, msg.canvas_turn) : undefined
           }
           const inspect = ['get_canvas', 'view_canvas', 'brand_kits', 'vectorcraft_photo_source', 'photo_adjust_target'].includes(msg.action)
-          const recommend = msg.action === 'recommend_embellishment' || msg.action === 'offer_roadmap_advice'
+          const recommend = msg.action === 'recommend_embellishment' || msg.action === 'offer_canvas_advice'
           const preview = msg.action === 'preview_embellishments' || msg.action === 'suggest_embellishments'
           const writesCanvas = !inspect && !recommend && !preview
-          if (inspect && msg.roadmap_turn && !matchingRoadmapTurn(editor, msg.roadmap_turn))
+          if (inspect && msg.canvas_turn && !matchingCanvasTurn(editor, msg.canvas_turn))
             throw new Error('TASK_SUPERSEDED: a newer request or editor session took over')
           const active = inspect ? undefined : guard()
           if (active?.purpose === 'canvas_review' && !recommend)
@@ -379,11 +372,8 @@ export function registerCommandBus(editor: Editor, project: string, isStale: () 
                 handoff: 'The text is ready for manual editing. This follow-up was skipped. Report the completed placement.' }
             }
           }
-          if (writesCanvas && msg.action !== 'update_roadmap') editor.markHistoryStoppingPoint(`agent:${msg.action}`)
-          const result = handler(editor, msg.args ?? {}, onError, msg.chat ?? '', guard, matchingRoadmapTurn(editor, msg.roadmap_turn))
-          if (active && msg.action === 'update_roadmap') active.revision = roadmap(editor).revision
-          if (active && (msg.action === 'apply_photo_recipe' || msg.action === 'add_text')) return Promise.resolve(result).then(value => { active.revision = roadmap(editor).revision; return value })
-          return result
+          if (writesCanvas) editor.markHistoryStoppingPoint(`agent:${msg.action}`)
+          return handler(editor, msg.args ?? {}, onError, msg.chat ?? '', guard, matchingCanvasTurn(editor, msg.canvas_turn))
         })
         .then((result) => reply({ ok: true, result }), (e) => reply({ ok: false, error: errorText(e) }))
     }),

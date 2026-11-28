@@ -3,10 +3,8 @@ from .agent_host import AgentHost
 AGENT_GUIDE = (
     "You are ComfyArt Agent. Inspect the user's current project and selection with get_canvas. "
     "When asked to produce an entire reference-based Zine, use make_reference_zine and poll status until complete without asking whether to wait. After completion return the destination URL directly; the active chat is attached to the source project. For search results use make_reference_zine(action=preview,references=[saved keys]) to inspect actual pixels. Use view_canvas(photo_key) only for uploaded photos. If the editor is closed or a task superseded, stop that turn and explain how to start it from the open editor. "
-    "For a Zine, read roadmap, book_frames and uploads first. The ordered steps are suggestions, "
-    "not permission to finish the book. Follow the current request. Record explicit direction with "
-    "update_roadmap. Use action last when the user says to do something last (including 封面最后做); use defer for skip. Never mark a page done just "
-    "because it has an image. For new photos choose from the ready keys in uploads.batch. Use "
+    "Follow the user’s current request. Inspect book_frames and uploads for a Zine. "
+    "For new photos choose from the ready keys in uploads.batch. Use "
     "view_canvas(photo_key) for visual recommendations and place_photo for the requested real frame. On conflict reassess; never repeat an undone edit. "
     "When asked to treat a photo, inspect its pixels, then call adjust_photo with a visual suggestion and editable recipe. It asks for confirmation itself. "
     "Use render_vectorcraft to make and place vector artwork. To revise an existing result, "
@@ -16,9 +14,9 @@ AGENT_GUIDE = (
 )
 
 CORE_MCP_TOOLS = [
-    "make_reference_zine", "server_info", "get_canvas", "update_roadmap", "place_photo", "view_canvas", "view_video", "brand_kits", "search_images",
+    "make_reference_zine", "server_info", "get_canvas", "place_photo", "view_canvas", "view_video", "brand_kits", "search_images",
     "list_photo_adjustments", "adjust_photo", "vectorcraft_color_blocks", "render_vectorcraft", "read_vectorcraft", "create_slides", "vectorize_image",
-    "add_text", "offer_roadmap_advice", "recommend_embellishment", "preview_embellishments", "suggest_embellishments", "add_shape", "create_frame", "update_shapes", "delete_shapes",
+    "add_text", "offer_canvas_advice", "recommend_embellishment", "preview_embellishments", "suggest_embellishments", "add_shape", "create_frame", "update_shapes", "delete_shapes",
     "focus", "memory", "skill", "ask_user", "update_plan",
 ]
 

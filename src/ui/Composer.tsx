@@ -7,7 +7,7 @@ import { RefFrameButton } from './RefFrameButton'
 import { PHOTO_ACCEPT } from '../photoImport'
 import { activeZineIndex, getZinePages } from '../zine'
 import { RequestEmbellishments } from './ZineEmbellishmentCard'
-import { markManualReview, roadmapReviewContext } from '../roadmapGuide'
+import { markManualReview, canvasReviewContext } from '../canvasReview'
 import { describeZine } from '../zineReview'
 import { botEnabledAtom, messagesAtom } from '../bot'
 import { imageUrl } from '../comfy'
@@ -70,7 +70,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
   const activePage = useValue('embellishment target', () => getZinePages(editor)[activeZineIndex(editor)], [editor])
   function reviewCanvas() {
     setMenu(null)
-    const context = roadmapReviewContext(editor)
+    const context = canvasReviewContext(editor)
     const book = context?.book
     if (context) markManualReview(context.bookVersion)
     void sendToAgent(editor, book ? t('zineReview.manual') : REVIEW_PROMPT, [], null, [], [],

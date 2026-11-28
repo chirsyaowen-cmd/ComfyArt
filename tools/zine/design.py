@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from frame_geometry import checked_frames, read_project, spread_geometry
-from layout_schema import SCHEMA_FILE, check_design, validate_schema
+from layout_schema import SCHEMA_FILE, discard_legacy_steps, check_design, validate_schema
 from local_runtime import ROOT, audit, write_json
 
 HERE = Path(__file__).resolve().parent
@@ -170,10 +170,8 @@ async def prepare_layout(packet, conf):
         for spread in data["spreads"]:
             if spread["id"] in paper_colors:
                 spread["paper"] = paper_colors[spread["id"]]
-        from layout_schema import resolve_step_elements
         from frame_geometry import editorial_pages
 
-        resolve_step_elements(data)
         valid(data)
         editorial_pages(data, targets)
 
@@ -328,10 +326,12 @@ async def generate_book(args):
     args.previous = {}
     source = metadata.get("zine_spec", {})
     if args.preserve_content:
+        discard_legacy_steps(source)
         validate_schema(source)
         args.previous = {s["id"]: d for d in source["designs"] for s in d["spreads"]}
     if args.reuse_cover:
         cover_source = json.loads(args.reuse_cover.read_text())
+        discard_legacy_steps(cover_source)
         validate_schema(cover_source)
         first = (cover_source.get("frames") or [{"id": "page-01"}])[0]["id"]
         covers = [

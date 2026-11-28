@@ -2,20 +2,23 @@ import { react, type Editor, type TLShapeId } from 'tldraw'
 import { placeAsset } from './assets'
 import { api, viewUrl } from './comfy'
 import { photoImportAtom, refreshPhotos, type Uploaded } from './photoImport'
-import { applies } from './roadmapModel'
-import { assertRevision, roadmap } from './roadmap'
 import { focusZinePage, getZinePages } from './zine'
 import { uuid } from './id'
 
 type ProjectPhoto = { key: string; state: Uploaded['state']; name: string; ref: { filename: string; subfolder: string; type: string } }
 type Library = { photos: ProjectPhoto[]; batch: string[] }
 export function projectPhotos(editor: Editor): Library {
-  return editor.getDocumentSettings().meta.roadmapPhotos as Library ?? { photos: [], batch: [] }
+  return editor.getDocumentSettings().meta.projectPhotos as Library ?? { photos: [], batch: [] }
 }
 
 // Keep source references in the project snapshot. Only in-flight File objects live in the tab.
 export function trackProjectPhotos(editor: Editor) {
   if (!getZinePages(editor).length) return () => {}
+  const meta = editor.getDocumentSettings().meta
+  if ('roadmap' in meta || 'roadmapPhotos' in meta) {
+    const { roadmap: _obsolete, roadmapPhotos: photos, ...rest } = meta
+    editor.updateDocumentSettings({ meta: { ...rest, ...(photos && !rest.projectPhotos ? { projectPhotos: photos } : {}) } })
+  }
   const saved = projectPhotos(editor)
   const rows = photoImportAtom.get()
   const settled = rows.every(row => row.stage.kind === 'stored')
@@ -40,7 +43,7 @@ export function trackProjectPhotos(editor: Editor) {
     }
     const next = { photos: [...photos.values()], batch: [...batch] }
     if (JSON.stringify(next) !== JSON.stringify(current)) editor.run(() =>
-      editor.updateDocumentSettings({ meta: { ...editor.getDocumentSettings().meta, roadmapPhotos: next } }), { history: 'ignore' })
+      editor.updateDocumentSettings({ meta: { ...editor.getDocumentSettings().meta, projectPhotos: next } }), { history: 'ignore' })
     const pending = rows.some(row => row.stage.kind === 'stored' && row.stage.photo.state === 'pending')
     if (pending && !timer) timer = window.setInterval(() => void refreshPhotos(), 800)
     else if (!pending && timer) { clearInterval(timer); timer = 0 }
@@ -63,16 +66,13 @@ export function frameFacts(editor: Editor, id: TLShapeId) {
     imageCount: records.filter(r => r?.type === 'image').length }
 }
 
-export type Placement = { expected_revision: number; frame: string; frame_version: string; photo_key: string; fit: 'cover' | 'contain' }
+export type Placement = { frame: string; frame_version: string; photo_key: string; fit: 'cover' | 'contain' }
 export async function placeProjectPhoto(editor: Editor, args: Placement, checkTask: () => void) {
   function check() {
     checkTask()
-    assertRevision(editor, args.expected_revision)
+    if (editor.isDisposed || editor.getIsReadonly()) throw new Error('Project editor is closed or read-only')
     const frame = getZinePages(editor).find(id => id === args.frame && editor.getShape(id)?.type === 'frame')
     if (!frame || frameFacts(editor, frame).frame_version !== args.frame_version) throw new Error('FRAME_CONFLICT: read get_canvas again')
-    const plan = roadmap(editor)
-    const current = plan.steps.find(step => step.id === plan.currentStepId)
-    if (!current || current.status === 'done' || !applies(current, frame)) throw new Error('TARGET_CONFLICT: focus the requested step before placing a photo')
     const library = projectPhotos(editor)
     const photo = library.batch.includes(args.photo_key) && library.photos.find(p => p.key === args.photo_key && p.state === 'ready')
     if (!photo || !['cover', 'contain'].includes(args.fit)) throw new Error('Expected a ready project photo and cover or contain')

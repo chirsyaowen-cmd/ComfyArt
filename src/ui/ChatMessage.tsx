@@ -12,7 +12,7 @@ import { Thumb } from './TaskDetails'
 import { CopyButton } from './CopyButton'
 import { t } from '../i18n'
 import { currentProject } from '../notices'
-import { ManualReviewOptions } from './RoadmapReviewOptions'
+import { ManualReviewOptions } from './ReviewOptions'
 import { reportError } from './ErrorToasts'
 import { RequestEmbellishments, ZineEmbellishmentCard } from './ZineEmbellishmentCard'
 
@@ -20,7 +20,7 @@ const GEN_TOOLS = new Set(['generate_image', 'generate_video', 'edit_image', 'an
 
 export function textOf(m: BotMessage): string {
   return visibleReplyBlocks(m.blocks).flatMap(b => {
-    if (b.type === 'roadmap_advice' && b.review)
+    if (b.review)
       return ['\n' + b.review.advice.text, ...b.review.advice.options.map(option => '\n' + option.label)]
     return b.type === 'text' ? [b.text ?? ''] : []
   }).join('').trim()
@@ -212,8 +212,9 @@ export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }
       if (b.type === 'text') items.push(<TypedReply key={`text-${textIndex++}`} text={b.text ?? ''} live={!done && i === blocks.length - 1} />)
       if (b.type === 'thinking' && b.text?.trim()) items.push(<Thought key={i} text={b.text} live={!done && i === blocks.length - 1} />)
       if (b.type === 'tool_use') items.push(<Step key={i} editor={editor} use={b} result={resultOf(b, i)} />)
-      if (b.type === 'roadmap_advice' && b.review)
+      if (b.type === 'canvas_advice' && b.review)
         items.push(<ManualReviewOptions key={m.id + i} editor={editor} review={b.review} messageId={m.id} streaming={!done} onError={reportError} />)
+      if (b.review && b.type !== 'canvas_advice') items.push(<div key={i}>{b.review.advice.text}</div>)
       if (b.type === 'ask') items.push(<Ask key={b.ask_id ?? i} b={b} />)
       if (b.type === 'embellishment' && b.offer?.project === currentProject())
         items.push(<ZineEmbellishmentCard key={`${b.offer.frame}/${b.offer.version}`} editor={editor} initial={b.offer} />)

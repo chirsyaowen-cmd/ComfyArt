@@ -131,17 +131,14 @@ class PngLayers(unittest.IsolatedAsyncioTestCase):
                     "name": "Spread",
                     "paper": "#ffffff",
                     "layers": [layer],
-                    "steps": [
-                        {"action": "Place", "elements": ["deco"], "check": "Visible"}
-                    ],
                 }
                 assets = CanvasAssets(None, store, [], folder / "trace")
                 assets.png_dir = folder
                 assets.upload = AsyncMock(return_value="/api/view?filename=shell.png")
-                steps, _ = await Spread(
+                await Spread(
                     store, assets, spread, {"components": []}, {}, ids
                 ).install()
-                image = store[steps[0]["elementIds"][0]]
+                image = store["shape:spread-01:0:deco"]
                 self.assertEqual(image["type"], "image")
                 self.assertEqual((image["props"]["w"], image["props"]["h"]), (50, 100))
                 self.assertEqual(image["props"]["url"], "")

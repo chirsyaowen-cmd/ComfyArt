@@ -8,7 +8,7 @@ import { onComfyEvent, onReconnect } from './ws'
 import { t } from './i18n'
 import type { EmbellishmentOffer } from './zineEmbellishments'
 
-import type { RoadmapAdvice } from './roadmapAdvice'
+import type { ReviewAdvice } from './reviewAdvice'
 
 export interface AskOption { id: string; label: string; description?: string }
 export interface BotBlock {
@@ -25,7 +25,7 @@ export interface BotBlock {
   ask_id?: string
   prompt?: string
   options?: AskOption[]
-  review?: { advice: RoadmapAdvice; bookVersion: string }
+  review?: { advice: ReviewAdvice; bookVersion: string }
   recommendation?: { frame: string; idea: string; version: string; project: string }
   offer?: EmbellishmentOffer & { project: string }
   min_selections?: number
@@ -52,10 +52,9 @@ export const TOOL_LABELS: Record<string, string> = {
   tool_search: t('bot.findTools'),
   server_info: t('bot.checkStatus'),
   get_canvas: t('bot.viewCanvas'),
-  update_roadmap: t('road.title'),
   adjust_photo: t('photo.tools'),
   list_photo_adjustments: t('photo.tools'),
-  place_photo: t('road.place'),
+  place_photo: t('photo.place'),
   view_canvas: t('bot.lookAtCanvas'),
   view_video: t('bot.watchVideo'),
   list_models: t('bot.viewModels'),
@@ -89,7 +88,7 @@ export const TOOL_LABELS: Record<string, string> = {
   place_html: t('bot.placeWebPage'),
   create_slides: t('bot.createPpt'),
   add_text: t('bot.addText'),
-  offer_roadmap_advice: t('road.reviewSuggestion'),
+  offer_canvas_advice: t('review.suggestion'),
   recommend_embellishment: t('embellishment.title'),
   preview_embellishments: t('embellishment.title'),
   suggest_embellishments: t('embellishment.title'),
@@ -191,7 +190,7 @@ async function ensureChat(): Promise<BotChat> {
   return chat
 }
 
-export interface SendInput { source?: 'schedule'; roadmap_turn?: string; text: string; refs: { id: string; src: string; name: string; kind: 'image' | 'video' | 'audio'; transcript?: string }[]; docs: { src: string; name: string }[]; kits: { name: string; description: string; images: string[] }[]; skill?: string; context?: string }
+export interface SendInput { source?: 'schedule'; canvas_turn?: string; text: string; refs: { id: string; src: string; name: string; kind: 'image' | 'video' | 'audio'; transcript?: string }[]; docs: { src: string; name: string }[]; kits: { name: string; description: string; images: string[] }[]; skill?: string; context?: string }
 
 export async function sendMessage(input: SendInput) {
   const chat = await ensureChat()

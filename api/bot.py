@@ -147,6 +147,8 @@ async def bot_send(request: web.Request) -> web.Response:
         return bot_disabled()
     chat = _owned_chat(request)
     body = await json_body(request)
+    if body.get("roadmap_turn"):
+        return error("请刷新 ComfyArt 页面后再发送。Refresh the editor before sending.", 409)
     text = str(body.get("text") or "").strip()
     try:
         refs = send_core.parse_refs(body.get("refs"))
@@ -170,8 +172,8 @@ async def bot_send(request: web.Request) -> web.Response:
     display_blocks = [{"type": r["kind"], "url": r["src"], "shape": r["id"]} for r in refs]
     display_blocks += [{"type": "file", "url": d["src"], "name": d["name"]} for d in docs]
     display_blocks += [{"type": "kit", "name": k["name"]} for k in kits]
-    if body.get("roadmap_turn"):
-        display_blocks.append({"type": "roadmap_turn", "token": str(body["roadmap_turn"])})
+    if body.get("canvas_turn"):
+        display_blocks.append({"type": "canvas_turn", "token": str(body["canvas_turn"])})
     elif chat.get("project"):
         snapshot = project_store.get_snapshot(request_user(request), chat["project"])
         if snapshot and json.loads(snapshot).get("document", {}).get("store", {}).get("document:document", {}).get("meta", {}).get("zinePages"):

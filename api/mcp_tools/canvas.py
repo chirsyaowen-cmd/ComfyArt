@@ -27,6 +27,8 @@ def _relay(action: str, *, timeout: float = 20.0, approval: str = ""):
             if blocked is not None:
                 return blocked
         result = await submit_command(action, args, PROJECT.get(), timeout, chat=BOT_CHAT_ID.get())
+        if action == "get_canvas":
+            result.pop("roadmap", None)  # A tab opened before the update can still reply.
         image = result.pop("png", None)
         if image:
             result["_images"] = [{"data": image, "mime": "image/png"}]
@@ -61,29 +63,18 @@ SPECS: dict[str, dict] = {
             "kind": {"enum": ["rect", "ellipse", "star"]}, "fill": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
             **{k: _POINT for k in ("x", "y", "w", "h", "rotation")}}, ["kind", "fill", "x", "y", "w", "h", "rotation"])}},
         ["frame", "reason", "marks"]),
-    "update_roadmap": _tool(
-        "Apply ordered changes together to this Zine's project roadmap. Read get_canvas first. "
-        "Stable step id; create/edit accept type, title, targetFrameIds (real frames), scope "
-        "(frames or book). move inserts before the specified step, otherwise last. defer moves "
-        "before any reserved last creative step and closing review. Use action last for “封面最后做” to reserve its position even after later skips. focus changes attention only. resume restarts deferred work. "
-        "Use goal for the project goal and reason for user decisions. update_plan is only for this turn.",
-        {"expected_revision": {"type": "integer"}, "changes": {"type": "array", "items": _schema({
-            "action": {"enum": ["create", "edit", "goal", "focus", "start", "move", "defer", "last", "resume", "done"]},
-            **{k: {"type": "string"} for k in ("id", "type", "title", "before", "reason", "goal")},
-            "scope": {"enum": ["frames", "book"]}, "targetFrameIds": _IDS}, ["action"])}},
-        ["expected_revision", "changes"]),
     "place_photo": _tool(
-        "Place one ready project upload as a child of an explicit book frame in the focused step. "
+        "Place one ready project upload as a child of an explicit book frame. "
         "Use uploads.batch for new material. Read book_frames for frame_version. cover fills and clips; "
-        "contain fits the photo inside. This does not finish a step.",
-        {"expected_revision": {"type": "integer"}, "frame": _ID, "frame_version": {"type": "string"},
+        "contain fits the photo inside.",
+        {"frame": _ID, "frame_version": {"type": "string"},
          "photo_key": {"type": "string"}, "fit": {"enum": ["cover", "contain"]}},
-        ["expected_revision", "frame", "frame_version", "photo_key", "fit"]),
+        ["frame", "frame_version", "photo_key", "fit"]),
     "get_canvas": _tool(
         "List the open project: pages, the current page's frames and shapes (id, type, name or text, "
         "x/y/width/height, parent, image or video URL and its pixel size, generation prompt, the text of "
         "imported PDF pages), the selection, the linked "
-        "brand kit, Zine roadmap, book_frames with current content and frame_version, project uploads and latest batch, and running generations. page selects another page by id or name.",
+        "brand kit, book_frames with current content and frame_version, project uploads and latest batch, and running generations. page selects another page by id or name.",
         {"page": {"type": "string"}}),
     "view_canvas": _tool(
         "Render real pixels of the current page (default), of some shapes or frames (ids), so you can "
@@ -265,11 +256,10 @@ SPECS: dict[str, dict] = {
     "add_text": _tool(
         "Add an editable text shape. font_size in px, color as hex, font family name (brand fonts work), "
         "width wraps the text. x/y are relative to frame when supplied. For Zine typography first get_canvas, "
-        "then view_canvas(ids=[target frame(s)]) to inspect the treated page. Pass frame and role. Place related "
+        "then view_canvas(ids=[target frame(s)]) to inspect the page. Pass frame and role. Place related "
         "boxes together using additional (same page or spread; frame defaults to first box's frame). Each box "
         "has independent text/style/coordinates. Book fonts with full coverage have priority. Success selects "
-        "the first box, completes typography, and posts optional decoration cards when the pages are ready. "
-        "Cards handle user selection separately. Reply after the text is placed.",
+        "the first box for editing. Reply after the text is placed.",
         {**_TEXT_BOX, "additional": {"type": "array", "items": _schema(_TEXT_BOX, ["text"])}},
         ["text"]),
     "add_shape": _tool(

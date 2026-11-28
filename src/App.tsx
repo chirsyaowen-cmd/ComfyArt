@@ -57,8 +57,7 @@ import { KitEditor } from './ui/KitEditor'
 import { NoticeCenter } from './ui/NoticeCenter'
 import { loadNotices } from './notices'
 import { startScheduler } from './schedules'
-import { trackProjectPhotos } from './roadmapPhotos'
-import { trackRoadmap } from './roadmap'
+import { trackProjectPhotos } from './projectPhotos'
 import { startProactive } from './proactive'
 import { startChatFrames } from './chatFrame'
 import { ScheduleDialog } from './ui/ScheduleDialog'
@@ -171,7 +170,6 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
     let alive = true
     let stopJobs = () => { }
     let stopScheduler = () => { }
-    let stopRoadmap = () => { }
     let stopPhotos = () => { }
     let stopProactive = () => { }
     let stopChatFrames = () => { }
@@ -207,7 +205,6 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
         stopCommands = registerCommandBus(editor, id, () => staleRef.current, setError)
         const autosave = startAutosave(editor, id, () => !staleRef.current, () => channel.postMessage({ project: id, tab: TAB }))
         stopAutosave = autosave.stop
-        stopRoadmap = trackRoadmap(editor)
         stopPhotos = trackProjectPhotos(editor)
         const url = new URL(location.href)
         if (url.searchParams.has(NEW_PARAM)) {
@@ -229,7 +226,6 @@ export function App({ id, snapshot }: { id: string; snapshot: TLEditorSnapshot |
       alive = false
       stopJobs()
       stopScheduler()
-      stopRoadmap()
       stopPhotos()
       stopProactive()
       stopChatFrames()

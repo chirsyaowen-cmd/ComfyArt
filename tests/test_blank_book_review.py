@@ -25,7 +25,7 @@ async def test_blank_book_review_shows_only_agent_options_before_and_after_impor
                 json={"text": json.dumps({"suggestion": suggestion})}))
             old_notice = {"id": "older-review", "project": "photo-review-test", "kind": "suggestion",
                           "title": "Previous review", "body": suggestion["text"], "time": 1,
-                          "source": "canvas_review", "roadmapAdvice": True}
+                          "source": "canvas_review", "reviewAdvice": True}
             saved = await page.request.post(str(server.make_url("/api/userdata/comfyart/notices.json")),
                                             data=json.dumps([old_notice]))
             assert saved.ok
@@ -43,17 +43,23 @@ async def test_blank_book_review_shows_only_agent_options_before_and_after_impor
             await playwright.expect(composer.get_by_text(suggestion["text"], exact=True)).to_have_count(0)
             await playwright.expect(composer.get_by_role("button", name="Choose photos from device")).to_have_count(0)
             await playwright.expect(page.locator(".ca-zine-photo button")).to_have_text(["Choose photos from device"])
-            async def roadmap():
-                response = await page.request.get(str(server.make_url("/api/comfyart/projects/photo-review-test")))
-                return (await response.json())["document"]["store"]["document:document"]["meta"]["roadmap"]
-
-            before = await roadmap()
+            response = await page.request.get(str(server.make_url("/api/comfyart/projects/photo-review-test")))
+            snapshot = await response.json()
+            meta = snapshot["document"]["store"]["document:document"]["meta"]
+            assert "roadmap" not in meta
+            await playwright.expect(page.get_by_role("button", name="Roadmap")).to_have_count(0)
+            endpoint = str(server.make_url("/comfyart/mcp?project=photo-review-test"))
+            response = await page.request.post(endpoint, data={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "get_canvas", "arguments": {}}})
+            result = (await response.json())["result"]
+            assert not result["isError"]
+            canvas = json.loads(result["content"][0]["text"])
+            assert canvas["book_frames"] and "uploads" in canvas and "roadmap" not in canvas
             async with page.expect_file_chooser() as event:
                 await source.click()
             chooser = await event.value
             await chooser.set_files([])
             await chooser.element.dispatch_event("cancel")
-            assert await roadmap() == before
             await playwright.expect(source).to_be_visible()
             async with page.expect_file_chooser() as event:
                 await source.click()
@@ -65,10 +71,31 @@ async def test_blank_book_review_shows_only_agent_options_before_and_after_impor
             await playwright.expect(photo_button).to_be_visible()
             await bell.click()
             await page.get_by_role("button", name="Add", exact=True).click()
-            await page.get_by_role("button", name="Canvas Review", exact=True).click()
+            async with page.expect_request("**/api/comfyart/bot/chats/*/send") as sent:
+                await page.get_by_role("button", name="Canvas Review", exact=True).click()
+            assert "roadmap" not in (await sent.value).post_data.lower()
             await playwright.expect(project).to_have_count(0)
             await playwright.expect(page.get_by_role("button", name="Suggest a photo")).to_have_count(0)
             await playwright.expect(page.locator(".ca-zine-photo button")).to_have_count(0)
             await photo_button.click()
+
+            # Reopen a pre-removal book. Uploaded photos used a separate legacy metadata key.
+            meta["roadmap"] = {"goal": "obsolete-route-marker", "steps": []}
+            meta["roadmapPhotos"] = {"batch": ["original"], "photos": [
+                {"key": "original", "name": "old-photo.png", "state": "ready",
+                 "ref": {"filename": "old-photo.png", "type": "input", "subfolder": ""}}]}
+            legacy = await page.request.put(str(server.make_url("/api/comfyart/projects/legacy-book")),
+                                            data={"snapshot": snapshot, "name": "Legacy"})
+            assert legacy.ok
+            async with page.expect_response("**/api/comfyart/mcp_page"):
+                await page.goto(str(server.make_url("/comfyart/?project=legacy-book")))
+            rpc = await page.request.post(str(server.make_url("/comfyart/mcp?project=legacy-book")),
+                data={"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "get_canvas"}})
+            result = (await rpc.json())["result"]
+            assert not result["isError"]
+            canvas = json.loads(result["content"][0]["text"])
+            assert canvas["uploads"]["batch"] == ["original"]
+            assert canvas["uploads"]["photos"][0]["name"] == "old-photo.png"
+            assert "roadmap" not in canvas and "obsolete-route-marker" not in json.dumps(canvas)
         finally:
             await browser.close()
