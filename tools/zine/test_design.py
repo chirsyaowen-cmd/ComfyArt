@@ -29,7 +29,7 @@ class GenerateSpreadTests(unittest.IsolatedAsyncioTestCase):
                 gate=asyncio.Semaphore(1),
                 release=folder,
                 previous={},
-                content={},
+                reference_structure={"spread-01": {"paper": "#ECEBE9", "photoFreeSides": []}},
                 prompt="test",
                 schema_digest="test",
             )
@@ -70,18 +70,12 @@ class GenerateSpreadTests(unittest.IsolatedAsyncioTestCase):
                 validate(output)
                 return output
 
-            with (
-                patch(
-                    "paper_sample.sample_paper",
-                    return_value={"status": "measured", "paper": "#ECEBE9"},
-                ),
-            ):
-                task = await prepare_layout([(group, target)], conf)
-                actual = await generate(None, task.blocks, task.save, None, None)
-                self.assertEqual(actual["spreads"][0]["paper"], "#ECEBE9")
-                self.assertEqual(
-                    actual["spreads"][0]["layers"][0]["points"], [[320, 0], [320, 510]]
-                )
+            task = await prepare_layout([(group, target)], conf)
+            actual = await generate(None, task.blocks, task.save, None, None)
+            self.assertEqual(actual["spreads"][0]["paper"], "#ECEBE9")
+            self.assertEqual(
+                actual["spreads"][0]["layers"][0]["points"], [[320, 0], [320, 510]]
+            )
 
 
 class StepElementsTests(unittest.TestCase):

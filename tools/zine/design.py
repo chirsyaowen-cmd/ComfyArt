@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -70,24 +71,14 @@ class LayoutTask:
 
 
 async def prepare_layout(packet, conf):
-    from paper_sample import sample_paper
-
     targets = [target for _, target in packet]
     conf.records.mkdir(parents=True, exist_ok=True)
-
-    async def locate(group, target):
-        async with conf.gate:
-            return await sample_paper(group, target, conf)
-
     fresh = [(g, t) for g, t in packet if g.get("reference")]
-    measurements = await asyncio.gather(*(locate(g, t) for g, t in fresh))
-    measured = {}
-    for (_, target), evidence in zip(fresh, measurements):
-        if evidence["status"] == "unobservable" and target["id"] == "spread-01":
-            continue
-        if evidence["status"] != "measured":
-            raise ValueError(f"{target['id']}: 此参考没有可靠的纸色记录")
-        measured[target["id"]] = evidence["paper"]
+    readings = getattr(conf, "reference_structure", {})
+    paper_colors = {
+        t["id"]: readings[t["id"]]["paper"] for _, t in fresh
+        if t["id"] in readings and readings[t["id"]]["paper"] is not None
+    }
     expected = [(t["id"], t["pageIds"]) for t in targets]
     old = conf.previous.get(targets[0]["id"])
     if not fresh and old is None:
@@ -98,20 +89,22 @@ async def prepare_layout(packet, conf):
         + "\n真实书页 frame 及跨页几何（只返回规定的规格字段）："
         + json.dumps(targets, ensure_ascii=False)
     )
+    if readings:
+        prompt += "\n逐页参考观察，保持有图和纯文字区域、真实比例与文字层级：" + json.dumps({t["id"]: readings[t["id"]] for t in targets if t["id"] in readings}, ensure_ascii=False)
     if old:
         if not fresh:
             prompt += (
                 "\n此封面沿用以下已有设计，请为目标 frame 重新构图。已有尺寸与旧坐标仅作为设计来源，不要沿用旧版版心。"
                 + json.dumps(old, ensure_ascii=False)
             )
-            measured[targets[0]["id"]] = old["spreads"][0]["paper"]
+            paper_colors[targets[0]["id"]] = old["spreads"][0]["paper"]
         prompt += "\n复用以下槽位ID和类型，使同一图文能对比新旧留白。" + json.dumps(
             old["slots"], ensure_ascii=False
         )
     minimum_photos = getattr(conf, "photo_plan", {}).get(targets[0]["id"], 0)
     if minimum_photos:
         prompt += f"\n主编为这一组分配了至少 {minimum_photos} 张不同的用户照片。为它们分别设计可见且可独立换图的照片槽。"
-    prompt += "\n纸色数据：" + json.dumps(measured)
+    prompt += "\n纸色数据：" + json.dumps(paper_colors)
     if len(packet) > 1:
         prompt += "\n这些是相关联的两面设计。把静止的底图、取景与可移动的叠层做成共享定义；用实例变换表达翻面关系。"
     blocks.append({"type": "text", "text": prompt})
@@ -129,6 +122,22 @@ async def prepare_layout(packet, conf):
             }
         )
         check_design(data, expected)
+        if readings:
+            from frame_geometry import IDENTITY, compose, intersects, point, rotate_box
+            groups = {c["id"]: c["layers"] for c in data["components"]}
+            for spread, target in zip(data["spreads"], targets):
+                sides = readings.get(target["id"], {}).get("photoFreeSides", [])
+                for layer in spread["layers"]:
+                    for child in (groups[layer["component"]] if layer["kind"] == "use" else [layer]):
+                        if child["kind"] != "photo" or not sides:
+                            continue
+                        box = child.get("clip", child["box"])
+                        x, y, w, h = box
+                        m = compose(layer.get("matrix", IDENTITY), rotate_box(child["box"], child.get("rotation", 0)))
+                        pts = [point(m, a, b) for a in (x, x+w) for b in (y, y+h)]
+                        if any(intersects(pts, target["geometry"]["pages"][i]) for i in sides):
+                            raise ValueError("A photo overlaps the reference's text-only page")
+
         if sum(slot["kind"] == "photo" for slot in data["slots"]) < minimum_photos:
             raise ValueError(f"Provide {minimum_photos} separate photo slots for this group")
         if old and {a["id"]: a["kind"] for a in data["slots"]} != {
@@ -136,11 +145,11 @@ async def prepare_layout(packet, conf):
         }:
             raise ValueError("Keep the same slot IDs and types as the source design")
         if any(
-            s["id"] in measured and s["paper"] != measured[s["id"]]
+            s["id"] in paper_colors and s["paper"] != paper_colors[s["id"]]
             for s in data["spreads"]
         ):
             raise ValueError(
-                "Cached design paper disagrees with its measured reference"
+                "Cached design paper disagrees with the saved Agent color"
             )
 
     if cache.exists():
@@ -159,8 +168,8 @@ async def prepare_layout(packet, conf):
 
     def finalize(data):
         for spread in data["spreads"]:
-            if spread["id"] in measured:
-                spread["paper"] = measured[spread["id"]]
+            if spread["id"] in paper_colors:
+                spread["paper"] = paper_colors[spread["id"]]
         from layout_schema import resolve_step_elements
         from frame_geometry import editorial_pages
 
@@ -211,6 +220,45 @@ def arguments():
     return parser
 
 
+async def read_reference_structure(args, work):
+    """Describe each photographed page before allocating any of the user's photos."""
+    from harness_json import request
+
+    blocks = []
+    targets = {}
+    for packet in work:
+        for group, target in packet:
+            if group.get("reference"):
+                key = target["id"]
+                targets[key] = target
+                blocks.extend([{"type": "text", "text": key + " " + str(target["pageRoles"])},
+                               reference(group)])
+    if not targets:
+        return {}
+    blocks.append({"type": "text", "text":
+        "请逐张观察原书，先定位纸页四角并排除场景、手、桌面和书外空白。仅记录所见。"
+        "逐组分别说明左右页的图窗数量、相对纸页的位置与比例、是否出血或对齐，文字层级位置和行数、纸张裸露处。"
+        "封面单图只对应右页，没拍到的封底标明未知。给出 photoFreeSides，只列实际看见且完全无照片的纸页，左0右1。"
+        "看露出的书页：如果把这张纸放在中性光下，它本身是什么颜色？先在心里判断纸的种类，再在 paper 字段输出本色 HEX。普通白纸统一用 #FFFFFF，只有纸张本身明确为奶油纸、牛皮纸或彩纸才输出相应色值。"
+        "注意区分纸张与印在上面的照片，忽略环境光和阴影；看不到纸面就填 null。"
+        "返回以每个跨页编号为键的 JSON，每组含 layout、photoFreeSides 和 paper。"})
+    def valid(result):
+        if set(result) != set(targets):
+            raise ValueError("Describe every supplied spread")
+        for row in result.values():
+            if not isinstance(row["layout"], str) or not row["layout"].strip():
+                raise ValueError("Describe the visible layout")
+            color = row["paper"]
+            if color is not None and (not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", color)):
+                raise ValueError("paper must be a HEX color or null")
+            sides = row["photoFreeSides"]
+            if not isinstance(sides, list) or any(type(i) is not int or i not in (0, 1) for i in sides):
+                raise ValueError("Invalid page side")
+    result = await request(args.release, blocks, valid, args.records / "trace.jsonl", "reference_structure")
+    write_json(args.records / "reference-structure.json", result)
+    return result
+
+
 async def plan_photo_slots(args, work):
     """Have the editor allocate the upload batch before individual layouts are sealed."""
     from harness_json import request
@@ -226,7 +274,8 @@ async def plan_photo_slots(args, work):
     blocks.append({"type": "text", "text":
         f"你是整本小志的主编。这里有 {count} 张不同照片需要全部入册。根据每组参考的构图与创作要求，"
         "分配每组至少需要几个可独立替换的照片槽。返回纯 JSON，键为上面的组编号，值为非负整数，总数等于照片数。"
-        "每页一张的要求意味着每个双页要容纳两张不同的照片。创作要求：" + args.brief})
+        "保留纯文字页与对页关系；优先利用未展示的封底等自由位置安置额外照片。除非用户明示，不平均分配。观察："
+        + json.dumps(getattr(args, "reference_structure", {}), ensure_ascii=False) + " 创作要求：" + args.brief})
     def valid(plan):
         if (not isinstance(plan, dict) or set(plan) != set(keys)
                 or any(type(v) is not int or v < 0 for v in plan.values())
@@ -295,6 +344,7 @@ async def generate_book(args):
         args.previous[work[0][0][1]["id"]] = covers[0]
     from spread_team import run_team
 
+    args.reference_structure = await read_reference_structure(args, work)
     if args.photos and args.use_all_photos and not args.preserve_content:
         args.photo_plan = await plan_photo_slots(args, work)
     prepared = await asyncio.gather(*(prepare_layout(p, args) for p in work))
